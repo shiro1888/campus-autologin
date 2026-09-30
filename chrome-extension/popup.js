@@ -3,73 +3,10 @@
  */
 'use strict';
 
-const $ = (id) => document.getElementById(id);
-
-/** 把分钟数显示成人话 */
-function fmt(min) {
-  const n = parseFloat(min);
-  if (!Number.isFinite(n)) return '—';
-  return n < 1 ? Math.round(n * 60) + ' 秒' : n + ' 分钟';
-}
-
-/** 格式化流量为 MB / GB */
-function fmtFlow(kb) {
-  const n = parseFloat(kb);
-  if (!Number.isFinite(n) || n <= 0) return '0 MB';
-  if (n < 1024) return n + ' KB';
-  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' MB';
-  return (n / (1024 * 1024)).toFixed(2) + ' GB';
-}
-
 /** 动态在线计时器 (秒表实时跳动) */
-let durationTimer = null;
-let loginStartTimeMs = null;
-
-function fmtDuration(totalSec) {
-  if (!Number.isFinite(totalSec) || totalSec < 0) return '00分 00秒';
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  const p = (n) => String(n).padStart(2, '0');
-  if (h > 0) {
-    return `${h}小时 ${p(m)}分 ${p(s)}秒`;
-  }
-  return `${p(m)}分 ${p(s)}秒`;
-}
-
-function startDurationTicker(startTimeStr) {
-  if (durationTimer) {
-    clearInterval(durationTimer);
-    durationTimer = null;
-  }
-  if (!startTimeStr) {
-    loginStartTimeMs = null;
-    return;
-  }
-  const d = new Date(startTimeStr.replace(/-/g, '/'));
-  loginStartTimeMs = d.getTime();
-  if (isNaN(loginStartTimeMs)) {
-    loginStartTimeMs = null;
-    return;
-  }
-
-  function tick() {
-    if (!loginStartTimeMs) return;
-    const elapsedSec = Math.max(0, Math.floor((Date.now() - loginStartTimeMs) / 1000));
-    $('onlineDuration').textContent = fmtDuration(elapsedSec);
-  }
-
-  tick();
-  durationTimer = setInterval(tick, 1000);
-}
-
-function stopDurationTicker() {
-  if (durationTimer) {
-    clearInterval(durationTimer);
-    durationTimer = null;
-  }
-  loginStartTimeMs = null;
-}
+const durationTicker = createTicker((text) => {
+  $('onlineDuration').textContent = text;
+});
 
 
 /** 设置状态卡片UI */
@@ -175,7 +112,7 @@ function refresh() {
     }
 
     if (!res.reachable) {
-      stopDurationTicker();
+      durationTicker.stop();
       setStatus('未连接校园网', '门户不可达，请连接校园 Wi-Fi 或插网线', 'off');
       setLocalIp('');
       $('onlineDuration').textContent = '网络断开';
@@ -190,24 +127,16 @@ function refresh() {
       setLocalIp(ip);
 
       if (rawData.stime) {
-        startDurationTicker(rawData.stime);
+        durationTicker.start(rawData.stime);
         $('onlineDuration').title = '上线时间: ' + rawData.stime;
       } else if (rawData.actt) {
-        const startMs = Date.now() - parseInt(rawData.actt, 10) * 1000;
-        loginStartTimeMs = startMs;
-        if (!durationTimer) {
-          durationTimer = setInterval(() => {
-            const elapsed = Math.max(0, Math.floor((Date.now() - loginStartTimeMs) / 1000));
-            $('onlineDuration').textContent = fmtDuration(elapsed);
-          }, 1000);
-        }
-        $('onlineDuration').textContent = fmtDuration(parseInt(rawData.actt, 10));
+        durationTicker.start(parseInt(rawData.actt, 10));
       } else {
-        stopDurationTicker();
+        durationTicker.stop();
         $('onlineDuration').textContent = '在线中';
       }
     } else {
-      stopDurationTicker();
+      durationTicker.stop();
       setStatus('未登录 · 需要认证', '已连上校园局域网，请点击登录', 'wait');
       $('btnLoginText').textContent = '立即登录';
       $('btnLogout').disabled = true;
