@@ -590,6 +590,18 @@ def cmd_login(args, cfg) -> int:
 
 def cmd_logout(args, cfg) -> int:
     portal = _make_portal(args, cfg)
+
+    # 执行注销前进行二次确认，防止手滑断网（可用 -y 或 --yes 跳过）
+    if not getattr(args, "yes", False) and not args.json and not _QUIET:
+        try:
+            ans = input("确定要注销下线当前校园网会话吗？(y/N): ").strip().lower()
+            if ans not in ("y", "yes"):
+                say("已取消注销。")
+                return EXIT_OK
+        except (EOFError, KeyboardInterrupt):
+            say("\n已取消注销。")
+            return EXIT_OK
+
     try:
         resp = portal.logout()
     except NetworkError as exc:
@@ -876,6 +888,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--user", help="临时覆盖账号")
     parser.add_argument("--password", help="临时覆盖密码")
     parser.add_argument("--force", action="store_true", help="即使已在线也强制重新登录")
+    parser.add_argument("-y", "--yes", action="store_true", help="跳过注销等操作的二次确认")
     parser.add_argument("--retry", type=int, help="失败重试次数")
     parser.add_argument("--timeout", type=float, help="请求超时(秒)")
     parser.add_argument("-v", "--version", action="version", version="campus_login.py " + VERSION)
