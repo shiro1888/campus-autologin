@@ -578,12 +578,79 @@ body {
   background: #f1f5f9;
 }
 
-.foot-link:hover svg {
-  color: var(--primary);
-}
-
 .foot-sep {
   width: 1px;
   height: 11px;
   background: #e2e8f0;
 }
+
+/* --- Dark Mode for Popup --- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-page: #0b0f19;
+    --bg-card: #141c2e;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --text-light: #64748b;
+    --border-color: #243049;
+    --border-subtle: #1c273e;
+    --shadow-card: 0 4px 14px rgba(0, 0, 0, 0.4);
+    --success-bg: #064e3b33;
+    --success-border: #05966955;
+    --success-text: #34d399;
+    --danger-bg: #7f1d1d33;
+    --danger-border: #dc262655;
+    --danger-text: #f87171;
+    --warning-bg: #78350f33;
+    --warning-border: #d9770655;
+    --warning-text: #fbbf24;
+  }
+
+  .version-badge {
+    background: #0b0f19;
+    border-color: #243049;
+    color: #94a3b8;
+  }
+
+  .ip-chip {
+    background: #0b0f19;
+    border-color: #243049;
+  }
+  .ip-chip:hover {
+    background: #172136;
+    border-color: #3b82f6;
+  }
+
+  .metric-row {
+    border-bottom-color: #1c273e;
+  }
+
+  .btn-secondary {
+    background: #141c2e;
+    border-color: #243049;
+    color: #cbd5e1;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: #7f1d1d33;
+    border-color: #dc262655;
+    color: #f87171;
+  }
+
+  .btn-icon:hover {
+    background: #243049;
+    color: #f8fafc;
+  }
+
+  .footer {
+    border-top-color: #1c273e;
+  }
+
+  .foot-link:hover {
+    background: #1c273e;
+  }
+
+  .foot-sep {
+    background: #243049;
+  }
+}
+

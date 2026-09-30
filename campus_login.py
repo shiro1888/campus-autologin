@@ -427,32 +427,59 @@ def _make_portal(args, cfg) -> Portal:
     return Portal(cfg)
 
 
+def _format_flow(kb) -> str:
+    try:
+        n = float(kb)
+        if n <= 0:
+            return "0 MB"
+        if n < 1024:
+            return "%.1f KB" % n
+        if n < 1024 * 1024:
+            return "%.1f MB" % (n / 1024)
+        return "%.2f GB" % (n / (1024 * 1024))
+    except (TypeError, ValueError):
+        return "—"
+
+
 def cmd_status(args, cfg) -> int:
     portal = _make_portal(args, cfg)
     st = portal.status()
     online = int(st.get("result", 0)) == 1
     ip = st.get("v4ip") or st.get("ss5") or detect_local_ip(portal.host_only)
+    flow_text = _format_flow(st.get("flow", 0))
+    fee_val = st.get("fee", 0)
+    fee_text = ("¥%.2f" % (float(fee_val) / 10000)) if fee_val else "—"
+
     info = {
         "action": "status",
         "online": online,
         "ip": ip,
         "account": st.get("uid") or st.get("AC") or "",
         "stime": st.get("stime", ""),
+        "flow": flow_text,
+        "fee": fee_text,
         "raw": st,
     }
     if args.json:
         emit_json(info)
     else:
+        say("┌────────────────────────────────────────────────────────┐")
+        say("│          校园网自动登录 · Dr.COM ePortal              │")
+        say("├────────────────────────────────────────────────────────┤")
         if online:
-            say("● 已在线")
-            say("  账号: %s" % info["account"])
-            say("  本机IP: %s" % ip)
+            say("│  状态:      ● 已在线 (认证通过)                        │")
+            say("│  账号:      %-40s   │" % str(info["account"])[:40])
+            say("│  本机IP:    %-40s   │" % str(ip)[:40])
+            say("│  已用流量:  %-40s   │" % flow_text[:40])
+            if fee_text != "—":
+                say("│  账户余额:  %-40s   │" % fee_text[:40])
             if info["stime"]:
-                say("  上线时间: %s" % info["stime"])
+                say("│  上线时间:  %-40s   │" % str(info["stime"])[:40])
         else:
-            say("○ 未在线(需要认证)")
+            say("│  状态:      ○ 未在线 (需要认证)                        │")
             if ip:
-                say("  本机IP: %s" % ip)
+                say("│  本机IP:    %-40s   │" % str(ip)[:40])
+        say("└────────────────────────────────────────────────────────┘")
     return EXIT_OK if online else EXIT_FAIL
 
 
@@ -618,6 +645,160 @@ def cmd_auto(args, cfg) -> int:
     return cmd_login(args, cfg)
 
 
+def cmd_gui(args, cfg) -> int:
+    """启动轻量级现代桌面图形控制台 (基于标准库 tkinter)"""
+    import threading
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+    except ImportError:
+        say("✗ 当前 Python 环境未安装 tkinter，无法启动图形界面。")
+        return EXIT_FAIL
+
+    root = tk.Tk()
+    root.title("校园网自动登录 · 桌面控制中心")
+    root.geometry("450x580")
+    root.minsize(420, 520)
+    root.configure(bg="#0f172a")
+
+    bg = "#0f172a"
+    card_bg = "#1e293b"
+    text_color = "#f8fafc"
+    text_muted = "#94a3b8"
+    accent = "#2563eb"
+    success_color = "#10b981"
+    danger_color = "#ef4444"
+
+    # Header
+    head = tk.Frame(root, bg=bg, pady=12, padx=18)
+    head.pack(fill="x")
+    title = tk.Label(head, text="校园网自动登录", font=("Microsoft YaHei", 15, "bold"), fg=text_color, bg=bg)
+    title.pack(anchor="w")
+    sub = tk.Label(head, text="Dr.COM ePortal (172.30.100.2) 桌面控制台", font=("Microsoft YaHei", 9), fg=text_muted, bg=bg)
+    sub.pack(anchor="w", pady=(2, 0))
+
+    # Status Card
+    st_card = tk.Frame(root, bg=card_bg, padx=16, pady=14, highlightthickness=1, highlightbackground="#334155")
+    st_card.pack(fill="x", padx=18, pady=6)
+
+    st_lbl = tk.Label(st_card, text="● 检测状态中…", font=("Microsoft YaHei", 13, "bold"), fg="#f59e0b", bg=card_bg)
+    st_lbl.pack(anchor="w")
+
+    ip_lbl = tk.Label(st_card, text="本机 IP: —", font=("Consolas", 10), fg=text_color, bg=card_bg)
+    ip_lbl.pack(anchor="w", pady=(6, 0))
+
+    meta_lbl = tk.Label(st_card, text="已用流量: —  |  时长: —", font=("Microsoft YaHei", 9), fg=text_muted, bg=card_bg)
+    meta_lbl.pack(anchor="w", pady=(2, 0))
+
+    # Form Card
+    form_card = tk.Frame(root, bg=card_bg, padx=16, pady=14, highlightthickness=1, highlightbackground="#334155")
+    form_card.pack(fill="x", padx=18, pady=10)
+
+    tk.Label(form_card, text="上网账号", font=("Microsoft YaHei", 9, "bold"), fg=text_color, bg=card_bg).pack(anchor="w")
+    user_ent = tk.Entry(form_card, font=("Microsoft YaHei", 10), bg="#0b1120", fg=text_color, insertbackground=text_color, relief="flat", highlightthickness=1, highlightbackground="#334155")
+    user_ent.insert(0, cfg.get("username", ""))
+    user_ent.pack(fill="x", pady=(3, 10), ipady=4)
+
+    tk.Label(form_card, text="登录密码", font=("Microsoft YaHei", 9, "bold"), fg=text_color, bg=card_bg).pack(anchor="w")
+    pass_ent = tk.Entry(form_card, show="●", font=("Microsoft YaHei", 10), bg="#0b1120", fg=text_color, insertbackground=text_color, relief="flat", highlightthickness=1, highlightbackground="#334155")
+    pass_ent.insert(0, cfg.get("password", ""))
+    pass_ent.pack(fill="x", pady=(3, 10), ipady=4)
+
+    # Actions Frame
+    btn_frame = tk.Frame(root, bg=bg, padx=18, pady=6)
+    btn_frame.pack(fill="x")
+
+    def run_async(fn, *a):
+        threading.Thread(target=fn, args=a, daemon=True).start()
+
+    def do_refresh():
+        st_lbl.config(text="● 检测中…", fg="#f59e0b")
+        def _task():
+            try:
+                portal = Portal(cfg)
+                st = portal.status()
+                online = int(st.get("result", 0)) == 1
+                ip = st.get("v4ip") or st.get("ss5") or detect_local_ip(portal.host_only)
+                flow = _format_flow(st.get("flow", 0))
+                time_str = st.get("stime", "")
+                def _ui():
+                    if online:
+                        st_lbl.config(text="● 已在线 (认证通过)", fg=success_color)
+                    else:
+                        st_lbl.config(text="○ 未在线 (需要认证)", fg=danger_color)
+                    ip_lbl.config(text="本机 IP: %s" % (ip or "—"))
+                    meta_lbl.config(text="已用流量: %s  |  上线: %s" % (flow, time_str or "—"))
+                root.after(0, _ui)
+            except Exception as e:
+                def _err():
+                    st_lbl.config(text="! 网络不可达", fg=danger_color)
+                    ip_lbl.config(text="错误: %s" % e)
+                root.after(0, _err)
+        run_async(_task)
+
+    def do_login():
+        cfg["username"] = user_ent.get().strip()
+        cfg["password"] = pass_ent.get().strip()
+        st_lbl.config(text="→ 正在登录…", fg="#3b82f6")
+        def _task():
+            try:
+                portal = Portal(cfg)
+                res = portal.login(cfg["username"], cfg["password"])
+                def _ui():
+                    if res.get("ok"):
+                        messagebox.showinfo("成功", "登录成功！已确认在线。")
+                    else:
+                        messagebox.showerror("失败", "登录失败: " + str(res.get("message", "未知错误")))
+                    do_refresh()
+                root.after(0, _ui)
+            except Exception as e:
+                root.after(0, lambda: messagebox.showerror("错误", str(e)))
+        run_async(_task)
+
+    def do_logout():
+        st_lbl.config(text="→ 正在注销…", fg="#f59e0b")
+        def _task():
+            try:
+                portal = Portal(cfg)
+                res = portal.logout()
+                def _ui():
+                    if res.get("offline") or res.get("ok"):
+                        messagebox.showinfo("注销", "已注销下线。")
+                    else:
+                        messagebox.showwarning("注销", "注销请求已发出。")
+                    do_refresh()
+                root.after(0, _ui)
+            except Exception as e:
+                root.after(0, lambda: messagebox.showerror("错误", str(e)))
+        run_async(_task)
+
+    def do_save():
+        cfg["username"] = user_ent.get().strip()
+        cfg["password"] = pass_ent.get().strip()
+        try:
+            with open(CONFIG_PATH, "w", encoding="utf-8") as fh:
+                json.dump(cfg, fh, indent=2, ensure_ascii=False)
+            messagebox.showinfo("提示", "配置已成功保存至 config.json")
+        except Exception as e:
+            messagebox.showerror("保存失败", str(e))
+
+    btn_login = tk.Button(btn_frame, text="立即登录", font=("Microsoft YaHei", 10, "bold"), bg=accent, fg="#fff", activebackground="#1d4ed8", relief="flat", cursor="hand2", command=do_login)
+    btn_login.pack(side="left", expand=True, fill="x", padx=3, ipady=6)
+
+    btn_logout = tk.Button(btn_frame, text="注销", font=("Microsoft YaHei", 10), bg="#334155", fg="#f8fafc", activebackground="#475569", relief="flat", cursor="hand2", command=do_logout)
+    btn_logout.pack(side="left", expand=True, fill="x", padx=3, ipady=6)
+
+    btn_refresh = tk.Button(btn_frame, text="刷新", font=("Microsoft YaHei", 10), bg="#1e293b", fg=text_color, relief="flat", cursor="hand2", command=do_refresh)
+    btn_refresh.pack(side="left", expand=True, fill="x", padx=3, ipady=6)
+
+    btn_save = tk.Button(btn_frame, text="保存账号", font=("Microsoft YaHei", 10), bg="#1e293b", fg=text_muted, relief="flat", cursor="hand2", command=do_save)
+    btn_save.pack(side="left", expand=True, fill="x", padx=3, ipady=6)
+
+    do_refresh()
+    root.mainloop()
+    return EXIT_OK
+
+
 # --------------------------------------------------------------------------
 # 入口
 # --------------------------------------------------------------------------
@@ -628,11 +809,12 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="示例:\n"
                "  python campus_login.py            智能登录\n"
+               "  python campus_login.py gui        启动桌面图形界面\n"
                "  python campus_login.py status     查看状态\n"
                "  python campus_login.py test       自检\n",
     )
     parser.add_argument("command", nargs="?", default="auto",
-                        choices=["auto", "login", "logout", "status", "wait", "test"],
+                        choices=["auto", "login", "logout", "status", "wait", "test", "gui"],
                         help="要执行的操作 (默认 auto)")
     parser.add_argument("--json", action="store_true", help="以 JSON 输出结果")
     parser.add_argument("-q", "--quiet", action="store_true", help="静默模式")
@@ -658,6 +840,7 @@ def main(argv: list[str] | None = None) -> int:
             "status": cmd_status,
             "wait": cmd_wait,
             "test": cmd_test,
+            "gui": cmd_gui,
         }[args.command]
         return handler(args, cfg)
     except ConfigError as exc:

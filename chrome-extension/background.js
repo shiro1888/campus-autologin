@@ -177,22 +177,25 @@ function fail(message, online) {
  */
 async function checkStatus() {
   const url = URL_CHKSTATUS + '?callback=dr1001&v=' + rand() + '&lang=zh&jsVersion=' + JS_VERSION;
+  const t0 = Date.now();
   let text;
   try {
     text = await fetchText(url);
   } catch (e) {
-    return { reachable: false, online: false, raw: null, message: '不在校园网内 / 门户不可达' };
+    return { reachable: false, online: false, raw: null, pingMs: -1, message: '不在校园网内 / 门户不可达' };
   }
+  const pingMs = Date.now() - t0;
   const data = parseJsonp(text);
   if (!data) {
     // 网络通但返回不是预期的 JSONP
-    return { reachable: true, online: false, raw: null, message: '门户返回数据无法解析（可能认证页已变更）' };
+    return { reachable: true, online: false, raw: null, pingMs, message: '门户返回数据无法解析（可能认证页已变更）' };
   }
   const online = Number(data.result) === 1;
   return {
     reachable: true,
     online: online,
     raw: data,
+    pingMs: pingMs,
     message: online ? '当前已在线' : '当前未登录'
   };
 }

@@ -12,6 +12,16 @@ function fmt(min) {
   return n < 1 ? Math.round(n * 60) + ' 秒' : n + ' 分钟';
 }
 
+/** 格式化流量为 MB / GB */
+function fmtFlow(kb) {
+  const n = parseFloat(kb);
+  if (!Number.isFinite(n) || n <= 0) return '0 MB';
+  if (n < 1024) return n + ' KB';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' MB';
+  return (n / (1024 * 1024)).toFixed(2) + ' GB';
+}
+
+
 /** 设置状态卡片UI */
 function setStatus(title, desc, cls) {
   const card = $('statusCard');
@@ -97,6 +107,20 @@ function refresh() {
       return;
     }
 
+    // 网关延迟与已用流量
+    if (res.pingMs !== undefined && res.pingMs >= 0) {
+      $('popPing').textContent = res.pingMs + ' ms';
+    } else {
+      $('popPing').textContent = res.reachable ? '< 10 ms' : '超时';
+    }
+
+    const rawData = res.raw || {};
+    if (rawData.flow !== undefined) {
+      $('popFlow').textContent = fmtFlow(rawData.flow);
+    } else {
+      $('popFlow').textContent = res.online ? '计量中' : '—';
+    }
+
     if (!res.reachable) {
       setStatus('未连接校园网', '门户不可达，请连接校园 Wi-Fi 或插网线', 'off');
       setLocalIp('');
@@ -108,16 +132,15 @@ function refresh() {
       $('btnLoginText').textContent = '重新验证';
       $('btnLogout').disabled = false;
 
-      const raw = res.raw || {};
-      const ip = raw.v4ip || raw.ss5 || '';
+      const ip = rawData.v4ip || rawData.ss5 || '';
       setLocalIp(ip);
 
-      if (raw.stime) {
+      if (rawData.stime) {
         // 显示具体的登录时间
-        const t = raw.stime.indexOf(' ') !== -1 ? raw.stime.split(' ')[1] : raw.stime;
+        const t = rawData.stime.indexOf(' ') !== -1 ? rawData.stime.split(' ')[1] : rawData.stime;
         $('onlineDuration').textContent = t + ' 上线';
-      } else if (raw.time) {
-        $('onlineDuration').textContent = Math.round(raw.time / 60) + ' 分钟';
+      } else if (rawData.time) {
+        $('onlineDuration').textContent = Math.round(rawData.time / 60) + ' 分钟';
       } else {
         $('onlineDuration').textContent = '在线中';
       }
@@ -126,13 +149,13 @@ function refresh() {
       $('btnLoginText').textContent = '立即登录';
       $('btnLogout').disabled = true;
 
-      const raw = res.raw || {};
-      const ip = raw.v4ip || raw.ss5 || '';
+      const ip = rawData.v4ip || rawData.ss5 || '';
       setLocalIp(ip);
       $('onlineDuration').textContent = '未在线';
     }
   });
 }
+
 
 // --- 登录 / 重新验证 ---
 $('btnLogin').addEventListener('click', () => {

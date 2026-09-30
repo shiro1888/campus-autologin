@@ -222,6 +222,53 @@
     })();
   }
 
+  /** 在门户页面顶部显示现代浮动指示条 */
+  function showHud(text, state) {
+    try {
+      let hud = document.getElementById('campus-login-hud');
+      if (!hud) {
+        hud = document.createElement('div');
+        hud.id = 'campus-login-hud';
+        hud.style.cssText = [
+          'position:fixed',
+          'top:20px',
+          'left:50%',
+          'transform:translateX(-50%)',
+          'z-index:2147483647',
+          'background:rgba(15, 23, 42, 0.92)',
+          'backdrop-filter:blur(12px)',
+          '-webkit-backdrop-filter:blur(12px)',
+          'color:#ffffff',
+          'padding:9px 18px',
+          'border-radius:30px',
+          'font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          'font-size:13px',
+          'font-weight:600',
+          'box-shadow:0 10px 25px -5px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.18)',
+          'display:flex',
+          'align-items:center',
+          'gap:9px',
+          'transition:all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+          'pointer-events:none'
+        ].join(';');
+        document.body.appendChild(hud);
+      }
+      const icon = state === 'success' ? '✓' : (state === 'error' ? '✗' : '⚡');
+      const iconBg = state === 'success' ? '#10b981' : (state === 'error' ? '#ef4444' : '#3b82f6');
+      hud.innerHTML = '<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:' + iconBg + ';color:#fff;font-size:11px;font-weight:bold;">' + icon + '</span> <span>' + text + '</span>';
+      if (state === 'success' || state === 'error') {
+        setTimeout(function () {
+          if (!hud) return;
+          hud.style.opacity = '0';
+          hud.style.transform = 'translateX(-50%) translateY(-10px)';
+          setTimeout(function () { if (hud && hud.parentNode) hud.parentNode.removeChild(hud); }, 400);
+        }, 3200);
+      }
+    } catch (e) {
+      /* 忽略页面环境异常 */
+    }
+  }
+
   function main() {
     getSettings().then(function (s) {
       if (!s.enabled || !s.account || !s.password) return;
@@ -238,6 +285,7 @@
             return;
           }
 
+          showHud('校园网自动登录：正在提交认证…', 'loading');
           const submitted = fillAndSubmit(s.account, s.password, s.isp);
           if (!submitted) return;
 
@@ -249,11 +297,17 @@
             checkStatus().then(function (ok) {
               if (ok) {
                 done = true;
+                showHud('校园网认证成功！已在线', 'success');
                 report({ ok: true, online: true, message: '登录成功，已确认在线' });
                 return;
               }
               directLogin(s.account, s.password, s.isp).then(function (r) {
                 done = true;
+                if (r.ok) {
+                  showHud('校园网认证成功！已在线', 'success');
+                } else {
+                  showHud('登录失败：' + (r.msg || '请检查密码'), 'error');
+                }
                 report({
                   ok: r.ok,
                   online: r.ok,
@@ -261,7 +315,7 @@
                 });
               });
             });
-          }, 4000);
+          }, 3500);
         });
       });
     });

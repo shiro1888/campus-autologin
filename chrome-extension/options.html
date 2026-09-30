@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="auto">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,11 +25,18 @@
           <h1>校园网自动登录 · 控制中心</h1>
           <span class="version-badge" id="ver">v1.3.0</span>
         </div>
-        <p class="subtitle">Dr.COM / 哆点 ePortal 认证系统 · 断线自适应秒级重连引擎</p>
+        <p class="subtitle">Dr.COM / 哆点 ePortal 智能认证 · 断线自适应秒级重连引擎</p>
       </div>
     </div>
 
-    <div class="header-right">
+    <div class="header-actions-bar">
+      <!-- Theme Switcher -->
+      <button type="button" class="theme-toggle-btn" id="btnThemeToggle" title="切换深色/浅色模式">
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <span class="theme-label" id="themeLabel">自动</span>
+      </button>
+
       <a href="http://172.30.100.2/" target="_blank" class="portal-link-btn" title="访问校园网登录门户">
         <span class="portal-dot"></span>
         <span class="portal-ip">172.30.100.2</span>
@@ -38,7 +45,7 @@
     </div>
   </header>
 
-  <!-- Live Status & Diagnostic Widget (Hero) -->
+  <!-- Live Telemetry & Diagnostic Dashboard (Hero) -->
   <section class="card status-hero" id="statusWidget">
     <div class="hero-top-bar">
       <div class="hero-status-pill-wrap">
@@ -65,6 +72,7 @@
       </div>
     </div>
 
+    <!-- 4 Telemetry Metrics Grid -->
     <div class="hero-stat-grid">
       <div class="stat-card">
         <div class="stat-label">
@@ -72,19 +80,39 @@
           <span>本机局域网 IP</span>
         </div>
         <div class="stat-val mono" id="stIp">正在获取…</div>
+        <div class="stat-sub text-muted" id="stMac">物理 MAC: —</div>
       </div>
 
       <div class="stat-card">
         <div class="stat-label">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <span>上线时间</span>
+          <span>在线会话时长</span>
         </div>
         <div class="stat-val" id="stTime">—</div>
+        <div class="stat-sub text-muted" id="stStime">上线时间: —</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span>网关延迟 (Ping)</span>
+        </div>
+        <div class="stat-val text-accent" id="stPing">—</div>
+        <div class="stat-sub text-muted">172.30.100.2 响应耗时</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span>校园网流量统计</span>
+        </div>
+        <div class="stat-val" id="stFlow">—</div>
+        <div class="stat-sub text-muted" id="stFee">账户计费: —</div>
       </div>
 
       <div class="stat-card full-span">
         <div class="stat-label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           <span>上次检查响应</span>
         </div>
         <div class="stat-val note" id="stLast">—</div>
@@ -109,7 +137,7 @@
         </div>
         <div class="card-title-box">
           <h2>认证凭据与网络</h2>
-          <p>用于校园网门户登录认证的账号信息，仅安全保存在本机浏览器内</p>
+          <p>用于校园网门户登录认证的账号信息，仅安全保存在本机浏览器沙盒中</p>
         </div>
       </div>
 
@@ -136,7 +164,7 @@
         </div>
 
         <div class="field">
-          <label for="isp">运营商选择 (R3 参数)</label>
+          <label for="isp">运营商选择 (R3 认证参数)</label>
           <div class="select-wrap">
             <select id="isp">
               <option value="1">校园用户（默认，无后缀）</option>
@@ -171,7 +199,7 @@
           <div class="switch-info">
             <div class="switch-title">
               <span>自适应加速 (Adaptive Turbo)</span>
-              <span class="badge-success">极速重连</span>
+              <span class="badge-success">极速秒级恢复</span>
             </div>
             <div class="switch-desc">平时以低频节能巡检；一旦检测到网络掉线，秒速切入高频抢险模式，重连成功后自动切回常规频率。</div>
           </div>

@@ -50,8 +50,57 @@ function fmt(v) {
   return n < 1 ? Math.round(n * 60) + ' 秒' : n + ' 分钟';
 }
 
+/** 格式化流量为 MB / GB */
+function fmtFlow(kb) {
+  const n = parseFloat(kb);
+  if (!Number.isFinite(n) || n <= 0) return '0 MB';
+  if (n < 1024) return n + ' KB';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' MB';
+  return (n / (1024 * 1024)).toFixed(2) + ' GB';
+}
+
+/** 格式化 MAC 地址为 XX:XX:XX:XX:XX:XX */
+function fmtMac(hex) {
+  if (!hex || typeof hex !== 'string') return '';
+  const clean = hex.replace(/[^0-9a-fA-F]/g, '');
+  if (clean.length !== 12) return hex;
+  return clean.match(/.{1,2}/g).join(':').toUpperCase();
+}
+
+/** 主题切换管理 */
+function initTheme() {
+  chrome.storage.local.get({ theme: 'auto' }, (s) => {
+    applyTheme(s.theme || 'auto');
+  });
+
+  const btn = $('btnThemeToggle');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      chrome.storage.local.get({ theme: 'auto' }, (s) => {
+        const cur = s.theme || 'auto';
+        const next = cur === 'auto' ? 'dark' : (cur === 'dark' ? 'light' : 'auto');
+        chrome.storage.local.set({ theme: next }, () => {
+          applyTheme(next);
+          const nameMap = { auto: '跟随系统', dark: '深色模式', light: '浅色模式' };
+          showToast('已切换至 ' + nameMap[next], 'info');
+        });
+      });
+    });
+  }
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const label = $('themeLabel');
+  if (label) {
+    label.textContent = theme === 'dark' ? '深色' : (theme === 'light' ? '浅色' : '自动');
+  }
+}
+
 /** 从本地存储加载配置到表单 */
 function load() {
+  initTheme();
+
   try {
     const ver = chrome.runtime.getManifest().version;
     $('ver').textContent = 'v' + (ver || '1.3.0');
@@ -122,6 +171,11 @@ function refreshStatus(cb) {
       textEl.textContent = '后台未响应';
       $('stIp').textContent = '—';
       $('stTime').textContent = '—';
+      $('stMac').textContent = '物理 MAC: —';
+      $('stPing').textContent = '—';
+      $('stFlow').textContent = '—';
+      $('stFee').textContent = '账户计费: —';
+      $('stStime').textContent = '上线时间: —';
       if (cb) cb();
       return;
     }
@@ -129,13 +183,38 @@ function refreshStatus(cb) {
     const raw = res.raw || {};
     const ip = raw.v4ip || raw.ss5 || '';
     $('stIp').textContent = ip || '未获取到';
+    $('stMac').textContent = raw.ss1 ? ('物理 MAC: ' + fmtMac(raw.ss1)) : '物理 MAC: —';
 
     if (raw.stime) {
-      $('stTime').textContent = raw.stime;
+      $('stTime').textContent = raw.stime.replace(/^.*?\s+/, '');
+      $('stStime').textContent = '上线时间: ' + raw.stime;
     } else if (raw.time) {
       $('stTime').textContent = Math.round(raw.time / 60) + ' 分钟';
+      $('stStime').textContent = '上线时间: —';
     } else {
       $('stTime').textContent = res.online ? '在线中' : '未在线';
+      $('stStime').textContent = '上线时间: —';
+    }
+
+    // Ping
+    if (res.pingMs !== undefined && res.pingMs >= 0) {
+      $('stPing').textContent = res.pingMs + ' ms';
+    } else {
+      $('stPing').textContent = res.reachable ? '< 10 ms' : '超时';
+    }
+
+    // Flow & Fee
+    if (raw.flow !== undefined) {
+      $('stFlow').textContent = fmtFlow(raw.flow);
+    } else {
+      $('stFlow').textContent = res.online ? '计量中' : '—';
+    }
+
+    if (raw.fee !== undefined) {
+      const yuan = (parseFloat(raw.fee) / 10000).toFixed(2);
+      $('stFee').textContent = '账户余额: ¥' + yuan;
+    } else {
+      $('stFee').textContent = '账户余额: —';
     }
 
     if (!res.reachable) {
@@ -152,6 +231,7 @@ function refreshStatus(cb) {
     if (cb) cb();
   });
 }
+
 
 /** 读取表单当前值 */
 function readForm() {
