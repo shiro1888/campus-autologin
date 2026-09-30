@@ -46,6 +46,14 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+# 确保在 Windows 控制台下输出 UTF-8 中文和框线符号不乱码
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 VERSION = "1.0.0"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
