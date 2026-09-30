@@ -21,8 +21,10 @@ const URL_LOGOUT = PORTAL_ORIGIN + '/drcom/logout';
 const JS_VERSION = '4.1.3';
 
 const ALARM_NAME = 'campus-auto-login';
-const DEFAULT_INTERVAL_MIN = 0.5;   // 默认 30 秒（chrome.alarms 的最快频率）
-const MIN_INTERVAL_MIN = 0.5;       // 0.5 分钟 = 30 秒，Chrome 下限
+const DEFAULT_INTERVAL_MIN = 1 / 60;   // 默认 1 秒
+// 下限 1 秒。注意：Chrome 官方文档说 alarms 最快 30 秒，但那只对「已打包/商店安装」
+// 的扩展生效；开发者模式加载的未打包扩展不受此限制，实测 1 秒可正常触发。
+const MIN_INTERVAL_MIN = 1 / 60;
 const MAX_INTERVAL_MIN = 60;
 
 const NET_TIMEOUT_MS = 8000;
@@ -32,7 +34,9 @@ const DEFAULT_SETTINGS = {
   account: 'REDACTED_CAMPUS_ACCOUNT',
   password: 'REDACTED_CAMPUS_PASSWORD',
   isp: '1',
-  intervalMin: DEFAULT_INTERVAL_MIN,
+  intervalMin: DEFAULT_INTERVAL_MIN,   // 在线时的检查间隔
+  offlineIntervalMin: 1 / 60,          // 掉线后的检查间隔（默认 1 秒）
+  adaptive: true,                      // 自适应：在线慢、掉线快
   autoOnStartup: true,
   contentAutoFill: true,
   instantTrigger: true,
@@ -55,6 +59,9 @@ const ERROR_MAP = {
 
 // 并发保护：防止定时器与手动点击同时发起登录
 let running = false;
+
+// 上一次检查的在线状态（用于自适应轮询）。null = 尚未检查过
+let lastOnline = null;
 
 // ---------------------------------------------------------------------------
 // 小工具
@@ -119,6 +126,9 @@ async function getSettings() {
     password: typeof stored.password === 'string' && stored.password ? stored.password : DEFAULT_SETTINGS.password,
     isp: stored.isp ? String(stored.isp) : DEFAULT_SETTINGS.isp,
     intervalMin: clampInterval(stored.intervalMin),
+    offlineIntervalMin: clampInterval(
+      stored.offlineIntervalMin === undefined ? DEFAULT_SETTINGS.offlineIntervalMin : stored.offlineIntervalMin),
+    adaptive: stored.adaptive === undefined ? DEFAULT_SETTINGS.adaptive : !!stored.adaptive,
     autoOnStartup: stored.autoOnStartup === undefined ? DEFAULT_SETTINGS.autoOnStartup : !!stored.autoOnStartup,
     contentAutoFill: stored.contentAutoFill === undefined ? DEFAULT_SETTINGS.contentAutoFill : !!stored.contentAutoFill,
     instantTrigger: stored.instantTrigger === undefined ? DEFAULT_SETTINGS.instantTrigger : !!stored.instantTrigger,
@@ -136,7 +146,7 @@ function clampInterval(v) {
   return n;
 }
 
-/** 把分钟数显示成人话：0.5 -> "30 秒"，1 -> "1 分钟" */
+/** 把分钟数显示成人话：1/60 -> "1 秒"，0.5 -> "30 秒"，1 -> "1 分钟" */
 function formatInterval(min) {
   if (min < 1) return Math.round(min * 60) + ' 秒';
   return min + ' 分钟';
@@ -254,6 +264,26 @@ async function doLogin(settings) {
 }
 
 /**
+ * 在线状态变化时切换轮询节奏。
+ * 只在状态真的翻转时才重建闹钟，避免每次检查都重置计时。
+ */
+async function maybeSwitchCadence(online) {
+  const changed = lastOnline !== online;
+  lastOnline = online;
+  if (!changed) return;
+  try {
+    const settings = await getSettings();
+    if (!settings.adaptive) return;
+    await ensureAlarm();
+    console.log('[adaptive] 状态变为 ' + (online ? '在线' : '掉线') +
+      '，检查间隔切到 ' +
+      formatInterval(clampInterval(online ? settings.intervalMin : settings.offlineIntervalMin)));
+  } catch (e) {
+    // 忽略
+  }
+}
+
+/**
  * 主流程：先查状态，未在线则登录，登录后再验证。
  * 永远不抛异常。
  */
@@ -272,17 +302,21 @@ async function autoLogin(trigger) {
       const r = fail(st.message, false);
       await saveResult(r);
       console.log(tag + '门户不可达');
+      // 门户不可达（多半是断网），切到快速重连节奏
+      await maybeSwitchCadence(false);
       return r;
     }
     if (st.online) {
       const r = ok('已在线，无需登录', true);
       await saveResult(r);
       console.log(tag + '已在线，跳过登录');
+      await maybeSwitchCadence(true);
       return r;
     }
 
     // 2) 登录
     console.log(tag + '未在线，开始登录：' + settings.account);
+    await maybeSwitchCadence(false);
     let r = await doLogin(settings);
 
     // 3) 登录后二次验证
@@ -337,11 +371,30 @@ async function doLogout() {
 // 闹钟与生命周期
 // ---------------------------------------------------------------------------
 
-/** 按当前设置创建/更新定时闹钟 */
-async function ensureAlarm() {
+/**
+ * 按当前设置创建/更新定时闹钟。
+ *
+ * 支持自适应：在线时用「常规间隔」，一旦掉线就切到「掉线间隔」快速重连，
+ * 重连成功后再切回常规间隔。这样既能秒级恢复，又不会一直高频空转。
+ */
+async function ensureAlarm(forcePeriod) {
   try {
     const settings = await getSettings();
-    const period = clampInterval(settings.intervalMin);
+    let period;
+    if (forcePeriod !== undefined && forcePeriod !== null) {
+      period = clampInterval(forcePeriod);
+    } else if (settings.adaptive && lastOnline === false) {
+      period = clampInterval(settings.offlineIntervalMin);
+    } else {
+      period = clampInterval(settings.intervalMin);
+    }
+
+    const existing = await chrome.alarms.get(ALARM_NAME);
+    // 周期没变就不重建，避免每次唤醒都重置计时器
+    if (existing && Math.abs((existing.periodInMinutes || 0) - period) < 1e-9) {
+      return;
+    }
+
     await chrome.alarms.clear(ALARM_NAME);
     await chrome.alarms.create(ALARM_NAME, {
       delayInMinutes: period,
@@ -363,6 +416,8 @@ async function initDefaults() {
       patch.password = DEFAULT_SETTINGS.password;
       patch.isp = DEFAULT_SETTINGS.isp;
       patch.intervalMin = DEFAULT_SETTINGS.intervalMin;
+      patch.offlineIntervalMin = DEFAULT_SETTINGS.offlineIntervalMin;
+      patch.adaptive = true;
       patch.autoOnStartup = true;
       patch.contentAutoFill = true;
       patch.instantTrigger = true;

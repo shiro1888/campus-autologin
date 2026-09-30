@@ -5,6 +5,13 @@
 
 const $ = (id) => document.getElementById(id);
 
+/** 把分钟数显示成人话 */
+function fmt(min) {
+  const n = parseFloat(min);
+  if (!Number.isFinite(n)) return '—';
+  return n < 1 ? Math.round(n * 60) + ' 秒' : n + ' 分钟';
+}
+
 function setStatus(text, cls) {
   const el = $('status');
   el.textContent = text;
@@ -28,12 +35,16 @@ function refresh() {
     $('ver').textContent = '';
   }
 
-  chrome.storage.local.get(['account', 'intervalMin', 'lastResult'], (s) => {
+  chrome.storage.local.get(['account', 'intervalMin', 'offlineIntervalMin', 'adaptive', 'lastResult'], (s) => {
     $('account').textContent = (s && s.account) || '未设置';
-    const iv = s && s.intervalMin !== undefined ? parseFloat(s.intervalMin) : 0.5;
-    $('interval').textContent = Number.isFinite(iv)
-      ? (iv < 1 ? Math.round(iv * 60) + ' 秒' : iv + ' 分钟')
-      : '—';
+
+    const iv = s && s.intervalMin !== undefined ? parseFloat(s.intervalMin) : 1 / 60;
+    const off = s && s.offlineIntervalMin !== undefined ? parseFloat(s.offlineIntervalMin) : 1 / 60;
+    const adaptive = !s || s.adaptive !== false;
+    $('interval').textContent = adaptive
+      ? fmt(iv) + ' / 掉线 ' + fmt(off)
+      : fmt(iv);
+
     const r = s && s.lastResult;
     if (r && r.time) $('lastTime').textContent = r.time;
     if (r && r.message) setMsg(r.message, r.ok ? 'ok' : 'err');

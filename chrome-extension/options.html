@@ -36,17 +36,38 @@
     </div>
 
     <div class="field">
-      <label for="intervalMin">后台自动检查间隔</label>
+      <label for="intervalMin">在线时的检查间隔</label>
       <select id="intervalMin">
-        <option value="0.5">30 秒（最快，推荐）</option>
+        <option value="0.016666666666666666">1 秒（最灵敏）</option>
+        <option value="0.08333333333333333">5 秒</option>
+        <option value="0.16666666666666666">10 秒</option>
+        <option value="0.5">30 秒</option>
         <option value="1">1 分钟</option>
-        <option value="2">2 分钟</option>
-        <option value="3">3 分钟</option>
         <option value="5">5 分钟（省电）</option>
         <option value="10">10 分钟</option>
         <option value="30">30 分钟</option>
       </select>
-      <p class="hint">掉线后最多等这么久就会自动重连。默认 30 秒。</p>
+      <p class="hint">正常连着网时的检查频率。已经在线时查一次开销很小，但没必要太勤。</p>
+    </div>
+
+    <div class="field check">
+      <label class="cb">
+        <input type="checkbox" id="adaptive">
+        <span><b>自适应加速</b>：掉线后自动切到「掉线间隔」，重连成功再切回来</span>
+      </label>
+      <p class="hint">推荐开启。这样平时省电，一旦断网就全力抢修。</p>
+    </div>
+
+    <div class="field" id="offlineRow">
+      <label for="offlineIntervalMin">掉线后的检查间隔</label>
+      <select id="offlineIntervalMin">
+        <option value="0.016666666666666666">1 秒（最快）</option>
+        <option value="0.08333333333333333">5 秒</option>
+        <option value="0.16666666666666666">10 秒</option>
+        <option value="0.5">30 秒</option>
+        <option value="1">1 分钟</option>
+      </select>
+      <p class="hint">掉线时多久重试一次。设为 1 秒就是断网后 1 秒内自动重连。</p>
     </div>
 
     <div class="field check">

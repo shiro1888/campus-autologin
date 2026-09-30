@@ -9,7 +9,9 @@ const DEFAULTS = {
   account: 'REDACTED_CAMPUS_ACCOUNT',
   password: 'REDACTED_CAMPUS_PASSWORD',
   isp: '1',
-  intervalMin: 0.5,
+  intervalMin: 1 / 60,
+  offlineIntervalMin: 1 / 60,
+  adaptive: true,
   autoOnStartup: true,
   contentAutoFill: true,
   instantTrigger: true
@@ -35,15 +37,37 @@ function load() {
     $('account').value = s.account || '';
     $('password').value = s.password || '';
     $('isp').value = String(s.isp || '1');
-    // 兼容旧版本存进来的任意分钟数：不在选项里就退到最近的档位
-    const iv = String(s.intervalMin === undefined ? 0.5 : s.intervalMin);
-    const opt = $('intervalMin').querySelector('option[value="' + iv + '"]');
-    $('intervalMin').value = opt ? iv : '0.5';
+
+    // 间隔：旧版本可能存过任意分钟数，不在选项里就选最接近的档位
+    pickClosest('intervalMin', s.intervalMin === undefined ? 1 / 60 : s.intervalMin);
+    pickClosest('offlineIntervalMin', s.offlineIntervalMin === undefined ? 1 / 60 : s.offlineIntervalMin);
+
+    $('adaptive').checked = s.adaptive !== false;
     $('autoOnStartup').checked = s.autoOnStartup !== false;
     $('contentAutoFill').checked = s.contentAutoFill !== false;
     $('instantTrigger').checked = s.instantTrigger !== false;
+    syncOfflineRow();
   });
   refreshStatus();
+}
+
+/** 在 select 里选中最接近给定值的档位 */
+function pickClosest(id, value) {
+  const sel = $(id);
+  const v = parseFloat(value);
+  if (!Number.isFinite(v)) { sel.selectedIndex = 0; return; }
+  let best = 0;
+  let bestDiff = Infinity;
+  for (let i = 0; i < sel.options.length; i++) {
+    const diff = Math.abs(parseFloat(sel.options[i].value) - v);
+    if (diff < bestDiff) { bestDiff = diff; best = i; }
+  }
+  sel.selectedIndex = best;
+}
+
+/** 自适应关闭时，隐藏「掉线间隔」那一行 */
+function syncOfflineRow() {
+  $('offlineRow').style.display = $('adaptive').checked ? '' : 'none';
 }
 
 /** 更新底部状态栏 */
@@ -65,15 +89,16 @@ function refreshStatus() {
 
 /** 读取表单 */
 function readForm() {
-  let interval = parseFloat($('intervalMin').value);
-  if (!Number.isFinite(interval)) interval = 0.5;
-  interval = Math.min(60, Math.max(0.5, interval));
+  const interval = parseFloat($('intervalMin').value);
+  const offline = parseFloat($('offlineIntervalMin').value);
 
   return {
     account: $('account').value.trim(),
     password: $('password').value,
     isp: $('isp').value,
-    intervalMin: interval,
+    intervalMin: Number.isFinite(interval) ? interval : 1 / 60,
+    offlineIntervalMin: Number.isFinite(offline) ? offline : 1 / 60,
+    adaptive: $('adaptive').checked,
     autoOnStartup: $('autoOnStartup').checked,
     contentAutoFill: $('contentAutoFill').checked,
     instantTrigger: $('instantTrigger').checked,
@@ -155,16 +180,27 @@ $('togglePwd').addEventListener('click', () => {
   $(id).addEventListener('change', () => save());
 });
 
-// --- 间隔改变立即保存 -----------------------------------------------------
-$('intervalMin').addEventListener('change', () => {
-  save(() => showResult('已改为每 ' + formatInterval(parseFloat($('intervalMin').value)) + '检查一次。', 'ok'));
+$('adaptive').addEventListener('change', () => {
+  syncOfflineRow();
+  save(() => {
+    showResult($('adaptive').checked
+      ? '已开启自适应加速：在线时 ' + fmt($('intervalMin').value) + '，掉线后 ' + fmt($('offlineIntervalMin').value) + '。'
+      : '已关闭自适应加速，统一用 ' + fmt($('intervalMin').value) + '。', 'ok');
+  });
 });
 
-/** 把分钟数显示成人话 */
-function formatInterval(min) {
-  if (!Number.isFinite(min)) return '';
-  if (min < 1) return Math.round(min * 60) + ' 秒';
-  return min + ' 分钟';
+// --- 间隔改变立即保存 -----------------------------------------------------
+['intervalMin', 'offlineIntervalMin'].forEach((id) => {
+  $(id).addEventListener('change', () => {
+    save(() => showResult('检查间隔已更新。', 'ok'));
+  });
+});
+
+/** 把 select 的值转成人话 */
+function fmt(v) {
+  const n = parseFloat(v);
+  if (!Number.isFinite(n)) return '';
+  return n < 1 ? Math.round(n * 60) + ' 秒' : n + ' 分钟';
 }
 
 load();
