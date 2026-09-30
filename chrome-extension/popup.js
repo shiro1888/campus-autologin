@@ -197,8 +197,18 @@ $('btnRefresh').addEventListener('click', refresh);
 // --- 打开设置页 ---
 $('openOptions').addEventListener('click', (e) => {
   e.preventDefault();
-  chrome.runtime.openOptionsPage();
-  window.close();
+  const optionsUrl = chrome.runtime.getURL('options.html');
+  chrome.tabs.query({ url: optionsUrl + '*' }, (tabs) => {
+    if (tabs && tabs.length > 0) {
+      chrome.tabs.update(tabs[0].id, { active: true }, () => {
+        chrome.tabs.reload(tabs[0].id);
+      });
+    } else {
+      chrome.runtime.openOptionsPage();
+    }
+    window.close();
+  });
 });
+
 
 refresh();
