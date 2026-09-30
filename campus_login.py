@@ -42,6 +42,7 @@ import re
 import socket
 import sys
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -449,6 +450,13 @@ def _format_flow(kb) -> str:
         return "—"
 
 
+def _card_line(text: str, width: int = 51) -> str:
+    """计算 CJK 全角与半角字符在控制台中的视觉显示宽度，保证卡片右边框 100% 垂直对齐。"""
+    dw = sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in text)
+    pad = max(0, width - dw)
+    return "│  " + text + (" " * pad) + " │"
+
+
 def cmd_status(args, cfg) -> int:
     portal = _make_portal(args, cfg)
     st = portal.status()
@@ -456,7 +464,7 @@ def cmd_status(args, cfg) -> int:
     ip = st.get("v4ip") or st.get("ss5") or detect_local_ip(portal.host_only)
     flow_text = _format_flow(st.get("flow", 0))
     fee_val = st.get("fee", 0)
-    fee_text = ("¥%.2f" % (float(fee_val) / 10000)) if fee_val else "—"
+    fee_text = ("%.2f 元" % (float(fee_val) / 10000)) if fee_val else "—"
 
     info = {
         "action": "status",
@@ -471,23 +479,24 @@ def cmd_status(args, cfg) -> int:
     if args.json:
         emit_json(info)
     else:
-        say("┌────────────────────────────────────────────────────────┐")
-        say("│          校园网自动登录 · Dr.COM ePortal              │")
-        say("├────────────────────────────────────────────────────────┤")
+        bar = "─" * 54
+        say("┌" + bar + "┐")
+        say(_card_line("        校园网自动登录 · Dr.COM ePortal"))
+        say("├" + bar + "┤")
         if online:
-            say("│  状态:      ● 已在线 (认证通过)                        │")
-            say("│  账号:      %-40s   │" % str(info["account"])[:40])
-            say("│  本机IP:    %-40s   │" % str(ip)[:40])
-            say("│  已用流量:  %-40s   │" % flow_text[:40])
+            say(_card_line("状态:      ● 已在线 (认证通过)"))
+            say(_card_line("账号:      %s" % str(info["account"])[:36]))
+            say(_card_line("本机 IP:   %s" % str(ip)[:36]))
+            say(_card_line("已用流量:  %s" % flow_text[:36]))
             if fee_text != "—":
-                say("│  账户余额:  %-40s   │" % fee_text[:40])
+                say(_card_line("账户余额:  %s" % fee_text[:36]))
             if info["stime"]:
-                say("│  上线时间:  %-40s   │" % str(info["stime"])[:40])
+                say(_card_line("上线时间:  %s" % str(info["stime"])[:36]))
         else:
-            say("│  状态:      ○ 未在线 (需要认证)                        │")
+            say(_card_line("状态:      ○ 未在线 (需要认证)"))
             if ip:
-                say("│  本机IP:    %-40s   │" % str(ip)[:40])
-        say("└────────────────────────────────────────────────────────┘")
+                say(_card_line("本机 IP:   %s" % str(ip)[:36]))
+        say("└" + bar + "┘")
     return EXIT_OK if online else EXIT_FAIL
 
 
@@ -719,6 +728,13 @@ def cmd_gui(args, cfg) -> int:
     def run_async(fn, *a):
         threading.Thread(target=fn, args=a, daemon=True).start()
 
+    def safe_ui(fn):
+        try:
+            if root.winfo_exists():
+                root.after(0, fn)
+        except Exception:
+            pass
+
     def do_refresh():
         st_lbl.config(text="● 检测中…", fg="#f59e0b")
         def _task():
@@ -736,12 +752,12 @@ def cmd_gui(args, cfg) -> int:
                         st_lbl.config(text="○ 未在线 (需要认证)", fg=danger_color)
                     ip_lbl.config(text="本机 IP: %s" % (ip or "—"))
                     meta_lbl.config(text="已用流量: %s  |  上线: %s" % (flow, time_str or "—"))
-                root.after(0, _ui)
+                safe_ui(_ui)
             except Exception as e:
                 def _err():
                     st_lbl.config(text="! 网络不可达", fg=danger_color)
                     ip_lbl.config(text="错误: %s" % e)
-                root.after(0, _err)
+                safe_ui(_err)
         run_async(_task)
 
     def do_login():
@@ -758,9 +774,9 @@ def cmd_gui(args, cfg) -> int:
                     else:
                         messagebox.showerror("失败", "登录失败: " + str(res.get("message", "未知错误")))
                     do_refresh()
-                root.after(0, _ui)
+                safe_ui(_ui)
             except Exception as e:
-                root.after(0, lambda: messagebox.showerror("错误", str(e)))
+                safe_ui(lambda: messagebox.showerror("错误", str(e)))
         run_async(_task)
 
     def do_logout():
@@ -775,9 +791,9 @@ def cmd_gui(args, cfg) -> int:
                     else:
                         messagebox.showwarning("注销", "注销请求已发出。")
                     do_refresh()
-                root.after(0, _ui)
+                safe_ui(_ui)
             except Exception as e:
-                root.after(0, lambda: messagebox.showerror("错误", str(e)))
+                safe_ui(lambda: messagebox.showerror("错误", str(e)))
         run_async(_task)
 
     def do_save():
