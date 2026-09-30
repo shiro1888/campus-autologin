@@ -1,5 +1,5 @@
 /**
- * 校园网自动登录 — 设置页
+ * 校园网自动登录 — 控制中心设置脚本
  */
 'use strict';
 
@@ -17,18 +17,44 @@ const DEFAULTS = {
   instantTrigger: true
 };
 
-/** 显示结果条 */
-function showResult(text, kind) {
-  const el = $('result');
-  el.textContent = text;
-  el.className = 'result show ' + (kind || 'info');
+let toastTimer = null;
+
+/** 顶部浮动消息通知 */
+function showToast(text, kind) {
+  const bar = $('toastBar');
+  const msgEl = $('toastMsg');
+  const iconEl = $('toastIcon');
+
+  if (toastTimer) clearTimeout(toastTimer);
+
+  bar.className = 'toast-bar show ' + (kind || 'info');
+  msgEl.textContent = text;
+
+  if (kind === 'ok') {
+    iconEl.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+  } else if (kind === 'err') {
+    iconEl.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+  } else {
+    iconEl.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+  }
+
+  toastTimer = setTimeout(() => {
+    bar.className = 'toast-bar';
+  }, 4500);
 }
 
-/** 从存储加载设置到表单 */
+/** 格式化分钟数字符串 */
+function fmt(v) {
+  const n = parseFloat(v);
+  if (!Number.isFinite(n)) return '';
+  return n < 1 ? Math.round(n * 60) + ' 秒' : n + ' 分钟';
+}
+
+/** 从本地存储加载配置到表单 */
 function load() {
-  // 显示版本号 —— 用来确认 Chrome 是否已加载到最新代码
   try {
-    $('ver').textContent = 'v' + (chrome.runtime.getManifest().version || '?');
+    const ver = chrome.runtime.getManifest().version;
+    $('ver').textContent = 'v' + (ver || '1.3.0');
   } catch (e) {
     $('ver').textContent = '';
   }
@@ -38,7 +64,6 @@ function load() {
     $('password').value = s.password || '';
     $('isp').value = String(s.isp || '1');
 
-    // 间隔：旧版本可能存过任意分钟数，不在选项里就选最接近的档位
     pickClosest('intervalMin', s.intervalMin === undefined ? 1 / 60 : s.intervalMin);
     pickClosest('offlineIntervalMin', s.offlineIntervalMin === undefined ? 1 / 60 : s.offlineIntervalMin);
 
@@ -48,10 +73,11 @@ function load() {
     $('instantTrigger').checked = s.instantTrigger !== false;
     syncOfflineRow();
   });
+
   refreshStatus();
 }
 
-/** 在 select 里选中最接近给定值的档位 */
+/** 在 select 里选中最接近给定值的项 */
 function pickClosest(id, value) {
   const sel = $(id);
   const v = parseFloat(value);
@@ -65,29 +91,69 @@ function pickClosest(id, value) {
   sel.selectedIndex = best;
 }
 
-/** 自适应关闭时，隐藏「掉线间隔」那一行 */
+/** 自适应关闭时，隐藏「掉线重连间隔」 */
 function syncOfflineRow() {
-  $('offlineRow').style.display = $('adaptive').checked ? '' : 'none';
+  const row = $('offlineRow');
+  if ($('adaptive').checked) {
+    row.style.display = '';
+  } else {
+    row.style.display = 'none';
+  }
 }
 
-/** 更新底部状态栏 */
-function refreshStatus() {
+/** 刷新顶部诊断卡片状态 */
+function refreshStatus(cb) {
+  const checkBtn = $('btnCheckStatus');
+  if (checkBtn) checkBtn.classList.add('spinning');
+
   chrome.storage.local.get(['lastResult'], (s) => {
     const r = s && s.lastResult;
-    $('stLast').textContent = r ? (r.time + ' · ' + r.message) : '—';
+    $('stLast').textContent = r ? (r.time + ' · ' + r.message) : '暂无记录';
   });
 
   chrome.runtime.sendMessage({ type: 'status' }, (res) => {
+    if (checkBtn) checkBtn.classList.remove('spinning');
+
+    const pill = $('stPill');
+    const textEl = $('stOnline');
+
     if (chrome.runtime.lastError || !res) {
-      $('stOnline').textContent = '后台未响应';
+      pill.className = 'status-pill off';
+      textEl.textContent = '后台未响应';
+      $('stIp').textContent = '—';
+      $('stTime').textContent = '—';
+      if (cb) cb();
       return;
     }
-    if (!res.reachable) $('stOnline').textContent = '不在校园网内';
-    else $('stOnline').textContent = res.online ? '已在线 ✓' : '未登录';
+
+    const raw = res.raw || {};
+    const ip = raw.v4ip || raw.ss5 || '';
+    $('stIp').textContent = ip || '未获取到';
+
+    if (raw.stime) {
+      $('stTime').textContent = raw.stime;
+    } else if (raw.time) {
+      $('stTime').textContent = Math.round(raw.time / 60) + ' 分钟';
+    } else {
+      $('stTime').textContent = res.online ? '在线中' : '未在线';
+    }
+
+    if (!res.reachable) {
+      pill.className = 'status-pill off';
+      textEl.textContent = '不在校园网内';
+    } else if (res.online) {
+      pill.className = 'status-pill on';
+      textEl.textContent = '已在线 ✓';
+    } else {
+      pill.className = 'status-pill wait';
+      textEl.textContent = '未登录';
+    }
+
+    if (cb) cb();
   });
 }
 
-/** 读取表单 */
+/** 读取表单当前值 */
 function readForm() {
   const interval = parseFloat($('intervalMin').value);
   const offline = parseFloat($('offlineIntervalMin').value);
@@ -106,11 +172,11 @@ function readForm() {
   };
 }
 
-/** 保存 + 通知后台重建闹钟 */
+/** 保存到 chrome.storage 并通知后台刷新定时器 */
 function save(cb) {
   const s = readForm();
   if (!s.account || !s.password) {
-    showResult('请先填写账号和密码。', 'err');
+    showToast('请先填写上网账号和密码。', 'err');
     if (cb) cb(false);
     return;
   }
@@ -122,85 +188,129 @@ function save(cb) {
   });
 }
 
-// --- 保存并立即测试 -------------------------------------------------------
+// --- 保存并立即测试 ---
 $('form').addEventListener('submit', (e) => {
   e.preventDefault();
   const btn = $('btnSave');
   btn.disabled = true;
-  btn.textContent = '测试中…';
-  showResult('正在保存并连接门户测试…', 'info');
+  btn.classList.add('loading');
+  $('btnSaveText').textContent = '正在保存并测试…';
+  showToast('正在向校园网门户发起验证…', 'info');
 
   save((okSaved) => {
     if (!okSaved) {
       btn.disabled = false;
-      btn.textContent = '保存并立即测试';
+      btn.classList.remove('loading');
+      $('btnSaveText').textContent = '保存配置并立即测试';
       return;
     }
+
     chrome.runtime.sendMessage({ type: 'login' }, (res) => {
       btn.disabled = false;
-      btn.textContent = '保存并立即测试';
+      btn.classList.remove('loading');
+      $('btnSaveText').textContent = '保存配置并立即测试';
+
       if (chrome.runtime.lastError || !res) {
-        showResult('后台无响应，请在 chrome://extensions 里重新加载插件。', 'err');
+        showToast('保存成功，但后台未响应测试请求', 'err');
         return;
       }
-      showResult(res.message || '完成', res.ok ? 'ok' : 'err');
+
+      showToast(res.message || '配置已生效', res.ok ? 'ok' : 'err');
       refreshStatus();
     });
   });
 });
 
-// --- 立即登录（不保存） ---------------------------------------------------
+// --- 顶部快捷：测试连接/检测状态 ---
+$('btnCheckStatus').addEventListener('click', () => {
+  refreshStatus(() => {
+    showToast('网络与认证状态已更新', 'info');
+  });
+});
+
+// --- 顶部快捷：立即登录 ---
 $('btnLoginNow').addEventListener('click', () => {
   const btn = $('btnLoginNow');
   btn.disabled = true;
-  btn.textContent = '登录中…';
-  showResult('正在登录…', 'info');
+  showToast('正在请求登录…', 'info');
+
   chrome.runtime.sendMessage({ type: 'login' }, (res) => {
     btn.disabled = false;
-    btn.textContent = '立即登录';
     if (chrome.runtime.lastError || !res) {
-      showResult('后台无响应，请重新加载插件。', 'err');
+      showToast('后台未响应', 'err');
       return;
     }
-    showResult(res.message || '完成', res.ok ? 'ok' : 'err');
+    showToast(res.message || '登录请求完成', res.ok ? 'ok' : 'err');
     refreshStatus();
   });
 });
 
-// --- 显示/隐藏密码 -------------------------------------------------------
-$('togglePwd').addEventListener('click', () => {
-  const el = $('password');
-  const show = el.type === 'password';
-  el.type = show ? 'text' : 'password';
-  $('togglePwd').textContent = show ? '隐藏' : '显示';
+// --- 顶部快捷：注销下线 ---
+$('btnLogoutNow').addEventListener('click', () => {
+  const btn = $('btnLogoutNow');
+  btn.disabled = true;
+  showToast('正在请求注销下线…', 'info');
+
+  chrome.runtime.sendMessage({ type: 'logout' }, (res) => {
+    btn.disabled = false;
+    if (chrome.runtime.lastError || !res) {
+      showToast('注销超时，请到门户手动注销', 'err');
+      return;
+    }
+    showToast(res.message || '注销完成', res.ok ? 'ok' : 'err');
+    refreshStatus();
+  });
 });
 
-// --- 勾选类改动立即保存 ---------------------------------------------------
+// --- 恢复默认设置 ---
+$('btnResetDefaults').addEventListener('click', () => {
+  if (!confirm('确定要将所有设置恢复为默认值吗？\n（你的账号密码将被重置为初始配置）')) {
+    return;
+  }
+  chrome.storage.local.set(DEFAULTS, () => {
+    load();
+    chrome.runtime.sendMessage({ type: 'settingsChanged' });
+    showToast('已恢复为默认配置。', 'ok');
+  });
+});
+
+// --- 显示/隐藏密码 ---
+$('togglePwd').addEventListener('click', () => {
+  const el = $('password');
+  const isPwd = el.type === 'password';
+  el.type = isPwd ? 'text' : 'password';
+
+  const eyeIcon = $('eyeIcon');
+  if (isPwd) {
+    // 隐藏状态图标 (带有斜线)
+    eyeIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+  } else {
+    // 正常眼睛图标
+    eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+  }
+});
+
+// --- 即时保存的切换项 ---
 ['autoOnStartup', 'contentAutoFill', 'instantTrigger'].forEach((id) => {
-  $(id).addEventListener('change', () => save());
+  $(id).addEventListener('change', () => {
+    save(() => showToast('设置已自动保存。', 'ok'));
+  });
 });
 
 $('adaptive').addEventListener('change', () => {
   syncOfflineRow();
   save(() => {
-    showResult($('adaptive').checked
-      ? '已开启自适应加速：在线时 ' + fmt($('intervalMin').value) + '，掉线后 ' + fmt($('offlineIntervalMin').value) + '。'
-      : '已关闭自适应加速，统一用 ' + fmt($('intervalMin').value) + '。', 'ok');
+    showToast($('adaptive').checked
+      ? `已启用自适应重连加速（掉线重试：${fmt($('offlineIntervalMin').value)}）`
+      : '已关闭自适应加速，统一使用常规间隔。', 'ok');
   });
 });
 
-// --- 间隔改变立即保存 -----------------------------------------------------
-['intervalMin', 'offlineIntervalMin'].forEach((id) => {
+// --- 下拉框改动即时保存 ---
+['intervalMin', 'offlineIntervalMin', 'isp'].forEach((id) => {
   $(id).addEventListener('change', () => {
-    save(() => showResult('检查间隔已更新。', 'ok'));
+    save(() => showToast('参数已自动保存并生效。', 'ok'));
   });
 });
-
-/** 把 select 的值转成人话 */
-function fmt(v) {
-  const n = parseFloat(v);
-  if (!Number.isFinite(n)) return '';
-  return n < 1 ? Math.round(n * 60) + ' 秒' : n + ' 分钟';
-}
 
 load();

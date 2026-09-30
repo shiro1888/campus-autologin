@@ -257,6 +257,58 @@ async function doLogin(settings) {
 }
 
 /**
+ * 注销下线。
+ * 先从 chkstatus 取出 wlan_user_ip / mac / ac_ip，再请求注销接口。
+ */
+async function doLogout() {
+  const st = await checkStatus();
+  if (!st.reachable) {
+    return fail('不在校园网内 / 门户不可达', false);
+  }
+  const raw = st.raw || {};
+  const ip = String(raw.v4ip || raw.ss5 || '');
+  const mac = String(raw.ss1 || '000000000000');
+  const ac_ip = String(raw.ss6 || '');
+
+  const p1 = new URLSearchParams({
+    callback: 'dr' + (Math.floor(Math.random() * 9000) + 1000),
+    v: rand(),
+    lang: 'zh',
+    login_method: '0',
+    user_account: 'drcom',
+    user_password: '123',
+    ac_logout: '0',
+    register_mode: '1',
+    wlan_user_ip: ip,
+    wlan_user_ipv6: '',
+    wlan_vlan_id: '1',
+    wlan_user_mac: mac,
+    wlan_ac_ip: ac_ip,
+    wlan_ac_name: '',
+    jsVersion: JS_VERSION
+  });
+
+  try {
+    await fetchText(PORTAL_ORIGIN + '/drcom/logout?' + p1.toString());
+  } catch (e) {}
+
+  try {
+    await fetchText(PORTAL_ORIGIN + ':801/eportal/?c=ACSetting&a=Logout&ver=1.0&url=drappal&' + p1.toString());
+  } catch (e) {}
+
+  await new Promise((r) => setTimeout(r, 600));
+  const stAfter = await checkStatus();
+  const res = !stAfter.online
+    ? ok('已注销下线', false)
+    : fail('注销请求已提交，但会话仍在（可能需到门户页面手动注销）', true);
+
+  await saveResult(res);
+  await maybeSwitchCadence(stAfter.online);
+  return res;
+}
+
+
+/**
  * 在线状态变化时切换轮询节奏。
  * 只在状态真的翻转时才重建闹钟，避免每次检查都重置计时。
  */
@@ -487,6 +539,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .catch((e) => sendResponse(fail('发生未知错误：' + (e && e.message ? e.message : String(e)), false)));
     return true; // 异步响应
   }
+
+  if (msg.type === 'logout') {
+    doLogout()
+      .then((r) => sendResponse(r))
+      .catch((e) => sendResponse(fail('注销异常：' + (e && e.message ? e.message : String(e)), false)));
+    return true;
+  }
+
 
   if (msg.type === 'status') {
     checkStatus()

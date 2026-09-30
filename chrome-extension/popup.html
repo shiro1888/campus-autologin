@@ -2,37 +2,141 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>校园网自动登录</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="head">
-    <span class="dot" id="dot"></span>
-    <span class="title">校园网自动登录</span>
-    <span class="ver" id="ver"></span>
-  </div>
+  <div class="popup-wrapper">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+            <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+            <circle cx="12" cy="20" r="1" fill="currentColor"></circle>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <div class="brand-title">校园网自动登录</div>
+          <div class="brand-sub">Dr.COM ePortal</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <span class="version-badge" id="ver">v1.3.0</span>
+        <button id="btnRefresh" class="btn-icon" title="刷新状态">
+          <svg class="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+        </button>
+      </div>
+    </header>
 
-  <div class="status" id="status">正在检测…</div>
+    <!-- Hero Status Card -->
+    <div class="card status-card" id="statusCard">
+      <div class="status-top">
+        <div class="status-indicator">
+          <span class="pulse-ring" id="pulseRing"></span>
+          <span class="dot" id="dot"></span>
+        </div>
+        <div class="status-texts">
+          <div class="status-title" id="statusTitle">正在检测…</div>
+          <div class="status-desc" id="statusDesc">正在查询校园网状态</div>
+        </div>
+      </div>
 
-  <div class="row">
-    <span class="label">账号</span>
-    <span class="value" id="account">—</span>
-  </div>
-  <div class="row">
-    <span class="label">检查间隔</span>
-    <span class="value" id="interval">—</span>
-  </div>  <div class="row">
-    <span class="label">上次检查</span>
-    <span class="value" id="lastTime">—</span>
-  </div>
+      <div class="ip-row">
+        <div class="ip-chip" id="ipChip" title="点击复制 IP">
+          <svg class="ip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+          </svg>
+          <span class="ip-label">本机 IP</span>
+          <span class="ip-val" id="localIp">正在获取…</span>
+          <button class="ip-copy-btn" id="btnCopyIp" title="复制 IP">
+            <svg class="icon-copy" id="copyIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
 
-  <button id="btnLogin" class="primary">立即登录</button>
+    <!-- Metrics Card -->
+    <div class="card metrics-card">
+      <div class="metric-row">
+        <span class="metric-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          当前账号
+        </span>
+        <span class="metric-val" id="account">—</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          检查机制
+        </span>
+        <span class="metric-val" id="interval">—</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          在线时长
+        </span>
+        <span class="metric-val" id="onlineDuration">—</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          上次检查
+        </span>
+        <span class="metric-val" id="lastTime">—</span>
+      </div>
+    </div>
 
-  <div class="msg" id="msg"></div>
+    <!-- Alert / Toast Message -->
+    <div class="msg-box" id="msgBox">
+      <span class="msg-icon" id="msgIcon"></span>
+      <span class="msg-text" id="msg"></span>
+    </div>
 
-  <div class="foot">
-    <a href="#" id="openOptions">⚙ 设置</a>
-    <span class="sep">|</span>
-    <a href="http://172.30.100.2/" target="_blank">打开门户</a>
+    <!-- Action Buttons -->
+    <div class="actions-group">
+      <button id="btnLogin" class="btn-primary">
+        <span class="btn-spinner" id="loginSpinner"></span>
+        <svg class="btn-icon" id="loginIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        <span id="btnLoginText">立即登录</span>
+      </button>
+
+      <button id="btnLogout" class="btn-secondary" title="注销下线">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        <span>注销</span>
+      </button>
+    </div>
+
+    <!-- Footer Toolbar -->
+    <footer class="footer">
+      <a href="#" id="openOptions" class="foot-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>偏好设置</span>
+      </a>
+      <span class="foot-sep"></span>
+      <a href="http://172.30.100.2/" target="_blank" class="foot-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span>校园门户</span>
+      </a>
+    </footer>
   </div>
 
   <script src="popup.js"></script>
