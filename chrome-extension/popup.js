@@ -21,6 +21,13 @@ function setMsg(text, cls) {
 
 /** 询问后台当前状态 */
 function refresh() {
+  // 显示版本号，用来确认 Chrome 是否已加载最新代码
+  try {
+    $('ver').textContent = 'v' + (chrome.runtime.getManifest().version || '?');
+  } catch (e) {
+    $('ver').textContent = '';
+  }
+
   chrome.storage.local.get(['account', 'intervalMin', 'lastResult'], (s) => {
     $('account').textContent = (s && s.account) || '未设置';
     const iv = s && s.intervalMin !== undefined ? parseFloat(s.intervalMin) : 0.5;
