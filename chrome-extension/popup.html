@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="head">
+    <span class="dot" id="dot"></span>
+    <span class="title">校园网自动登录</span>
+  </div>
+
+  <div class="status" id="status">正在检测…</div>
+
+  <div class="row">
+    <span class="label">账号</span>
+    <span class="value" id="account">—</span>
+  </div>
+  <div class="row">
+    <span class="label">检查间隔</span>
+    <span class="value" id="interval">—</span>
+  </div>
+  <div class="row">
+    <span class="label">上次检查</span>
+    <span class="value" id="lastTime">—</span>
+  </div>
+
+  <button id="btnLogin" class="primary">立即登录</button>
+
+  <div class="msg" id="msg"></div>
+
+  <div class="foot">
+    <a href="#" id="openOptions">⚙ 设置</a>
+    <span class="sep">|</span>
+    <a href="http://172.30.100.2/" target="_blank">打开门户</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

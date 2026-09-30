@@ -1,0 +1,26 @@
+# 运行日志
+logs/
+*.log
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 临时/侦察目录
+.recon/
+_verify/
+
+# 本地个人配置（含真实密码）——默认不提交
+# 如果你 fork 了这个项目，请复制 config.example.json 为 config.json 并填入自己的账号密码
+config.local.json
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+
+# 系统
+Thumbs.db
+desktop.ini
+.DS_Store

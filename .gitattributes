@@ -1,0 +1,16 @@
+# 统一换行符，避免在不同系统/不同 Git 配置下 clone 出坏文件。
+#
+# 关键：.bat 必须是 CRLF，否则 cmd.exe 完全无法解析（会报
+# "'XX' is not recognized as an internal or external command"）。
+# 其它文本文件统一用 LF。
+
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.png binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
