@@ -4,7 +4,6 @@
  * 协议说明（逆向自 172.30.100.2 Dr.COM / 哆点 ePortal）：
  *   状态：GET /drcom/chkstatus?callback=dr1001&v=<rand>&lang=zh&jsVersion=4.1.3
  *   登录：GET /drcom/login?callback=dr1002&DDDDD=<账号>&upass=<密码>&...
- *   注销：GET /drcom/logout?callback=dr1003&...
  * 全部为 JSONP，返回形如 dr1001({...}); 需先剥壳再 JSON.parse。
  */
 
@@ -17,7 +16,6 @@
 const PORTAL_ORIGIN = 'http://172.30.100.2';
 const URL_CHKSTATUS = PORTAL_ORIGIN + '/drcom/chkstatus';
 const URL_LOGIN = PORTAL_ORIGIN + '/drcom/login';
-const URL_LOGOUT = PORTAL_ORIGIN + '/drcom/logout';
 const JS_VERSION = '4.1.3';
 
 const ALARM_NAME = 'campus-auto-login';
@@ -152,17 +150,12 @@ function formatInterval(min) {
   return min + ' 分钟';
 }
 
-/** 把结果写入 storage，并广播给 popup / options（忽略无接收方错误） */
+/** 把结果写入 storage（popup / options 直接读这里） */
 async function saveResult(result) {
   try {
     await chrome.storage.local.set({ lastResult: result });
   } catch (e) {
     // 忽略
-  }
-  try {
-    await chrome.runtime.sendMessage({ type: 'result', result: result });
-  } catch (e) {
-    // 没有打开的界面，正常情况
   }
 }
 
@@ -346,27 +339,6 @@ async function autoLogin(trigger) {
   }
 }
 
-/** 注销（可选功能） */
-async function doLogout() {
-  const url =
-    URL_LOGOUT + '?callback=dr1003' +
-    '&login_method=0' +
-    '&user_account=drcom' +
-    '&user_password=123' +
-    '&wlan_vlan_id=1' +
-    '&wlan_user_mac=000000000000' +
-    '&jsVersion=' + JS_VERSION;
-  try {
-    const text = await fetchText(url);
-    const data = parseJsonp(text);
-    if (data && String(data.result) === '1') return ok('已注销下线', false);
-    if (/ok/i.test(text)) return ok('已注销下线', false);
-    return fail('注销失败（门户未确认）', true);
-  } catch (e) {
-    return fail('不在校园网内 / 门户不可达', true);
-  }
-}
-
 // ---------------------------------------------------------------------------
 // 闹钟与生命周期
 // ---------------------------------------------------------------------------
@@ -505,11 +477,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-// 浏览器网络恢复时也试一次
-if (chrome.runtime.onConnect) {
-  // 预留：popup 连接不做事
-}
-
 // popup / options 发来的指令
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return false;
@@ -519,16 +486,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse(fail('发生未知错误：' + (e && e.message ? e.message : String(e)), false)));
     return true; // 异步响应
-  }
-
-  if (msg.type === 'logout') {
-    doLogout()
-      .then(async (r) => {
-        await saveResult(r);
-        sendResponse(r);
-      })
-      .catch((e) => sendResponse(fail('发生未知错误：' + (e && e.message ? e.message : String(e)), true)));
-    return true;
   }
 
   if (msg.type === 'status') {
