@@ -396,6 +396,9 @@ $('btnLoginNow').addEventListener('click', () => {
 
 // --- 顶部快捷：注销下线 ---
 $('btnLogoutNow').addEventListener('click', () => {
+  if (!confirm('确定要注销下线当前校园网会话吗？\n注销后电脑将断开互联网连接。')) {
+    return;
+  }
   const btn = $('btnLogoutNow');
   btn.disabled = true;
   showToast('正在请求注销下线…', 'info');

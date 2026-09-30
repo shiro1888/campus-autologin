@@ -244,6 +244,9 @@ $('btnLogin').addEventListener('click', () => {
 
 // --- 注销下线 ---
 $('btnLogout').addEventListener('click', () => {
+  if (!confirm('确定要注销下线当前校园网吗？\n注销后电脑将断开互联网连接。')) {
+    return;
+  }
   const btn = $('btnLogout');
   btn.disabled = true;
   setMsg('正在向门户请求注销下线…', 'info');
