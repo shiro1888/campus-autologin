@@ -67,6 +67,56 @@ function fmtMac(hex) {
   return clean.match(/.{1,2}/g).join(':').toUpperCase();
 }
 
+/** 动态在线计时器 (秒表实时跳动) */
+let durationTimer = null;
+let loginStartTimeMs = null;
+
+function fmtDuration(totalSec) {
+  if (!Number.isFinite(totalSec) || totalSec < 0) return '00分 00秒';
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const p = (n) => String(n).padStart(2, '0');
+  if (h > 0) {
+    return `${h}小时 ${p(m)}分 ${p(s)}秒`;
+  }
+  return `${p(m)}分 ${p(s)}秒`;
+}
+
+function startDurationTicker(startTimeStr) {
+  if (durationTimer) {
+    clearInterval(durationTimer);
+    durationTimer = null;
+  }
+  if (!startTimeStr) {
+    loginStartTimeMs = null;
+    return;
+  }
+  const d = new Date(startTimeStr.replace(/-/g, '/'));
+  loginStartTimeMs = d.getTime();
+  if (isNaN(loginStartTimeMs)) {
+    loginStartTimeMs = null;
+    return;
+  }
+
+  function tick() {
+    if (!loginStartTimeMs) return;
+    const elapsedSec = Math.max(0, Math.floor((Date.now() - loginStartTimeMs) / 1000));
+    $('stTime').textContent = fmtDuration(elapsedSec);
+  }
+
+  tick();
+  durationTimer = setInterval(tick, 1000);
+}
+
+function stopDurationTicker() {
+  if (durationTimer) {
+    clearInterval(durationTimer);
+    durationTimer = null;
+  }
+  loginStartTimeMs = null;
+}
+
 /** 主题切换管理 */
 function initTheme() {
   chrome.storage.local.get({ theme: 'auto' }, (s) => {
@@ -185,14 +235,28 @@ function refreshStatus(cb) {
     $('stIp').textContent = ip || '未获取到';
     $('stMac').textContent = raw.ss1 ? ('物理 MAC: ' + fmtMac(raw.ss1)) : '物理 MAC: —';
 
-    if (raw.stime) {
-      $('stTime').textContent = raw.stime.replace(/^.*?\s+/, '');
+    if (res.online && raw.stime) {
+      startDurationTicker(raw.stime);
       $('stStime').textContent = '上线时间: ' + raw.stime;
-    } else if (raw.time) {
-      $('stTime').textContent = Math.round(raw.time / 60) + ' 分钟';
+    } else if (res.online && raw.actt) {
+      // 备用：从网关 active time 计数器倒推
+      const startMs = Date.now() - parseInt(raw.actt, 10) * 1000;
+      loginStartTimeMs = startMs;
+      if (!durationTimer) {
+        durationTimer = setInterval(() => {
+          const elapsedSec = Math.max(0, Math.floor((Date.now() - loginStartTimeMs) / 1000));
+          $('stTime').textContent = fmtDuration(elapsedSec);
+        }, 1000);
+      }
+      $('stTime').textContent = fmtDuration(parseInt(raw.actt, 10));
+      $('stStime').textContent = '在线中 (网关计时)';
+    } else if (res.online) {
+      stopDurationTicker();
+      $('stTime').textContent = '在线中';
       $('stStime').textContent = '上线时间: —';
     } else {
-      $('stTime').textContent = res.online ? '在线中' : '未在线';
+      stopDurationTicker();
+      $('stTime').textContent = '未在线';
       $('stStime').textContent = '上线时间: —';
     }
 
@@ -203,27 +267,32 @@ function refreshStatus(cb) {
       $('stPing').textContent = res.reachable ? '< 10 ms' : '超时';
     }
 
-    // Flow & Fee
+    // Flow & Fee (下行 / 上行 / 总计 / 余额)
     if (raw.flow !== undefined) {
       $('stFlow').textContent = fmtFlow(raw.flow);
+      const sub = [];
+      if (raw.actdf !== undefined && raw.actuf !== undefined) {
+        sub.push(`↓ ${fmtFlow(raw.actdf)} · ↑ ${fmtFlow(raw.actuf)}`);
+      }
+      if (raw.fee !== undefined) {
+        const yuan = (parseFloat(raw.fee) / 10000).toFixed(2);
+        sub.push(`余额 ¥${yuan}`);
+      }
+      $('stFee').textContent = sub.length ? sub.join(' | ') : '校园网计费统计';
     } else {
       $('stFlow').textContent = res.online ? '计量中' : '—';
-    }
-
-    if (raw.fee !== undefined) {
-      const yuan = (parseFloat(raw.fee) / 10000).toFixed(2);
-      $('stFee').textContent = '账户余额: ¥' + yuan;
-    } else {
       $('stFee').textContent = '账户余额: —';
     }
 
     if (!res.reachable) {
+      stopDurationTicker();
       pill.className = 'status-pill off';
       textEl.textContent = '不在校园网内';
     } else if (res.online) {
       pill.className = 'status-pill on';
       textEl.textContent = '已在线 ✓';
     } else {
+      stopDurationTicker();
       pill.className = 'status-pill wait';
       textEl.textContent = '未登录';
     }
@@ -394,3 +463,10 @@ $('adaptive').addEventListener('change', () => {
 });
 
 load();
+
+// 当偏好设置页面在前台激活时，每 15 秒自动向后台刷新一次网关状态（流量与Ping）
+setInterval(() => {
+  if (document.visibilityState === 'visible') {
+    refreshStatus();
+  }
+}, 15000);

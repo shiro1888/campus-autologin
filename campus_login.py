@@ -466,13 +466,42 @@ def cmd_status(args, cfg) -> int:
     fee_val = st.get("fee", 0)
     fee_text = ("%.2f 元" % (float(fee_val) / 10000)) if fee_val else "—"
 
+    # 计算在线会话时长
+    dur_text = ""
+    if st.get("stime"):
+        try:
+            t_struct = time.strptime(str(st["stime"]), "%Y-%m-%d %H:%M:%S")
+            sec = max(0, int(time.time() - time.mktime(t_struct)))
+            h = sec // 3600
+            m = (sec % 3600) // 60
+            s = sec % 60
+            dur_text = ("%d小时 %02d分 %02d秒" % (h, m, s)) if h > 0 else ("%02d分 %02d秒" % (m, s))
+        except Exception:
+            pass
+    elif st.get("actt"):
+        try:
+            sec = int(st["actt"])
+            h = sec // 3600
+            m = (sec % 3600) // 60
+            s = sec % 60
+            dur_text = ("%d小时 %02d分 %02d秒" % (h, m, s)) if h > 0 else ("%02d分 %02d秒" % (m, s))
+        except Exception:
+            pass
+
+    # 包含下行与上行分项的流量字符串
+    flow_detail = flow_text
+    if st.get("actdf") and st.get("actuf"):
+        flow_detail += " (↓%s ↑%s)" % (_format_flow(st["actdf"]), _format_flow(st["actuf"]))
+
     info = {
         "action": "status",
         "online": online,
         "ip": ip,
         "account": st.get("uid") or st.get("AC") or "",
         "stime": st.get("stime", ""),
+        "duration": dur_text,
         "flow": flow_text,
+        "flow_detail": flow_detail,
         "fee": fee_text,
         "raw": st,
     }
@@ -487,7 +516,9 @@ def cmd_status(args, cfg) -> int:
             say(_card_line("状态:      ● 已在线 (认证通过)"))
             say(_card_line("账号:      %s" % str(info["account"])[:36]))
             say(_card_line("本机 IP:   %s" % str(ip)[:36]))
-            say(_card_line("已用流量:  %s" % flow_text[:36]))
+            if dur_text:
+                say(_card_line("在线时长:  %s" % dur_text[:36]))
+            say(_card_line("已用流量:  %s" % flow_detail[:36]))
             if fee_text != "—":
                 say(_card_line("账户余额:  %s" % fee_text[:36]))
             if info["stime"]:
