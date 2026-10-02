@@ -22,7 +22,7 @@
       <div class="header-actions">
         <span class="version-badge" id="ver">v1.3.0</span>
         <button type="button" id="btnRefresh" class="btn-icon" title="刷新状态">
-          <svg class="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
           </svg>
         </button>
@@ -62,49 +62,63 @@
       </div>
     </div>
 
-    <!-- Metrics Card -->
-    <div class="card metrics-card">
-      <div class="metric-row">
-        <span class="metric-label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          当前账号
-        </span>
-        <span class="metric-val" id="account">—</span>
+    <!-- Bento Grid (2x2 Dashboard Metrics) -->
+    <div class="bento-grid">
+      <!-- 1: 在线时长 -->
+      <div class="bento-card" title="在线时长">
+        <div class="bento-header">
+          <div class="bento-badge amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <span class="bento-label">在线时长</span>
+        </div>
+        <div class="bento-val mono" id="onlineDuration">—</div>
       </div>
-      <div class="metric-row">
-        <span class="metric-label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          检查机制
-        </span>
-        <span class="metric-val" id="interval">—</span>
+
+      <!-- 2: 已用流量 -->
+      <div class="bento-card" title="已用流量 (悬停查看上传/下载)">
+        <div class="bento-header">
+          <div class="bento-badge purple">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <span class="bento-label">已用流量</span>
+        </div>
+        <div class="bento-val" id="popFlow">—</div>
       </div>
-      <div class="metric-row">
-        <span class="metric-label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          在线时长
-        </span>
-        <span class="metric-val" id="onlineDuration">—</span>
+
+      <!-- 3: 网关延迟 -->
+      <div class="bento-card" title="网关延迟">
+        <div class="bento-header">
+          <div class="bento-badge emerald">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <span class="bento-label">网关延迟</span>
+        </div>
+        <div class="bento-val accent" id="popPing">—</div>
       </div>
-      <div class="metric-row">
-        <span class="metric-label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-          网关延迟
-        </span>
-        <span class="metric-val" id="popPing">—</span>
+
+      <!-- 4: 当前账号 -->
+      <div class="bento-card" title="当前认证账号">
+        <div class="bento-header">
+          <div class="bento-badge blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <span class="bento-label">认证账号</span>
+        </div>
+        <div class="bento-val mono ellipsis" id="account">—</div>
       </div>
-      <div class="metric-row">
-        <span class="metric-label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          已用流量
-        </span>
-        <span class="metric-val" id="popFlow">—</span>
+    </div>
+
+    <!-- Meta Status Pill / Sub-bar (检查机制 & 上次检查) -->
+    <div class="meta-strip">
+      <div class="meta-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span class="meta-txt"><span class="meta-muted">轮询:</span> <span id="interval">—</span></span>
       </div>
-      <div class="metric-row">
-        <span class="metric-label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-          上次检查
-        </span>
-        <span class="metric-val" id="lastTime">—</span>
+      <span class="meta-dot">·</span>
+      <div class="meta-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <span class="meta-txt"><span class="meta-muted">检查:</span> <span id="lastTime">—</span></span>
       </div>
     </div>
 
