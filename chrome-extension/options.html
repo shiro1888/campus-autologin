@@ -9,11 +9,15 @@
 <body>
 <div class="page-container">
 
+  <!-- Ambient Background Aura -->
+  <div class="page-ambient-mesh"></div>
+
   <!-- Header -->
   <header class="page-header">
     <div class="header-main">
       <div class="logo-box">
         <img src="icons/icon48.png" alt="Logo" class="logo-img">
+        <span class="logo-beacon" id="logoBeacon"></span>
       </div>
       <div class="title-group">
         <div class="title-row">
@@ -40,12 +44,17 @@
     </div>
   </header>
 
-  <!-- Live Telemetry & Diagnostic Dashboard (Hero) -->
+  <!-- Live Telemetry & Diagnostic Dashboard (Hero Radar) -->
   <section class="card status-hero" id="statusWidget">
+    <div class="hero-ambient-glow"></div>
+
     <div class="hero-top-bar">
       <div class="hero-status-pill-wrap">
         <span class="status-pill" id="stPill">
-          <span class="pill-dot" id="stDot"></span>
+          <span class="pill-beacon">
+            <span class="pill-ring"></span>
+            <span class="pill-dot" id="stDot"></span>
+          </span>
           <span class="pill-text" id="stOnline">检测中…</span>
         </span>
         <span class="hero-gw-tag">网关: 172.30.100.2:80</span>
@@ -67,7 +76,6 @@
       </div>
     </div>
 
-    <!-- 4 Telemetry Metrics Grid -->
     <!-- 4 Telemetry Metrics Grid (Bento Style) -->
     <div class="hero-stat-grid">
       <div class="stat-card">
@@ -106,7 +114,11 @@
       <div class="stat-card">
         <div class="stat-label">
           <div class="stat-badge purple">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 10l5-5 5 5"/>
+              <path d="M12 5v14"/>
+              <path d="M17 14l-5 5-5-5"/>
+            </svg>
           </div>
           <span>校园网流量统计</span>
         </div>
@@ -310,6 +322,7 @@
     <!-- Bottom Actions -->
     <div class="form-actions">
       <button type="submit" class="btn-main" id="btnSave">
+        <span class="btn-shimmer"></span>
         <svg class="btn-spinner" id="saveSpinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
         <svg class="btn-icon" id="saveIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         <span id="btnSaveText">保存配置并立即测试</span>
