@@ -80,7 +80,7 @@ function refresh() {
     (s) => {
       $('account').textContent = (s && s.account) || '未设置';
 
-      const iv = s && s.intervalMin !== undefined ? parseFloat(s.intervalMin) : 1 / 60;
+      const iv = s && s.intervalMin !== undefined ? parseFloat(s.intervalMin) : 10 / 60;
       const off = s && s.offlineIntervalMin !== undefined ? parseFloat(s.offlineIntervalMin) : 1 / 60;
       const adaptive = !s || s.adaptive !== false;
 
@@ -250,9 +250,21 @@ $('openOptions').addEventListener('click', (e) => {
 });
 
 // --- 同步设置页选择的主题 ---
+function applyPopupTheme(theme) {
+  if (theme && theme !== 'auto') {
+    document.documentElement.setAttribute('data-theme', theme);
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+}
+
 chrome.storage.local.get({ theme: 'auto' }, (s) => {
-  if (s && s.theme && s.theme !== 'auto') {
-    document.documentElement.setAttribute('data-theme', s.theme);
+  applyPopupTheme(s && s.theme);
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.theme) {
+    applyPopupTheme(changes.theme.newValue);
   }
 });
 

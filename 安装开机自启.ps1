@@ -69,9 +69,12 @@ Write-Step "创建计划任务..."
 
 $action = New-ScheduledTaskAction -Execute $target -WorkingDirectory $here
 
-# 开机后 30 秒启动；网络就绪后脚本自己会等待门户可达
-$trigger = New-ScheduledTaskTrigger -AtStartup
-$trigger.Delay = "PT30S"
+# 双触发器：开机启动（延迟 20 秒） + 用户登录（延迟 10 秒），兼顾台式机与笔记本合盖休眠唤醒
+$triggerStartup = New-ScheduledTaskTrigger -AtStartup
+$triggerStartup.Delay = "PT20S"
+$triggerLogon = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERNAME"
+$triggerLogon.Delay = "PT10S"
+$trigger = @($triggerStartup, $triggerLogon)
 
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `

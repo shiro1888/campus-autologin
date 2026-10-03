@@ -7,7 +7,7 @@ const DEFAULTS = {
   account: 'REDACTED_CAMPUS_ACCOUNT',
   password: 'REDACTED_CAMPUS_PASSWORD',
   isp: '1',
-  intervalMin: 1 / 60,
+  intervalMin: 10 / 60,
   offlineIntervalMin: 1 / 60,
   adaptive: true,
   autoOnStartup: true,
@@ -454,3 +454,18 @@ setInterval(() => {
     refreshStatus();
   }
 }, 15000);
+
+// 标签页重新切回前台时立即快速刷新
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    refreshStatus();
+  }
+});
+
+// 监听跨标签页的主题变动
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.theme) {
+    applyTheme(changes.theme.newValue || 'auto');
+  }
+});
+

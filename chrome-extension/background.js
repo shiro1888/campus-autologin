@@ -19,7 +19,7 @@ const URL_LOGIN = PORTAL_ORIGIN + '/drcom/login';
 const JS_VERSION = '4.1.3';
 
 const ALARM_NAME = 'campus-auto-login';
-const DEFAULT_INTERVAL_MIN = 1 / 60;   // 默认 1 秒
+const DEFAULT_INTERVAL_MIN = 10 / 60;   // 默认 10 秒（自适应在线巡检，掉线自动切至 1 秒抢修）
 // 下限 1 秒。注意：Chrome 官方文档说 alarms 最快 30 秒，但那只对「已打包/商店安装」
 // 的扩展生效；开发者模式加载的未打包扩展不受此限制，实测 1 秒可正常触发。
 const MIN_INTERVAL_MIN = 1 / 60;
