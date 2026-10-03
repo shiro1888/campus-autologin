@@ -864,8 +864,10 @@ def cmd_gui(args, cfg) -> int:
         st_lbl.config(text="● 检测中…", fg="#f59e0b")
         def _task():
             try:
+                t0 = time.time()
                 portal = Portal(cfg)
                 st = portal.status()
+                ping_ms = int((time.time() - t0) * 1000)
                 online = int(st.get("result", 0)) == 1
                 ip = st.get("v4ip") or st.get("ss5") or detect_local_ip(portal.host_only)
                 current_detected_ip[0] = ip
@@ -877,13 +879,47 @@ def cmd_gui(args, cfg) -> int:
                     else:
                         st_lbl.config(text="○ 未在线 (需要认证)", fg=danger_color)
                     ip_lbl.config(text="本机 IP: %s" % (ip or "—"))
-                    meta_lbl.config(text="已用流量: %s  |  上线: %s" % (flow, time_str or "—"))
+                    dur_text = ("  |  上线: %s" % time_str) if time_str else ""
+                    meta_lbl.config(text="流量: %s  |  延迟: %d ms%s" % (flow, ping_ms, dur_text))
                 safe_ui(_ui)
             except Exception as e:
                 def _err():
                     st_lbl.config(text="! 网络不可达", fg=danger_color)
                     ip_lbl.config(text="错误: %s" % e)
+                    meta_lbl.config(text="已用流量: —  |  时长: —")
                 safe_ui(_err)
+        run_async(_task)
+
+    def do_test():
+        st_lbl.config(text="→ 正在运行网络自检…", fg="#3b82f6")
+        def _task():
+            try:
+                portal = Portal(cfg)
+                c_home, _ = http_request(portal.web_base + "/", portal.timeout)
+                c_ep, _ = http_request(portal.ep_base + "/", portal.timeout)
+                st = portal.status()
+                c_auth = st.get("_http", 200)
+                online = int(st.get("result", 0)) == 1
+                ip = st.get("v4ip") or st.get("ss5") or detect_local_ip(portal.host_only)
+                diag = (
+                    "【校园网连接自检结果】\n\n"
+                    "• 门户首页 (端口 80): HTTP %d %s\n"
+                    "• ePortal 服务 (801): HTTP %d %s\n"
+                    "• 认证查询接口: HTTP %d %s\n"
+                    "• 本机出口 IP: %s\n"
+                    "• 当前认证状态: %s\n\n"
+                    "诊断结论: %s" % (
+                        c_home, "✓ 正常" if c_home == 200 else "✗ 异常",
+                        c_ep, "✓ 正常" if c_ep == 200 else "✗ 异常",
+                        c_auth, "✓ 正常" if c_auth == 200 else "✗ 异常",
+                        ip or "未探测到",
+                        "已在线 (网络畅通)" if online else "未登录认证",
+                        "校园网网关与认证服务全部连通正常！" if (c_home == 200 and c_auth == 200) else "部分接口响应异常，请检查网线或 Wi-Fi 连接。"
+                    )
+                )
+                safe_ui(lambda: [messagebox.showinfo("网络自检诊断", diag), do_refresh()])
+            except Exception as e:
+                safe_ui(lambda: [messagebox.showerror("自检异常", "网络自检失败: %s" % e), do_refresh()])
         run_async(_task)
 
     def do_login():
@@ -942,16 +978,19 @@ def cmd_gui(args, cfg) -> int:
     pass_ent.bind("<Return>", lambda e: do_login())
 
     btn_login = tk.Button(btn_frame, text="立即登录", font=("Microsoft YaHei", 10, "bold"), bg=accent, fg="#fff", activebackground="#1d4ed8", relief="flat", cursor="hand2", command=do_login)
-    btn_login.pack(side="left", expand=True, fill="x", padx=3, ipady=6)
+    btn_login.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
 
-    btn_logout = tk.Button(btn_frame, text="注销", font=("Microsoft YaHei", 10), bg="#334155", fg="#f8fafc", activebackground="#475569", relief="flat", cursor="hand2", command=do_logout)
-    btn_logout.pack(side="left", expand=True, fill="x", padx=3, ipady=6)
+    btn_test = tk.Button(btn_frame, text="自检", font=("Microsoft YaHei", 10), bg="#334155", fg="#f8fafc", activebackground="#475569", relief="flat", cursor="hand2", command=do_test)
+    btn_test.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
 
     btn_refresh = tk.Button(btn_frame, text="刷新", font=("Microsoft YaHei", 10), bg="#1e293b", fg=text_color, relief="flat", cursor="hand2", command=do_refresh)
-    btn_refresh.pack(side="left", expand=True, fill="x", padx=3, ipady=6)
+    btn_refresh.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
 
     btn_save = tk.Button(btn_frame, text="保存账号", font=("Microsoft YaHei", 10), bg="#1e293b", fg=text_muted, relief="flat", cursor="hand2", command=do_save)
-    btn_save.pack(side="left", expand=True, fill="x", padx=3, ipady=6)
+    btn_save.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
+
+    btn_logout = tk.Button(btn_frame, text="注销", font=("Microsoft YaHei", 10), bg="#1e293b", fg="#f87171", activebackground="#475569", relief="flat", cursor="hand2", command=do_logout)
+    btn_logout.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
 
     do_refresh()
     root.mainloop()

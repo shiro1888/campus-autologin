@@ -1170,6 +1170,26 @@ select:focus {
 .btn-main.loading .btn-icon,
 .btn-main.loading .btn-shimmer { display: none; }
 
+.unsaved-dot {
+  display: none;
+  width: 8px;
+  height: 8px;
+  background: #fbbf24;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #f59e0b;
+  margin-left: 5px;
+  animation: pulse-dot 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.35); opacity: 0.75; }
+}
+
+.btn-main.has-changes .unsaved-dot {
+  display: inline-block;
+}
+
 .btn-ghost-danger {
   height: 48px;
   padding: 0 22px;

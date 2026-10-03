@@ -326,12 +326,21 @@ function save(cb) {
     return;
   }
   chrome.storage.local.set(s, () => {
+    $('btnSave').classList.remove('has-changes');
     chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => {
       void chrome.runtime.lastError;
       if (cb) cb(true);
     });
   });
 }
+
+// --- 监听表单变更，实时提示未保存状态 ---
+$('form').addEventListener('input', () => {
+  $('btnSave').classList.add('has-changes');
+});
+$('form').addEventListener('change', () => {
+  $('btnSave').classList.add('has-changes');
+});
 
 // --- 保存并立即测试 ---
 $('form').addEventListener('submit', (e) => {
@@ -474,6 +483,7 @@ $('btnResetDefaults').addEventListener('click', () => {
     return;
   }
   chrome.storage.local.set(DEFAULTS, () => {
+    $('btnSave').classList.remove('has-changes');
     load();
     chrome.runtime.sendMessage({ type: 'settingsChanged' });
     showToast('已恢复为默认配置。', 'ok');
