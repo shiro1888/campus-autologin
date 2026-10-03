@@ -113,19 +113,17 @@ python campus_login.py status --json
 
 ## ② 设置开机自动登录
 
-**以管理员身份**打开 PowerShell，执行：
+**推荐方式（一键双击）**：
+* **安装**：直接双击运行项目根目录下的 **`安装开机自启.bat`**。系统会自动弹出管理员授权窗口，点击「是」即自动完成自检并注册双触发器计划任务（开机 20 秒后启动 + 用户登录 10 秒后启动，完美兼容台式机常开与笔记本合盖休眠唤醒）。
+* **卸载**：直接双击运行 **`卸载开机自启.bat`** 即可安全清理。
+
+**高级方式（手动 PowerShell）**：
+以管理员身份打开 PowerShell，执行：
 
 ```powershell
 cd "C:\Project\校园网自动登录脚本"
 powershell -ExecutionPolicy Bypass -File "安装开机自启.ps1"
-```
-
-脚本会：自检配置和网络 → 创建名为 `CampusNetAutoLogin` 的计划任务（开机 30 秒后自动运行）。
-
-**卸载**：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File "安装开机自启.ps1" -Uninstall
+# 卸载请加 -Uninstall 参数
 ```
 
 **相关操作**：
