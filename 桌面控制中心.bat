@@ -12,7 +12,7 @@ if not errorlevel 1 set "PYEXE=python"
 if defined PYEXE goto :run
 
 echo.
-echo   [错误] 没有检测到 Python 环境。
+echo   [错误] 没有检测到 Python 运行环境
 echo.
 pause
 exit /b 2

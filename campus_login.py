@@ -55,7 +55,7 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-VERSION = "1.0.0"
+VERSION = "1.3.0"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
@@ -823,6 +823,8 @@ def cmd_gui(args, cfg) -> int:
         run_async(_task)
 
     def do_logout():
+        if not messagebox.askyesno("注销确认", "确定要注销下线当前校园网会话吗？\n注销后电脑将断开互联网连接。"):
+            return
         st_lbl.config(text="→ 正在注销…", fg="#f59e0b")
         def _task():
             try:

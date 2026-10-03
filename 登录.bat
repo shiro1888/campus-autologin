@@ -12,9 +12,9 @@ if not errorlevel 1 set "PYEXE=python"
 if defined PYEXE goto :run
 
 echo.
-echo   [错误] 没有检测到 Python。
-echo   请先到 https://www.python.org/downloads/ 安装 Python 3，
-echo   安装时记得勾选 "Add Python to PATH"。
+echo   [错误] 没有检测到 Python 环境
+echo   请先到 https://www.python.org/downloads/ 安装 Python 3
+echo   安装时记得勾选 "Add Python to PATH"
 echo.
 pause
 exit /b 2

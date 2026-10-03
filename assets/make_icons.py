@@ -5,8 +5,8 @@ import sys
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BASE_DIR)
-MASTER_PATH = os.path.join(PROJECT_ROOT, "assets", "master.jpg")
-OUT_DIR = os.path.join(BASE_DIR, "icons")
+MASTER_PATH = os.path.join(BASE_DIR, "master.jpg")
+OUT_DIR = os.path.join(PROJECT_ROOT, "chrome-extension", "icons")
 
 
 def main():

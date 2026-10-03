@@ -130,13 +130,13 @@ dr1002({"result":1,"uid":"REDACTED_CAMPUS_ACCOUNT","v4ip":"10.102.4.51",...});
 ```
 chrome-extension/
 ├── manifest.json     插件清单 (MV3)
-├── background.js     Service Worker：定时检查 + 自动重连
-├── content.js        登录页自动填写脚本
-├── popup.html/js/css 工具栏弹出面板
-├── options.html/js/css 设置页
-├── make_icons.py     图标生成脚本（已生成好图标，无需再运行）
-├── icons/            icon16/32/48/128.png
-└── README.md         本文件
+├── background.js     Service Worker：定时检查 + 自动重连 + webNavigation 监听
+├── common.js         公共模块：时间格式化、流量换算、状态秒表
+├── content.js        登录页自动填写与 HUD 状态胶囊提示脚本
+├── popup.html/js/css 工具栏弹出面板（Bento 网格、毛玻璃动态流光）
+├── options.html/js/css 控制中心设置页（吸顶导航、返回顶部、数据遥测）
+├── icons/            已生成的各尺寸图标 (icon16/32/48/128.png)
+└── README.md         本说明文件
 ```
 
 ---
