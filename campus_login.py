@@ -52,12 +52,12 @@ import urllib.request
 if sys.stdout is not None and hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
+    except (OSError, ValueError):
         pass
 if sys.stderr is not None and hasattr(sys.stderr, "reconfigure"):
     try:
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
+    except (OSError, ValueError):
         pass
 
 VERSION = "1.3.0"
@@ -789,7 +789,7 @@ def cmd_gui(args, cfg) -> int:
         """将 UI 更新调度到主线程。线程安全：不直接查询控件状态。"""
         try:
             root.after(0, fn)
-        except Exception:
+        except (tk.TclError, RuntimeError):
             pass
 
     def do_refresh():
