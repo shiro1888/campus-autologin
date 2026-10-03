@@ -76,7 +76,7 @@ function refresh() {
   }
 
   chrome.storage.local.get(
-    ['account', 'intervalMin', 'offlineIntervalMin', 'adaptive', 'lastResult'],
+    ['account', 'isp', 'intervalMin', 'offlineIntervalMin', 'adaptive', 'lastResult'],
     (s) => {
       $('account').textContent = (s && s.account) || '未设置';
 

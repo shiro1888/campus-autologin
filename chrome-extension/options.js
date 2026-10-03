@@ -272,6 +272,8 @@ function closeAllCustomSelects() {
     if (t) t.setAttribute('aria-expanded', 'false');
     const card = w.closest('.card');
     if (card) card.style.zIndex = '';
+    const field = w.closest('.field');
+    if (field) field.style.zIndex = '';
   });
 }
 
@@ -364,6 +366,13 @@ function initCustomSelects() {
         it.classList.toggle('active', isMatch);
         it.setAttribute('aria-selected', isMatch ? 'true' : 'false');
       });
+
+      if (wrap.classList.contains('open')) {
+        const activeItem = menu.querySelector('.custom-select-option.active');
+        if (activeItem) {
+          activeItem.scrollIntoView({ block: 'nearest' });
+        }
+      }
     }
 
     // 挂载到 select 元素对象便于外界调用
@@ -391,6 +400,8 @@ function initCustomSelects() {
 
       const parentCard = wrap.closest('.card');
       if (parentCard) parentCard.style.zIndex = '50';
+      const parentField = wrap.closest('.field');
+      if (parentField) parentField.style.zIndex = '60';
 
       const activeItem = menu.querySelector('.custom-select-option.active');
       if (activeItem) {
@@ -403,6 +414,8 @@ function initCustomSelects() {
       trigger.setAttribute('aria-expanded', 'false');
       const parentCard = wrap.closest('.card');
       if (parentCard) parentCard.style.zIndex = '';
+      const parentField = wrap.closest('.field');
+      if (parentField) parentField.style.zIndex = '';
     }
 
     trigger.addEventListener('click', (e) => {
@@ -437,14 +450,14 @@ function initCustomSelects() {
       }
     });
 
-    // 点击 label 自动聚焦打开
+    // 点击 label 自动聚焦并切换打开
     if (select.id) {
       const label = document.querySelector(`label[for="${select.id}"]`);
       if (label) {
         label.addEventListener('click', (e) => {
           e.preventDefault();
           trigger.focus();
-          openMenu();
+          trigger.click();
         });
       }
     }
@@ -480,8 +493,8 @@ function load() {
     $('isp').value = String(s.isp || '1');
     syncCustomSelect('isp');
 
-    pickClosest('intervalMin', s.intervalMin === undefined ? 1 / 60 : s.intervalMin);
-    pickClosest('offlineIntervalMin', s.offlineIntervalMin === undefined ? 1 / 60 : s.offlineIntervalMin);
+    pickClosest('intervalMin', s.intervalMin === undefined ? DEFAULTS.intervalMin : s.intervalMin);
+    pickClosest('offlineIntervalMin', s.offlineIntervalMin === undefined ? DEFAULTS.offlineIntervalMin : s.offlineIntervalMin);
 
     $('adaptive').checked = s.adaptive !== false;
     $('autoOnStartup').checked = s.autoOnStartup !== false;

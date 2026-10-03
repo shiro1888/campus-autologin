@@ -1,6 +1,6 @@
 @echo off
 chcp 936 >nul
-rem 计划任务调用的静默版本，日志写到 logs\autologin.log
+rem Silent runner for scheduled task, writes logs to logs\autologin.log
 cd /d "%~dp0"
 if not exist "%~dp0logs" mkdir "%~dp0logs"
 
@@ -12,12 +12,12 @@ where python >nul 2>nul
 if not errorlevel 1 set "PYEXE=python"
 if defined PYEXE goto :run
 
-echo [%date% %time%] [错误] 未检测到 Python 环境 (py / python 均不在 PATH 中) >> "%~dp0logs\autologin.log"
+echo [%date% %time%] [ERROR] Python environment not found (neither py nor python in PATH) >> "%~dp0logs\autologin.log"
 exit /b 2
 
 :run
 echo. >> "%~dp0logs\autologin.log"
-echo [%date% %time%] ---- 开始 ---- >> "%~dp0logs\autologin.log"
+echo [%date% %time%] ---- START ---- >> "%~dp0logs\autologin.log"
 %PYEXE% "%~dp0campus_login.py" wait -q >> "%~dp0logs\autologin.log" 2>&1
-echo [%date% %time%] 退出: %ERRORLEVEL% >> "%~dp0logs\autologin.log"
+echo [%date% %time%] EXIT: %ERRORLEVEL% >> "%~dp0logs\autologin.log"
 exit /b %ERRORLEVEL%
