@@ -48,9 +48,14 @@ import urllib.parse
 import urllib.request
 
 # 确保在 Windows 控制台下输出 UTF-8 中文和框线符号不乱码
-if hasattr(sys.stdout, "reconfigure"):
+# 注意: pythonw.exe 无终端时 stdout/stderr 为 None
+if sys.stdout is not None and hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if sys.stderr is not None and hasattr(sys.stderr, "reconfigure"):
+    try:
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
@@ -91,16 +96,18 @@ _QUIET = False
 # --------------------------------------------------------------------------
 def say(msg: str = "") -> None:
     """按需输出到控制台(静默模式下只保留错误)。"""
-    if not _QUIET:
+    if not _QUIET and sys.stdout is not None:
         try:
             print(msg, flush=True)
-        except UnicodeEncodeError:
-            enc = sys.stdout.encoding or "utf-8"
+        except (UnicodeEncodeError, OSError):
+            enc = getattr(sys.stdout, "encoding", None) or "utf-8"
             print(msg.encode(enc, "replace").decode(enc, "replace"), flush=True)
 
 
 def emit_json(payload: dict) -> None:
     """--json 模式：无论是否静默都输出结构化结果。"""
+    if sys.stdout is None:
+        return
     try:
         sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
         sys.stdout.flush()
@@ -114,14 +121,18 @@ def emit_json(payload: dict) -> None:
 # --------------------------------------------------------------------------
 def load_config() -> dict:
     cfg = dict(DEFAULT_CONFIG)
-    if os.path.isfile(CONFIG_PATH):
+    # 优先读取用户本地 config.json，不存在则回退到仓库模板 config.example.json
+    config_file = CONFIG_PATH
+    if not os.path.isfile(config_file):
+        config_file = os.path.join(BASE_DIR, "config.example.json")
+    if os.path.isfile(config_file):
         try:
-            with open(CONFIG_PATH, "r", encoding="utf-8-sig") as fh:
+            with open(config_file, "r", encoding="utf-8-sig") as fh:
                 user_cfg = json.load(fh)
             if isinstance(user_cfg, dict):
                 cfg.update({k: v for k, v in user_cfg.items() if v is not None})
         except (OSError, ValueError) as exc:
-            raise ConfigError("配置文件 config.json 无法解析: %s" % exc)
+            raise ConfigError("配置文件 %s 无法解析: %s" % (os.path.basename(config_file), exc))
     return cfg
 
 
@@ -134,7 +145,7 @@ class ConfigError(Exception):
 # --------------------------------------------------------------------------
 def decode_body(raw: bytes) -> str:
     """门户页面存在 gb2312 / utf-8 混用，依次尝试解码。"""
-    for enc in ("utf-8", "gb18030", "latin-1"):
+    for enc in ("utf-8", "gb18030"):
         try:
             return raw.decode(enc)
         except (UnicodeDecodeError, LookupError):
@@ -156,11 +167,14 @@ def http_request(url: str, timeout: float, data: dict | None = None) -> tuple[in
     except urllib.error.HTTPError as exc:
         return exc.code, decode_body(exc.read() or b"")
     except urllib.error.URLError as exc:
-        raise NetworkError("无法连接门户 %s (%s)" % (url, exc.reason))
+        safe_url = urllib.parse.urlunparse(urllib.parse.urlparse(url)._replace(query=""))
+        raise NetworkError("无法连接门户 %s (%s)" % (safe_url, exc.reason))
     except (socket.timeout, TimeoutError):
-        raise NetworkError("连接门户超时: %s" % url)
+        safe_url = urllib.parse.urlunparse(urllib.parse.urlparse(url)._replace(query=""))
+        raise NetworkError("连接门户超时: %s" % safe_url)
     except OSError as exc:
-        raise NetworkError("网络错误: %s" % exc)
+        safe_url = urllib.parse.urlunparse(urllib.parse.urlparse(url)._replace(query=""))
+        raise NetworkError("网络错误: %s (%s)" % (safe_url, exc))
 
 
 class NetworkError(Exception):
@@ -169,7 +183,7 @@ class NetworkError(Exception):
 
 def parse_jsonp(text: str) -> dict:
     """门户返回形如 ` dr1001({"result":1,...}); `，提取其中的 JSON 对象。"""
-    match = re.search(r"\(\s*(\{.*\})\s*\)", text, re.S)
+    match = re.search(r"\(\s*(\{.*?\})\s*\)", text, re.S)
     if not match:
         snippet = " ".join(text.split())[:160]
         raise NetworkError("门户返回内容无法解析: %s" % snippet)
@@ -476,7 +490,7 @@ def cmd_status(args, cfg) -> int:
             m = (sec % 3600) // 60
             s = sec % 60
             dur_text = ("%d小时 %02d分 %02d秒" % (h, m, s)) if h > 0 else ("%02d分 %02d秒" % (m, s))
-        except Exception:
+        except (ValueError, TypeError, OverflowError):
             pass
     elif st.get("actt"):
         try:
@@ -485,7 +499,7 @@ def cmd_status(args, cfg) -> int:
             m = (sec % 3600) // 60
             s = sec % 60
             dur_text = ("%d小时 %02d分 %02d秒" % (h, m, s)) if h > 0 else ("%02d分 %02d秒" % (m, s))
-        except Exception:
+        except (ValueError, TypeError):
             pass
 
     # 包含下行与上行分项的流量字符串
@@ -772,9 +786,9 @@ def cmd_gui(args, cfg) -> int:
         threading.Thread(target=fn, args=a, daemon=True).start()
 
     def safe_ui(fn):
+        """将 UI 更新调度到主线程。线程安全：不直接查询控件状态。"""
         try:
-            if root.winfo_exists():
-                root.after(0, fn)
+            root.after(0, fn)
         except Exception:
             pass
 

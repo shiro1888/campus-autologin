@@ -9,7 +9,7 @@
 | **① Python 脚本** | 开机自动登录、命令行、计划任务 | 零依赖，双击即用 |
 | **② Chrome 插件** | 日常用浏览器上网 | 后台定时检测，掉线自动重连 |
 
-> 默认账号 `REDACTED_CAMPUS_ACCOUNT`，密码已写入配置。**请勿把本文件夹分享给他人**（里面有你的密码）。
+> 默认账号 `REDACTED_CAMPUS_ACCOUNT`，密码已写入配置模板 `config.example.json`。首次使用请复制为 `config.json` 并填入自己的账号密码。
 
 ---
 
@@ -19,9 +19,12 @@
 校园网自动登录脚本/
 ├── 登录.bat              ← 双击运行（推荐入口，带中文提示）
 ├── campus_login.py       ← 核心脚本（纯 Python 标准库，零依赖）
-├── config.json           ← 账号密码等配置
+├── config.example.json   ← 配置模板（复制为 config.json 后填入自己的账号密码）
 ├── autostart.bat         ← 静默版，供计划任务调用（写日志）
 ├── 安装开机自启.ps1      ← 一键安装/卸载「开机自动登录」计划任务
+├── 安装开机自启.bat      ← 双击自动提权安装计划任务
+├── 卸载开机自启.bat      ← 双击自动提权卸载计划任务
+├── 桌面控制中心.bat      ← 打开 GUI 控制面板
 ├── 刷新插件（重要）.bat  ← 改完插件代码后，一键打开扩展页刷新
 ├── chrome-extension/     ← Chrome 浏览器插件
 │   ├── manifest.json
@@ -30,6 +33,7 @@
 │   ├── options.html / options.js / options.css
 │   ├── icons/
 │   └── README.md         ← 插件单独的安装说明
+├── assets/               ← 图标生成工具
 ├── logs/                 ← 计划任务运行日志
 └── README.md             ← 本文件
 ```
@@ -96,7 +100,7 @@ python campus_login.py status --json
 
 ### 修改账号密码
 
-编辑 `config.json`：
+将 `config.example.json` 复制为 `config.json`，然后编辑 `config.json`：
 
 ```json
 {
@@ -106,6 +110,8 @@ python campus_login.py status --json
   "isp": "1"
 }
 ```
+
+> `config.json` 已被 `.gitignore` 忽略，不会被提交到 Git 仓库。
 
 `isp` 为运营商代码：`1` = 校园用户（默认，无后缀） · `2` = 校园电信 `@dx` · `3` = 校园联通 `@lt` · `4` = 校园其他
 
@@ -172,7 +178,7 @@ notepad "C:\Project\校园网自动登录脚本\logs\autologin.log"   # 查看�
 > **方法 B（最省事）**：**完全退出 Chrome 再打开**（关掉所有窗口；或右下角托盘退出）。
 > 重启后所有扩展都会重新从磁盘加载，等于自动刷新。
 >
-> 确认成功的标志：设置页标题右边出现版本号 **v1.2.0**。
+> 确认成功的标志：设置页标题右边出现版本号 **v1.3.0**。
 
 ---
 
@@ -221,10 +227,11 @@ dr1002({"result":1,"uid":"REDACTED_CAMPUS_ACCOUNT","v4ip":"10.102.4.51",...});
 
 ## 安全提醒
 
-`config.json` 和 Chrome 插件里保存了你的校园网密码（明文）。请注意：
+`config.json`（本地配置）和 Chrome 插件里保存了你的校园网密码（明文）。请注意：
 
-- 不要把本文件夹上传网盘、Git 仓库或发给别人
-- 公用电脑上使用后，建议删除 `config.json` 里的密码
+- `config.json` 已被 `.gitignore` 忽略，不会被意外提交到 Git 仓库
+- 不要把本文件夹上传网盘或发给别人（Chrome 插件设置里也有密码）
+- 公用电脑上使用后，建议删除 `config.json`
 
 ---
 

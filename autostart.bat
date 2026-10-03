@@ -1,6 +1,6 @@
 @echo off
 chcp 936 >nul
-rem 供计划任务调用的静默版本：不弹窗，日志写入 logs\autologin.log
+rem 计划任务调用的静默版本，日志写到 logs\autologin.log
 cd /d "%~dp0"
 if not exist "%~dp0logs" mkdir "%~dp0logs"
 
@@ -11,6 +11,8 @@ if defined PYEXE goto :run
 where python >nul 2>nul
 if not errorlevel 1 set "PYEXE=python"
 if defined PYEXE goto :run
+
+echo [%date% %time%] [错误] 未检测到 Python 环境 (py / python 均不在 PATH 中) >> "%~dp0logs\autologin.log"
 exit /b 2
 
 :run

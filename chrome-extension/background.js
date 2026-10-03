@@ -482,14 +482,12 @@ function setupInstantTriggers() {
   // 1) 主框架导航被重定向到门户 -> 说明掉线了
   chrome.webNavigation.onCommitted.addListener((details) => {
     if (details.frameId !== 0) return;
-    const url = details.url || '';
-    if (url.indexOf('172.30.100.2') === -1) return;
     enabled().then((on) => {
       if (!on) return;
       console.log('[instant] 检测到跳转到门户，立即登录');
       return autoLogin('掉线跳转');
     }).catch(() => {});
-  });
+  }, { url: [{ hostContains: '172.30.100.2' }] });
 
   // 2) 导航失败（DNS/连接错误）-> 也可能是掉线
   chrome.webNavigation.onErrorOccurred.addListener((details) => {

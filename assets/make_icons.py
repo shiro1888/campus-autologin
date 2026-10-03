@@ -17,6 +17,9 @@ def main():
         print("当前 chrome-extension/icons/ 下的图标已预先生成完毕，日常使用插件无需安装任何依赖。")
         return 0
 
+    # 兼容旧版 Pillow（<9.1.0 无 Image.Resampling）
+    LANCZOS = getattr(Image.Resampling, 'LANCZOS', None) or getattr(Image, 'LANCZOS', getattr(Image, 'ANTIALIAS', None))
+
     if not os.path.isfile(MASTER_PATH):
         print(f"错误: 未找到源图片 {MASTER_PATH}")
         return 1
@@ -31,13 +34,13 @@ def main():
     draw = ImageDraw.Draw(mask)
     radius = int(mask_w * 0.22)
     draw.rounded_rectangle([0, 0, mask_w, mask_h], radius=radius, fill=255)
-    mask = mask.resize((w, h), Image.Resampling.LANCZOS)
+    mask = mask.resize((w, h), LANCZOS)
 
     icon_master = img.copy()
     icon_master.putalpha(mask)
 
     for size in (16, 32, 48, 128):
-        resized = icon_master.resize((size, size), Image.Resampling.LANCZOS)
+        resized = icon_master.resize((size, size), LANCZOS)
         dest = os.path.join(OUT_DIR, f"icon{size}.png")
         resized.save(dest, "PNG")
         print(f"Generated {dest} ({size}x{size})")

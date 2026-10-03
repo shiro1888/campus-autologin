@@ -1,4 +1,4 @@
-﻿# =====================================================================
+# =====================================================================
 #  校园网自动登录 —— 一键安装"开机自动登录"计划任务
 #  用法(右键 PowerShell "以管理员身份运行"):
 #      powershell -ExecutionPolicy Bypass -File "安装开机自启.ps1"
@@ -67,7 +67,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Step "创建计划任务..."
 
-$action = New-ScheduledTaskAction -Execute $target -WorkingDirectory $here
+$action = New-ScheduledTaskAction -Execute "`"$target`"" -WorkingDirectory $here
 
 # 双触发器：开机启动（延迟 20 秒） + 用户登录（延迟 10 秒），兼顾台式机与笔记本合盖休眠唤醒
 $triggerStartup = New-ScheduledTaskTrigger -AtStartup
