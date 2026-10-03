@@ -76,10 +76,64 @@ function applyTheme(theme) {
   }
 }
 
-/** 页面快捷导航与返回顶部 */
+/** 页面快捷导航与滚动高亮 (Scroll Spy) */
 function initNavigation() {
   const navItems = document.querySelectorAll('.sticky-nav .nav-item');
   const btt = $('btnBackToTop');
+  const sectionIds = ['statusWidget', 'cardCredentials', 'cardPolicy', 'cardTriggers', 'cardFaq'];
+
+  let isClickScrolling = false;
+  let clickTimer = null;
+  let isScrollTicking = false;
+
+  function setActiveNav(targetId) {
+    navItems.forEach((item) => {
+      item.classList.toggle('active', item.getAttribute('data-target') === targetId);
+    });
+  }
+
+  function getTargetScrollTop(targetEl, targetId) {
+    if (targetId === 'statusWidget') return 0;
+    const navBar = document.querySelector('.sticky-nav');
+    const navOffset = (navBar ? navBar.offsetHeight : 44) + 26;
+    const rect = targetEl.getBoundingClientRect();
+    return Math.max(0, Math.round(window.scrollY + rect.top - navOffset));
+  }
+
+  function updateActiveNav() {
+    if (isClickScrolling) return;
+
+    const scrollY = window.scrollY;
+    const viewportHeight = window.innerHeight;
+    const docHeight = document.documentElement.scrollHeight;
+
+    // 页面处于顶部区域时，固定高亮首个模块（监控中心）
+    if (scrollY < 80) {
+      setActiveNav(sectionIds[0]);
+      return;
+    }
+
+    // 页面滚动至接近底部（距底 70px 内）时，锁定高亮末尾模块（常见问题）
+    if (scrollY + viewportHeight >= docHeight - 70) {
+      setActiveNav(sectionIds[sectionIds.length - 1]);
+      return;
+    }
+
+    // 正常区间：从上往下检测，最后一个 top 进入可视区的模块为当前高亮
+    const triggerOffset = 110;
+    let activeId = sectionIds[0];
+
+    for (const id of sectionIds) {
+      const el = $(id);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.top <= triggerOffset) {
+        activeId = id;
+      }
+    }
+
+    setActiveNav(activeId);
+  }
 
   // 平滑滚动快速跳转
   navItems.forEach((item) => {
@@ -87,53 +141,90 @@ function initNavigation() {
       e.preventDefault();
       const targetId = item.getAttribute('data-target');
       const targetEl = $(targetId);
-      if (targetEl) {
-        if (targetId === 'cardFaq' && targetEl.tagName === 'DETAILS') {
-          targetEl.open = true;
-        }
-        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        navItems.forEach((n) => n.classList.toggle('active', n === item));
+      if (!targetEl) return;
+
+      // 若目标为 FAQ 折叠栏，点击导航时自动展开
+      if (targetId === 'cardFaq' && targetEl.tagName === 'DETAILS') {
+        targetEl.open = true;
       }
+
+      // 锁定滚动监听，防止平滑滚动过程中的中间区域抢占高亮
+      isClickScrolling = true;
+      if (clickTimer) clearTimeout(clickTimer);
+      setActiveNav(targetId);
+
+      const targetTop = getTargetScrollTop(targetEl, targetId);
+      window.scrollTo({
+        top: targetTop,
+        behavior: 'smooth'
+      });
+
+      clickTimer = setTimeout(() => {
+        isClickScrolling = false;
+        updateActiveNav();
+      }, 800);
     });
   });
 
-  // 滚动时动态高亮当前可视模块
-  const sectionIds = ['statusWidget', 'cardCredentials', 'cardPolicy', 'cardTriggers', 'cardFaq'];
-  if ('IntersectionObserver' in window) {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const currentId = entry.target.id;
-          navItems.forEach((item) => {
-            item.classList.toggle('active', item.getAttribute('data-target') === currentId);
-          });
-        }
-      });
-    }, {
-      rootMargin: '-70px 0px -60% 0px',
-      threshold: 0.1
-    });
+  // 现代浏览器 scrollend 事件即时解除点击锁定
+  if ('onscrollend' in window) {
+    window.addEventListener('scrollend', () => {
+      if (isClickScrolling) {
+        if (clickTimer) clearTimeout(clickTimer);
+        isClickScrolling = false;
+        updateActiveNav();
+      }
+    }, { passive: true });
+  }
 
-    sectionIds.forEach((id) => {
-      const el = $(id);
-      if (el) observer.observe(el);
+  // 监听 FAQ 折叠状态变化，展开/折叠时重新校验视口高亮
+  const faqEl = $('cardFaq');
+  if (faqEl) {
+    faqEl.addEventListener('toggle', () => {
+      if (!isClickScrolling) updateActiveNav();
     });
   }
 
-  // 返回顶部按钮逻辑
-  if (btt) {
-    window.addEventListener('scroll', () => {
+  // 滚动与视口尺寸变化监听（节流）
+  const onScroll = () => {
+    // 处理返回顶部按钮显隐
+    if (btt) {
       if (window.scrollY > 180) {
         btt.classList.add('visible');
       } else {
         btt.classList.remove('visible');
       }
-    }, { passive: true });
+    }
 
+    // 更新导航高亮
+    if (!isClickScrolling && !isScrollTicking) {
+      window.requestAnimationFrame(() => {
+        updateActiveNav();
+        isScrollTicking = false;
+      });
+      isScrollTicking = true;
+    }
+  };
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll, { passive: true });
+
+  // 返回顶部按钮逻辑
+  if (btt) {
     btt.addEventListener('click', () => {
+      isClickScrolling = true;
+      if (clickTimer) clearTimeout(clickTimer);
+      setActiveNav(sectionIds[0]);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      clickTimer = setTimeout(() => {
+        isClickScrolling = false;
+        updateActiveNav();
+      }, 800);
     });
   }
+
+  // 页面就绪时初始化一次高亮状态
+  updateActiveNav();
 }
 
 /** 从本地存储加载配置到表单 */
