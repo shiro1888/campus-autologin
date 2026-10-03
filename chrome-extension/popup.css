@@ -98,11 +98,23 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+@keyframes popupEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(3px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .popup-wrapper {
   padding: 15px 14px 14px;
   display: flex;
   flex-direction: column;
   gap: 11px;
+  animation: popupEntrance 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ==========================================================================
@@ -530,6 +542,18 @@ body {
   color: var(--text-muted);
 }
 
+.isp-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--primary);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  margin-left: auto;
+  line-height: 1.25;
+}
+
 .dock-icon {
   width: 13.5px;
   height: 13.5px;
@@ -552,6 +576,19 @@ body {
   color: var(--text-main);
   line-height: 1.25;
   letter-spacing: -0.015em;
+  transition: color 0.2s ease;
+}
+
+.dock-value.ping-fast {
+  color: #10b981;
+}
+
+.dock-value.ping-normal {
+  color: #f59e0b;
+}
+
+.dock-value.ping-slow {
+  color: #ef4444;
 }
 
 .dock-value.mono {
@@ -818,6 +855,20 @@ body {
 
 .btn-secondary:active {
   transform: scale(0.96);
+}
+
+.btn-secondary.confirming {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: var(--danger-border);
+  box-shadow: 0 0 0 2px var(--danger-glow);
+  font-weight: 600;
+  animation: pulse-danger 0.9s infinite alternate;
+}
+
+@keyframes pulse-danger {
+  from { transform: scale(1); }
+  to { transform: scale(1.03); }
 }
 
 .btn-secondary:disabled {

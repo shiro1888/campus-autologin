@@ -91,6 +91,13 @@
           <svg class="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
           <span>检测状态</span>
         </button>
+        <button type="button" class="btn-action" id="btnCopyReport" title="一键复制完整网络与诊断参数">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span id="btnCopyReportText">复制诊断</span>
+        </button>
         <button type="button" class="btn-action primary" id="btnLoginNow" title="立即发起登录请求">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           <span>立即登录</span>
@@ -132,6 +139,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
           </div>
           <span>网关延迟 (Ping)</span>
+          <span class="latency-badge" id="pingBadge">良好</span>
         </div>
         <div class="stat-val text-accent" id="stPing">—</div>
         <div class="stat-sub text-muted">172.30.100.2 响应耗时</div>

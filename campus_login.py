@@ -731,9 +731,26 @@ def cmd_gui(args, cfg) -> int:
 
     root = tk.Tk()
     root.title("校园网自动登录 · 桌面控制中心")
-    root.geometry("450x580")
-    root.minsize(420, 520)
     root.configure(bg="#0f172a")
+
+    # 窗口尺寸与屏幕居中
+    win_w, win_h = 470, 650
+    root.minsize(440, 580)
+    root.update_idletasks()
+    sw = root.winfo_screenwidth()
+    sh = root.winfo_screenheight()
+    pos_x = max(0, (sw - win_w) // 2)
+    pos_y = max(0, (sh - win_h) // 2)
+    root.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
+
+    # 尝试加载高质感专属应用图标
+    icon_path = os.path.join(BASE_DIR, "chrome-extension", "icons", "icon48.png")
+    if os.path.isfile(icon_path):
+        try:
+            app_icon = tk.PhotoImage(file=icon_path)
+            root.iconphoto(True, app_icon)
+        except Exception:
+            pass
 
     bg = "#0f172a"
     card_bg = "#1e293b"
@@ -758,8 +775,26 @@ def cmd_gui(args, cfg) -> int:
     st_lbl = tk.Label(st_card, text="● 检测状态中…", font=("Microsoft YaHei", 13, "bold"), fg="#f59e0b", bg=card_bg)
     st_lbl.pack(anchor="w")
 
-    ip_lbl = tk.Label(st_card, text="本机 IP: —", font=("Consolas", 10), fg=text_color, bg=card_bg)
-    ip_lbl.pack(anchor="w", pady=(6, 0))
+    # IP Row with Copy Button
+    ip_frame = tk.Frame(st_card, bg=card_bg)
+    ip_frame.pack(fill="x", pady=(6, 0))
+    ip_lbl = tk.Label(ip_frame, text="本机 IP: —", font=("Consolas", 10), fg=text_color, bg=card_bg)
+    ip_lbl.pack(side="left")
+
+    current_detected_ip = [""]
+
+    def do_copy_ip():
+        ip_val = current_detected_ip[0]
+        if ip_val:
+            root.clipboard_clear()
+            root.clipboard_append(ip_val)
+            btn_copy_ip.config(text="已复制 ✓", fg=success_color)
+            root.after(1500, lambda: btn_copy_ip.config(text="复制", fg=text_muted))
+
+    btn_copy_ip = tk.Button(ip_frame, text="复制", font=("Microsoft YaHei", 8), bg="#334155", fg=text_muted,
+                            activebackground="#475569", activeforeground=text_color, relief="flat",
+                            cursor="hand2", padx=6, command=do_copy_ip)
+    btn_copy_ip.pack(side="right")
 
     meta_lbl = tk.Label(st_card, text="已用流量: —  |  时长: —", font=("Microsoft YaHei", 9), fg=text_muted, bg=card_bg)
     meta_lbl.pack(anchor="w", pady=(2, 0))
@@ -768,15 +803,48 @@ def cmd_gui(args, cfg) -> int:
     form_card = tk.Frame(root, bg=card_bg, padx=16, pady=14, highlightthickness=1, highlightbackground="#334155")
     form_card.pack(fill="x", padx=18, pady=10)
 
+    # 上网账号
     tk.Label(form_card, text="上网账号", font=("Microsoft YaHei", 9, "bold"), fg=text_color, bg=card_bg).pack(anchor="w")
-    user_ent = tk.Entry(form_card, font=("Microsoft YaHei", 10), bg="#0b1120", fg=text_color, insertbackground=text_color, relief="flat", highlightthickness=1, highlightbackground="#334155")
+    user_ent = tk.Entry(form_card, font=("Microsoft YaHei", 10), bg="#0b1120", fg=text_color,
+                        insertbackground=text_color, relief="flat", highlightthickness=1,
+                        highlightbackground="#334155")
     user_ent.insert(0, cfg.get("username", ""))
     user_ent.pack(fill="x", pady=(3, 10), ipady=4)
 
+    # 登录密码（带显示/隐藏切换小眼睛）
     tk.Label(form_card, text="登录密码", font=("Microsoft YaHei", 9, "bold"), fg=text_color, bg=card_bg).pack(anchor="w")
-    pass_ent = tk.Entry(form_card, show="●", font=("Microsoft YaHei", 10), bg="#0b1120", fg=text_color, insertbackground=text_color, relief="flat", highlightthickness=1, highlightbackground="#334155")
+    pwd_wrap = tk.Frame(form_card, bg="#0b1120", highlightthickness=1, highlightbackground="#334155")
+    pwd_wrap.pack(fill="x", pady=(3, 10))
+
+    pass_ent = tk.Entry(pwd_wrap, show="●", font=("Microsoft YaHei", 10), bg="#0b1120", fg=text_color,
+                        insertbackground=text_color, relief="flat", bd=0)
     pass_ent.insert(0, cfg.get("password", ""))
-    pass_ent.pack(fill="x", pady=(3, 10), ipady=4)
+    pass_ent.pack(side="left", fill="x", expand=True, padx=6, ipady=4)
+
+    pwd_visible = [False]
+
+    def toggle_pwd():
+        pwd_visible[0] = not pwd_visible[0]
+        pass_ent.config(show="" if pwd_visible[0] else "●")
+        btn_pwd_toggle.config(text="🙈 隐藏" if pwd_visible[0] else "👁 显示")
+
+    btn_pwd_toggle = tk.Button(pwd_wrap, text="👁 显示", font=("Microsoft YaHei", 8), bg="#1e293b",
+                               fg=text_muted, activebackground="#334155", activeforeground=text_color,
+                               relief="flat", bd=0, cursor="hand2", padx=6, command=toggle_pwd)
+    btn_pwd_toggle.pack(side="right", padx=4, pady=2)
+
+    # 运营商选择 (R3 参数)
+    tk.Label(form_card, text="运营商选择 (R3 认证参数)", font=("Microsoft YaHei", 9, "bold"),
+             fg=text_color, bg=card_bg).pack(anchor="w", pady=(2, 2))
+    isp_frame = tk.Frame(form_card, bg=card_bg)
+    isp_frame.pack(fill="x", pady=(2, 4))
+    isp_var = tk.StringVar(value=str(cfg.get("isp", "1")))
+    for isp_k, isp_name in [("1", "校园用户"), ("2", "校园电信"), ("3", "校园联通"), ("4", "校园其他")]:
+        r = tk.Radiobutton(isp_frame, text=isp_name, value=isp_k, variable=isp_var,
+                           font=("Microsoft YaHei", 8), fg=text_color, bg=card_bg,
+                           selectcolor="#0f172a", activebackground=card_bg, activeforeground=text_color,
+                           highlightthickness=0)
+        r.pack(side="left", padx=(0, 4))
 
     # Actions Frame
     btn_frame = tk.Frame(root, bg=bg, padx=18, pady=6)
@@ -800,6 +868,7 @@ def cmd_gui(args, cfg) -> int:
                 st = portal.status()
                 online = int(st.get("result", 0)) == 1
                 ip = st.get("v4ip") or st.get("ss5") or detect_local_ip(portal.host_only)
+                current_detected_ip[0] = ip
                 flow = _format_flow(st.get("flow", 0))
                 time_str = st.get("stime", "")
                 def _ui():
@@ -820,6 +889,7 @@ def cmd_gui(args, cfg) -> int:
     def do_login():
         cfg["username"] = user_ent.get().strip()
         cfg["password"] = pass_ent.get().strip()
+        cfg["isp"] = isp_var.get()
         st_lbl.config(text="→ 正在登录…", fg="#3b82f6")
         def _task():
             try:
@@ -858,12 +928,18 @@ def cmd_gui(args, cfg) -> int:
     def do_save():
         cfg["username"] = user_ent.get().strip()
         cfg["password"] = pass_ent.get().strip()
+        cfg["isp"] = isp_var.get()
+        target_save_path = CONFIG_PATH
         try:
-            with open(CONFIG_PATH, "w", encoding="utf-8") as fh:
+            with open(target_save_path, "w", encoding="utf-8") as fh:
                 json.dump(cfg, fh, indent=2, ensure_ascii=False)
             messagebox.showinfo("提示", "配置已成功保存至 config.json")
         except Exception as e:
             messagebox.showerror("保存失败", str(e))
+
+    # 回车键快捷提交登录
+    user_ent.bind("<Return>", lambda e: do_login())
+    pass_ent.bind("<Return>", lambda e: do_login())
 
     btn_login = tk.Button(btn_frame, text="立即登录", font=("Microsoft YaHei", 10, "bold"), bg=accent, fg="#fff", activebackground="#1d4ed8", relief="flat", cursor="hand2", command=do_login)
     btn_login.pack(side="left", expand=True, fill="x", padx=3, ipady=6)

@@ -80,6 +80,15 @@ function refresh() {
     (s) => {
       $('account').textContent = (s && s.account) || '未设置';
 
+      const ispNames = { '1': '校园', '2': '电信', '3': '联通', '4': '其他' };
+      const ispFullNames = { '1': '校园用户 (默认)', '2': '校园电信 (@dx)', '3': '校园联通 (@lt)', '4': '校园其他' };
+      const currentIsp = (s && s.isp) || '1';
+      const ispEl = $('accountIsp');
+      if (ispEl) {
+        ispEl.textContent = ispNames[currentIsp] || '校园';
+        ispEl.title = '认证运营商: ' + (ispFullNames[currentIsp] || currentIsp);
+      }
+
       const iv = s && s.intervalMin !== undefined ? parseFloat(s.intervalMin) : 10 / 60;
       const off = s && s.offlineIntervalMin !== undefined ? parseFloat(s.offlineIntervalMin) : 1 / 60;
       const adaptive = !s || s.adaptive !== false;
@@ -112,11 +121,23 @@ function refresh() {
     }
 
     // 网关延迟与已用流量
+    const pingEl = $('popPing');
     if (res.pingMs !== undefined && res.pingMs >= 0) {
-      const isFast = res.pingMs < 60;
-      $('popPing').innerHTML = `<span class="ping-badge ${isFast ? 'speed-fast' : 'speed-normal'}">${res.pingMs} ms</span>`;
+      pingEl.textContent = `${res.pingMs} ms`;
+      if (res.pingMs <= 50) {
+        pingEl.className = 'dock-value mono ping-fast';
+        pingEl.title = `极佳延迟 (${res.pingMs} ms)`;
+      } else if (res.pingMs <= 150) {
+        pingEl.className = 'dock-value mono ping-normal';
+        pingEl.title = `正常延迟 (${res.pingMs} ms)`;
+      } else {
+        pingEl.className = 'dock-value mono ping-slow';
+        pingEl.title = `较高延迟 (${res.pingMs} ms)`;
+      }
     } else {
-      $('popPing').textContent = res.reachable ? '< 10 ms' : '超时';
+      pingEl.textContent = res.reachable ? '< 10 ms' : '超时';
+      pingEl.className = 'dock-value mono';
+      pingEl.title = res.reachable ? '网关连通正常' : '网关不可达';
     }
 
     const rawData = res.raw || {};
@@ -189,12 +210,27 @@ $('btnLogin').addEventListener('click', () => {
   });
 });
 
-// --- 注销下线 ---
+// --- 注销下线 (防误触二次确认，避免浏览器原生 confirm 导致扩展弹窗失焦关闭) ---
+let logoutConfirmTimer = null;
 $('btnLogout').addEventListener('click', () => {
-  if (!confirm('确定要注销下线当前校园网吗？\n注销后电脑将断开互联网连接。')) {
+  const btn = $('btnLogout');
+  const span = btn.querySelector('span');
+
+  if (!btn.classList.contains('confirming')) {
+    btn.classList.add('confirming');
+    if (span) span.textContent = '确认注销？';
+    setMsg('再次点击「确认注销」即可下线断网', 'info', 3000);
+    logoutConfirmTimer = setTimeout(() => {
+      btn.classList.remove('confirming');
+      if (span) span.textContent = '注销';
+    }, 3000);
     return;
   }
-  const btn = $('btnLogout');
+
+  // 确认注销
+  clearTimeout(logoutConfirmTimer);
+  btn.classList.remove('confirming');
+  if (span) span.textContent = '注销';
   btn.disabled = true;
   setMsg('正在向门户请求注销下线…', 'info');
 
