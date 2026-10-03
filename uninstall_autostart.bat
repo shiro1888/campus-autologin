@@ -1,22 +1,22 @@
 @echo off
 chcp 936 >nul
-title 校园网自动登录 — 卸载开机自启
+title Campus AutoLogin - Uninstall AutoStart
 cd /d "%~dp0"
 
-:: 检查是否有管理员权限
+:: Check admin rights
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo.
-    echo   需要管理员权限来卸载计划任务...
+    echo   Admin privileges required to uninstall...
     powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process cmd.exe -ArgumentList ('/c \"\"%~f0\"\"') -Verb RunAs"
     exit /b
 )
 
-:: 已经有管理员权限，执行卸载
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0安装开机自启.ps1" -Uninstall
+:: Run uninstaller with elevated rights
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0install_autostart.ps1" -Uninstall
 echo.
 echo ------------------------------------------------------------
-echo   按任意键关闭此窗口...
+echo   Press any key to exit...
 echo ------------------------------------------------------------
 pause >nul
 exit /b 0

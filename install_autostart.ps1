@@ -1,8 +1,8 @@
 ﻿# =====================================================================
 #  校园网自动登录 —— 一键安装"开机自动登录"计划任务
 #  用法(右键 PowerShell "以管理员身份运行"):
-#      powershell -ExecutionPolicy Bypass -File "安装开机自启.ps1"
-#  卸载:  powershell -ExecutionPolicy Bypass -File "安装开机自启.ps1" -Uninstall
+#      powershell -ExecutionPolicy Bypass -File "install_autostart.ps1"
+#  卸载:  powershell -ExecutionPolicy Bypass -File "install_autostart.ps1" -Uninstall
 # =====================================================================
 [CmdletBinding()]
 param(
@@ -115,5 +115,5 @@ Write-Host ""
 Write-Host "  常用命令:"
 Write-Host "    立即测试:  schtasks /Run /TN $TaskName"
 Write-Host "    查看日志:  notepad `"$here\logs\autologin.log`""
-Write-Host "    卸载任务:  powershell -ExecutionPolicy Bypass -File `"$here\安装开机自启.ps1`" -Uninstall"
+Write-Host "    卸载任务:  powershell -ExecutionPolicy Bypass -File `"$here\install_autostart.ps1`" -Uninstall"
 Write-Host ""

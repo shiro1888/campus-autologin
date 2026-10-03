@@ -1,4 +1,4 @@
-# 校园网自动登录脚本
+# Campus AutoLogin (校园网自动登录)
 
 针对 **http://172.30.100.2/** （Dr.COM / 哆点 ePortal 认证系统）的自动登录工具。
 
@@ -16,26 +16,26 @@
 ## 目录结构
 
 ```
-校园网自动登录脚本/
-├── 登录.bat              ← 双击运行（推荐入口，带中文提示）
-├── campus_login.py       ← 核心脚本（纯 Python 标准库，零依赖）
-├── config.example.json   ← 配置模板（复制为 config.json 后填入自己的账号密码）
-├── autostart.bat         ← 静默版，供计划任务调用（写日志）
-├── 安装开机自启.ps1      ← 一键安装/卸载「开机自动登录」计划任务
-├── 安装开机自启.bat      ← 双击自动提权安装计划任务
-├── 卸载开机自启.bat      ← 双击自动提权卸载计划任务
-├── 桌面控制中心.bat      ← 打开 GUI 控制面板
-├── 刷新插件（重要）.bat  ← 改完插件代码后，一键打开扩展页刷新
-├── chrome-extension/     ← Chrome 浏览器插件
+campus-autologin/
+├── login.bat               ← 双击运行（命令行智能登录）
+├── gui.bat                 ← 桌面控制中心 GUI（暗色科技面板）
+├── campus_login.py         ← 核心脚本（纯 Python 标准库，零依赖）
+├── config.example.json     ← 配置模板（复制为 config.json 后填入自己的账号密码）
+├── autostart.bat           ← 静默版，供计划任务调用（写日志）
+├── install_autostart.bat   ← 双击自动提权安装计划任务
+├── uninstall_autostart.bat ← 双击自动提权卸载计划任务
+├── install_autostart.ps1   ← PowerShell 计划任务配置脚本
+├── reload_extension.bat    ← 改完插件代码后，一键打开扩展页刷新
+├── chrome-extension/       ← Chrome 浏览器插件
 │   ├── manifest.json
 │   ├── background.js
 │   ├── popup.html / popup.js / popup.css
 │   ├── options.html / options.js / options.css
 │   ├── icons/
-│   └── README.md         ← 插件单独的安装说明
-├── assets/               ← 图标生成工具
-├── logs/                 ← 计划任务运行日志
-└── README.md             ← 本文件
+│   └── README.md           ← 插件单独的安装说明
+├── assets/                 ← 图标生成工具
+├── logs/                   ← 计划任务运行日志
+└── README.md               ← 本文件
 ```
 
 ---
@@ -50,12 +50,12 @@
 
 ### 快速开始
 
-**方式一（最简单）**：双击 `登录.bat`
+**方式一（最简单）**：双击 `login.bat` 或运行 `gui.bat`（桌面图形控制台）
 
 **方式二（命令行）**：
 
 ```powershell
-cd "C:\Project\校园网自动登录脚本"
+cd "C:\Project\campus-autologin"
 python campus_login.py            # 智能登录：已在线就跳过，没在线就登录
 ```
 
@@ -120,15 +120,15 @@ python campus_login.py status --json
 ## ② 设置开机自动登录
 
 **推荐方式（一键双击）**：
-* **安装**：直接双击运行项目根目录下的 **`安装开机自启.bat`**。系统会自动弹出管理员授权窗口，点击「是」即自动完成自检并注册双触发器计划任务（开机 20 秒后启动 + 用户登录 10 秒后启动，完美兼容台式机常开与笔记本合盖休眠唤醒）。
-* **卸载**：直接双击运行 **`卸载开机自启.bat`** 即可安全清理。
+* **安装**：直接双击运行项目根目录下的 **`install_autostart.bat`**。系统会自动弹出管理员授权窗口，点击「是」即自动完成自检并注册双触发器计划任务（开机 20 秒后启动 + 用户登录 10 秒后启动，完美兼容台式机常开与笔记本合盖休眠唤醒）。
+* **卸载**：直接双击运行 **`uninstall_autostart.bat`** 即可安全清理。
 
 **高级方式（手动 PowerShell）**：
 以管理员身份打开 PowerShell，执行：
 
 ```powershell
-cd "C:\Project\校园网自动登录脚本"
-powershell -ExecutionPolicy Bypass -File "安装开机自启.ps1"
+cd "C:\Project\campus-autologin"
+powershell -ExecutionPolicy Bypass -File "install_autostart.ps1"
 # 卸载请加 -Uninstall 参数
 ```
 
@@ -172,7 +172,7 @@ notepad "C:\Project\校园网自动登录脚本\logs\autologin.log"   # 查看�
 > Chrome 只在**加载扩展的那一刻**读取代码，之后一直用内存里的副本。
 > 改了磁盘文件，不点刷新是不会生效的。两种解决办法，任选其一：
 >
-> **方法 A（推荐）**：双击 `刷新插件（重要）.bat`，在扩展页点「校园网自动登录」卡片上的 **🔄 刷新**，
+> **方法 A（推荐）**：双击 `reload_extension.bat`，在扩展页点「Campus AutoLogin」卡片上的 **🔄 刷新**，
 > 然后**把旧设置页标签关掉重新打开**。
 >
 > **方法 B（最省事）**：**完全退出 Chrome 再打开**（关掉所有窗口；或右下角托盘退出）。
