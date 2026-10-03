@@ -44,6 +44,32 @@
     </div>
   </header>
 
+  <!-- Sticky Quick Nav Bar -->
+  <nav class="sticky-nav" id="stickyNav" aria-label="快捷跳转导航">
+    <div class="nav-track">
+      <a href="#statusWidget" class="nav-item active" data-target="statusWidget">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        <span>监控中心</span>
+      </a>
+      <a href="#cardCredentials" class="nav-item" data-target="cardCredentials">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>认证凭据</span>
+      </a>
+      <a href="#cardPolicy" class="nav-item" data-target="cardPolicy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span>保活策略</span>
+      </a>
+      <a href="#cardTriggers" class="nav-item" data-target="cardTriggers">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+        <span>自动触发</span>
+      </a>
+      <a href="#cardFaq" class="nav-item" data-target="cardFaq">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>常见问题</span>
+      </a>
+    </div>
+  </nav>
+
   <!-- Live Telemetry & Diagnostic Dashboard (Hero Radar) -->
   <section class="card status-hero" id="statusWidget">
     <div class="hero-ambient-glow"></div>
@@ -148,7 +174,7 @@
   <form id="form" autocomplete="off">
 
     <!-- Card 1: 认证信息 -->
-    <div class="card form-card">
+    <div class="card form-card" id="cardCredentials">
       <div class="card-header">
         <div class="card-icon blue">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -201,7 +227,7 @@
     </div>
 
     <!-- Card 2: 智能保活策略 -->
-    <div class="card form-card">
+    <div class="card form-card" id="cardPolicy">
       <div class="card-header">
         <div class="card-icon emerald">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
@@ -265,7 +291,7 @@
     </div>
 
     <!-- Card 3: 自动化触发场景 -->
-    <div class="card form-card">
+    <div class="card form-card" id="cardTriggers">
       <div class="card-header">
         <div class="card-icon amber">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
@@ -336,7 +362,7 @@
   </form>
 
   <!-- FAQ / Help Accordion -->
-  <details class="card faq-card">
+  <details class="card faq-card" id="cardFaq">
     <summary class="faq-summary">
       <div class="faq-header-content">
         <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -372,6 +398,14 @@
       <span>纯本地安全存储 · 凭据绝不离机 · 零第三方网络追踪</span>
     </div>
   </footer>
+
+  <!-- Floating Back to Top Button -->
+  <button type="button" class="back-to-top" id="btnBackToTop" title="返回顶部" aria-label="返回顶部">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 15l-6-6-6 6"/>
+    </svg>
+    <span class="back-to-top-tip">返回顶部</span>
+  </button>
 
 </div>
 

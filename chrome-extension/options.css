@@ -317,6 +317,105 @@ body {
 }
 
 /* ==========================================================================
+   Sticky Quick Navigation Bar
+   ========================================================================== */
+.sticky-nav {
+  position: sticky;
+  top: 14px;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: -10px 0 2px;
+}
+
+.nav-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  transition: all 0.25s ease;
+}
+
+.nav-track::-webkit-scrollbar {
+  display: none;
+}
+
+.nav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6.5px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.nav-item svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.8;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.nav-item:hover {
+  color: var(--text-main);
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.nav-item:hover svg {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.nav-item.active {
+  color: var(--primary);
+  background: rgba(37, 99, 235, 0.12);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.22);
+}
+
+.nav-item.active svg {
+  opacity: 1;
+  color: var(--primary);
+}
+
+[data-theme="dark"] .nav-item.active {
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.3);
+}
+
+[data-theme="dark"] .nav-item.active svg {
+  color: #60a5fa;
+}
+
+/* Scroll margin offset for sections when jumped to via nav */
+#statusWidget,
+#cardCredentials,
+#cardPolicy,
+#cardTriggers,
+#cardFaq {
+  scroll-margin-top: 76px;
+}
+
+/* ==========================================================================
    Card Base
    ========================================================================== */
 .card {
@@ -970,6 +1069,14 @@ select:focus {
   gap: 8px;
   box-shadow: var(--primary-shadow);
   transition: all 0.25s var(--ease-spring);
+  white-space: nowrap;
+}
+
+.btn-icon {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  flex-shrink: 0;
 }
 
 .btn-shimmer {
@@ -1009,6 +1116,8 @@ select:focus {
   display: none;
   width: 16px;
   height: 16px;
+  min-width: 16px;
+  flex-shrink: 0;
   animation: spin 0.8s linear infinite;
 }
 
@@ -1196,3 +1305,81 @@ details[open] .faq-arrow {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ==========================================================================
+   Floating Back to Top Button
+   ========================================================================== */
+.back-to-top {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 100;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: var(--text-muted);
+  box-shadow: 0 10px 28px -4px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(16px) scale(0.9);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s var(--ease-spring), color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.back-to-top svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.back-to-top.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.back-to-top:hover {
+  color: var(--primary);
+  border-color: rgba(37, 99, 235, 0.4);
+  transform: translateY(-3px) scale(1.06);
+  box-shadow: 0 14px 32px -4px rgba(37, 99, 235, 0.28), 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.back-to-top:hover svg {
+  transform: translateY(-2px);
+}
+
+.back-to-top:active {
+  transform: scale(0.92);
+}
+
+.back-to-top-tip {
+  position: absolute;
+  right: 52px;
+  padding: 4px 9px;
+  background: var(--text-main);
+  color: var(--bg-page);
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(6px);
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.back-to-top:hover .back-to-top-tip {
+  opacity: 1;
+  transform: translateX(0);
+}
+

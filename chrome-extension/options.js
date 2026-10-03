@@ -76,9 +76,70 @@ function applyTheme(theme) {
   }
 }
 
+/** 页面快捷导航与返回顶部 */
+function initNavigation() {
+  const navItems = document.querySelectorAll('.sticky-nav .nav-item');
+  const btt = $('btnBackToTop');
+
+  // 平滑滚动快速跳转
+  navItems.forEach((item) => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetId = item.getAttribute('data-target');
+      const targetEl = $(targetId);
+      if (targetEl) {
+        if (targetId === 'cardFaq' && targetEl.tagName === 'DETAILS') {
+          targetEl.open = true;
+        }
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        navItems.forEach((n) => n.classList.toggle('active', n === item));
+      }
+    });
+  });
+
+  // 滚动时动态高亮当前可视模块
+  const sectionIds = ['statusWidget', 'cardCredentials', 'cardPolicy', 'cardTriggers', 'cardFaq'];
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const currentId = entry.target.id;
+          navItems.forEach((item) => {
+            item.classList.toggle('active', item.getAttribute('data-target') === currentId);
+          });
+        }
+      });
+    }, {
+      rootMargin: '-70px 0px -60% 0px',
+      threshold: 0.1
+    });
+
+    sectionIds.forEach((id) => {
+      const el = $(id);
+      if (el) observer.observe(el);
+    });
+  }
+
+  // 返回顶部按钮逻辑
+  if (btt) {
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 180) {
+        btt.classList.add('visible');
+      } else {
+        btt.classList.remove('visible');
+      }
+    }, { passive: true });
+
+    btt.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+}
+
 /** 从本地存储加载配置到表单 */
 function load() {
   initTheme();
+  initNavigation();
 
   try {
     const ver = chrome.runtime.getManifest().version;
