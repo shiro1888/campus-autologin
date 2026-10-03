@@ -8,11 +8,12 @@
 </head>
 <body>
   <div class="popup-wrapper">
-    <!-- Fluid Header -->
+    <!-- Header -->
     <header class="header">
       <div class="brand">
-        <div class="brand-avatar">
+        <div class="brand-avatar-box">
           <img src="icons/icon32.png" alt="Logo" class="brand-img">
+          <span class="avatar-beacon" id="avatarBeacon"></span>
         </div>
         <div class="brand-meta">
           <span class="brand-name">校园网自动登录</span>
@@ -29,8 +30,8 @@
       </div>
     </header>
 
-    <!-- Ambient Hero Card (Soft, Fluid, Glowing) -->
-    <section class="card status-hero" id="statusCard">
+    <!-- Ambient Hero Status Card (Live Glowing Mesh Card) -->
+    <section class="card status-card" id="statusCard">
       <div class="status-glow"></div>
       
       <div class="status-main">
@@ -44,7 +45,7 @@
         </div>
       </div>
 
-      <!-- Pill IP Tag -->
+      <!-- Pill IP Tag with Click Feedback -->
       <div class="ip-capsule" id="ipChip" title="点击复制本机 IP">
         <div class="ip-prefix">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -60,63 +61,73 @@
       </div>
     </section>
 
-    <!-- Seamless Metrics Dock (通透一体化数据展台，彻底消灭生硬小方盒) -->
+    <!-- Seamless Metrics Dock (真正的无界通透展台) -->
     <section class="metrics-dock">
+      <!-- 1: 在线时长 -->
       <div class="dock-item" title="当前已在线时长">
         <div class="dock-head">
-          <svg class="dock-icon amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <svg class="dock-icon amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <span>在线时长</span>
         </div>
         <div class="dock-value mono" id="onlineDuration">—</div>
       </div>
 
+      <!-- 2: 已用流量 (专业双向数据传输图标) -->
       <div class="dock-item" title="本期已消耗流量 (悬停查看上传/下载)">
         <div class="dock-head">
-          <svg class="dock-icon purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <svg class="dock-icon purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 10l5-5 5 5"/>
+            <path d="M12 5v14"/>
+            <path d="M17 14l-5 5-5-5"/>
+          </svg>
           <span>已用流量</span>
         </div>
         <div class="dock-value" id="popFlow">—</div>
       </div>
 
+      <!-- 3: 网关延迟 (动态信号脉冲波) -->
       <div class="dock-item" title="网关响应延迟">
         <div class="dock-head">
-          <svg class="dock-icon emerald" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <svg class="dock-icon emerald" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
           <span>网关延迟</span>
         </div>
-        <div class="dock-value accent" id="popPing">—</div>
+        <div class="dock-value" id="popPing">—</div>
       </div>
 
+      <!-- 4: 当前账号 (安全认证身份徽章) -->
       <div class="dock-item" title="当前登录上网账号">
         <div class="dock-head">
-          <svg class="dock-icon blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <svg class="dock-icon blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           <span>认证账号</span>
         </div>
         <div class="dock-value mono ellipsis" id="account">—</div>
       </div>
     </section>
 
-    <!-- Fluid Meta Strip -->
-    <div class="meta-row">
-      <div class="meta-tag">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        <span>心跳: <strong id="interval">—</strong></span>
+    <!-- Sleek Meta Capsule Bar (告别奇怪的孤立小句号，对称双胶囊) -->
+    <div class="meta-capsule-bar">
+      <div class="meta-pill">
+        <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span class="meta-caption">轮询:</span>
+        <span class="meta-value" id="interval">—</span>
       </div>
-      <span class="meta-bullet">·</span>
-      <div class="meta-tag">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-        <span>上次: <strong id="lastTime">—</strong></span>
+      <div class="meta-pill">
+        <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="meta-caption">上次:</span>
+        <span class="meta-value" id="lastTime">—</span>
       </div>
     </div>
 
-    <!-- Alert / Toast Capsule -->
+    <!-- Alert / Toast Capsule (操作或异常时灵动滑入) -->
     <div class="msg-box" id="msgBox">
       <span class="msg-icon" id="msgIcon"></span>
       <span class="msg-text" id="msg"></span>
     </div>
 
-    <!-- Fluid Pill Actions -->
+    <!-- Action Buttons with Animated Shimmer Light Beam -->
     <div class="actions-group">
       <button type="button" id="btnLogin" class="btn-primary">
+        <span class="btn-shimmer"></span>
         <span class="btn-spinner" id="loginSpinner"></span>
         <svg class="btn-icon" id="loginIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <polygon points="5 3 19 12 5 21 5 3"/>
@@ -134,7 +145,7 @@
       </button>
     </div>
 
-    <!-- Sleek Glass Footer -->
+    <!-- Footer Toolbar -->
     <footer class="footer">
       <a href="#" id="openOptions" class="foot-link">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>

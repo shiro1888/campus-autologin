@@ -1,35 +1,35 @@
 :root {
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
-  --primary-gradient: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
-  --primary-shadow: 0 4px 18px -2px rgba(37, 99, 235, 0.35);
+  --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
+  --primary-shadow: 0 4px 18px -2px rgba(37, 99, 235, 0.38);
 
   --success: #10b981;
-  --success-glow: rgba(16, 185, 129, 0.16);
-  --success-border: rgba(16, 185, 129, 0.3);
+  --success-glow: rgba(16, 185, 129, 0.25);
+  --success-border: rgba(16, 185, 129, 0.4);
   --success-bg: rgba(16, 185, 129, 0.08);
 
   --danger: #ef4444;
-  --danger-glow: rgba(239, 68, 68, 0.16);
-  --danger-border: rgba(239, 68, 68, 0.3);
+  --danger-glow: rgba(239, 68, 68, 0.22);
+  --danger-border: rgba(239, 68, 68, 0.35);
   --danger-bg: rgba(239, 68, 68, 0.08);
 
   --warning: #f59e0b;
-  --warning-glow: rgba(245, 158, 11, 0.16);
-  --warning-border: rgba(245, 158, 11, 0.3);
+  --warning-glow: rgba(245, 158, 11, 0.25);
+  --warning-border: rgba(245, 158, 11, 0.35);
   --warning-bg: rgba(245, 158, 11, 0.08);
 
   --bg-page: #f8fafc;
   --bg-card: #ffffff;
-  --bg-dock: rgba(248, 250, 252, 0.95);
-  --bg-card-subtle: rgba(241, 245, 249, 0.8);
+  --bg-dock: rgba(255, 255, 255, 0.95);
+  --bg-card-subtle: rgba(241, 245, 249, 0.85);
 
   --text-main: #0f172a;
   --text-muted: #64748b;
   --text-light: #94a3b8;
 
-  --border-hairline: rgba(148, 163, 184, 0.18);
-  --border-subtle: rgba(148, 163, 184, 0.28);
+  --border-hairline: rgba(148, 163, 184, 0.2);
+  --border-subtle: rgba(148, 163, 184, 0.32);
 
   --radius-xl: 20px;
   --radius-lg: 16px;
@@ -40,27 +40,27 @@
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
 
-  --shadow-card: 0 4px 20px -3px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.03);
-  --shadow-dock: 0 2px 12px -2px rgba(15, 23, 42, 0.04);
+  --shadow-card: 0 4px 20px -3px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --shadow-dock: 0 2px 14px -2px rgba(15, 23, 42, 0.05);
 }
 
 /* --- Dark Mode Palette --- */
 @media (prefers-color-scheme: dark) {
   :root {
     --bg-page: #080c15;
-    --bg-card: rgba(18, 26, 42, 0.85);
-    --bg-dock: rgba(15, 22, 36, 0.9);
-    --bg-card-subtle: rgba(26, 36, 56, 0.7);
+    --bg-card: rgba(18, 26, 42, 0.88);
+    --bg-dock: rgba(15, 22, 36, 0.92);
+    --bg-card-subtle: rgba(26, 36, 56, 0.75);
 
     --text-main: #f8fafc;
     --text-muted: #94a3b8;
     --text-light: #64748b;
 
-    --border-hairline: rgba(255, 255, 255, 0.08);
-    --border-subtle: rgba(255, 255, 255, 0.14);
+    --border-hairline: rgba(255, 255, 255, 0.09);
+    --border-subtle: rgba(255, 255, 255, 0.18);
 
-    --shadow-card: 0 8px 24px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    --shadow-dock: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --shadow-card: 0 8px 26px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --shadow-dock: 0 4px 18px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 }
 
@@ -85,17 +85,17 @@ body {
   padding: 15px 14px 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 11px;
 }
 
 /* ==========================================================================
-   Fluid Header
+   Header with Live Avatar Status Beacon
    ========================================================================== */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 2px;
+  padding: 0 2px 2px;
 }
 
 .brand {
@@ -104,25 +104,51 @@ body {
   gap: 10px;
 }
 
-.brand-avatar {
+.brand-avatar-box {
+  position: relative;
   width: 34px;
   height: 34px;
   border-radius: var(--radius-md);
-  overflow: hidden;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
   flex-shrink: 0;
+  cursor: pointer;
   transition: transform 0.25s var(--ease-spring);
 }
 
-.brand-avatar:hover {
-  transform: scale(1.05);
+.brand-avatar-box:hover {
+  transform: scale(1.08) rotate(-2deg);
 }
 
 .brand-img {
   width: 100%;
   height: 100%;
+  border-radius: var(--radius-md);
   object-fit: cover;
   display: block;
+}
+
+/* Avatar Live Online Dot */
+.avatar-beacon {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #94a3b8;
+  border: 2px solid var(--bg-page);
+  transition: all 0.3s ease;
+}
+
+.avatar-beacon.on {
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success);
+  animation: beacon-pop 2s ease-in-out infinite;
+}
+
+@keyframes beacon-pop {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
 }
 
 .brand-meta {
@@ -172,23 +198,23 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.25s var(--ease-smooth);
+  transition: all 0.25s var(--ease-spring);
 }
 
 .icon-btn:hover {
   color: var(--primary);
   border-color: var(--border-subtle);
   background: var(--bg-card);
-  transform: rotate(15deg);
+  transform: rotate(30deg) scale(1.05);
 }
 
 .icon-btn:active {
-  transform: scale(0.92);
+  transform: scale(0.9);
 }
 
 .icon-refresh {
-  width: 13px;
-  height: 13px;
+  width: 13.5px;
+  height: 13.5px;
 }
 
 .icon-btn.spinning .icon-refresh {
@@ -201,7 +227,7 @@ body {
 }
 
 /* ==========================================================================
-   Ambient Hero Status Card (Soft, Glowing, No Harsh Lines)
+   Hero Status Card (Live Animated Glowing Mesh Card)
    ========================================================================== */
 .card {
   background: var(--bg-card);
@@ -210,40 +236,51 @@ body {
   box-shadow: var(--shadow-card);
   position: relative;
   overflow: hidden;
-  transition: all 0.3s var(--ease-smooth);
+  transition: all 0.35s var(--ease-smooth);
 }
 
-.status-hero {
+.status-card {
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-/* Ambient Radial Glow in Top Corner */
+/* Ambient Radial Mesh Glow */
 .status-glow {
   position: absolute;
-  top: -20px;
-  left: -20px;
-  width: 180px;
-  height: 120px;
+  top: -30px;
+  left: -30px;
+  width: 200px;
+  height: 140px;
   pointer-events: none;
   border-radius: 50%;
-  opacity: 0.8;
+  opacity: 0.9;
   transition: all 0.5s ease;
-  background: radial-gradient(circle, rgba(148, 163, 184, 0.15) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(148, 163, 184, 0.12) 0%, transparent 70%);
 }
 
-.status-hero.on .status-glow {
-  background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.05) 55%, transparent 75%);
+/* ON State: Vibrant Emerald & Cyan Aurora */
+.status-card.on {
+  background: radial-gradient(circle at 14% 18%, rgba(16, 185, 129, 0.16) 0%, rgba(16, 185, 129, 0.02) 60%, transparent 80%),
+              radial-gradient(circle at 85% 85%, rgba(59, 130, 246, 0.08) 0%, transparent 60%),
+              var(--bg-card);
+  border-color: var(--success-border);
+  box-shadow: 0 6px 24px -4px var(--success-glow), var(--shadow-card);
 }
 
-.status-hero.off .status-glow {
-  background: radial-gradient(circle, rgba(239, 68, 68, 0.22) 0%, rgba(239, 68, 68, 0.04) 55%, transparent 75%);
+.status-card.off {
+  background: radial-gradient(circle at 14% 18%, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.02) 60%, transparent 80%),
+              var(--bg-card);
+  border-color: var(--danger-border);
+  box-shadow: 0 6px 24px -4px var(--danger-glow), var(--shadow-card);
 }
 
-.status-hero.wait .status-glow {
-  background: radial-gradient(circle, rgba(245, 158, 11, 0.22) 0%, rgba(245, 158, 11, 0.04) 55%, transparent 75%);
+.status-card.wait {
+  background: radial-gradient(circle at 14% 18%, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.02) 60%, transparent 80%),
+              var(--bg-card);
+  border-color: var(--warning-border);
+  box-shadow: 0 6px 24px -4px var(--warning-glow), var(--shadow-card);
 }
 
 .status-main {
@@ -254,10 +291,11 @@ body {
   z-index: 2;
 }
 
+/* Living Beacon Indicator */
 .status-beacon {
   position: relative;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -265,8 +303,8 @@ body {
 }
 
 .status-beacon .dot {
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   background: #94a3b8;
   transition: all 0.3s ease;
@@ -275,41 +313,49 @@ body {
 
 .status-beacon .pulse-ring {
   position: absolute;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: transparent;
   opacity: 0;
   z-index: 1;
 }
 
-.status-hero.on .status-beacon .dot {
+.status-card.on .status-beacon .dot {
   background: var(--success);
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.7);
-}
-.status-hero.on .status-beacon .pulse-ring {
-  background: var(--success);
-  animation: beacon-wave 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  box-shadow: 0 0 14px var(--success), 0 0 4px #34d399;
+  animation: dot-glow 2s ease-in-out infinite alternate;
 }
 
-.status-hero.off .status-beacon .dot {
+.status-card.on .status-beacon .pulse-ring {
+  background: var(--success);
+  animation: beacon-wave 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.status-card.off .status-beacon .dot {
   background: var(--danger);
-  box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
 }
 
-.status-hero.wait .status-beacon .dot {
+.status-card.wait .status-beacon .dot {
   background: var(--warning);
-  box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.7);
+  animation: dot-glow 1.5s ease-in-out infinite alternate;
 }
-.status-hero.wait .status-beacon .pulse-ring {
+.status-card.wait .status-beacon .pulse-ring {
   background: var(--warning);
-  animation: beacon-wave 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: beacon-wave 1.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+@keyframes dot-glow {
+  0% { transform: scale(0.94); filter: brightness(0.95); }
+  100% { transform: scale(1.08); filter: brightness(1.2); }
 }
 
 @keyframes beacon-wave {
-  0% { transform: scale(0.85); opacity: 0.65; }
-  60% { transform: scale(1.85); opacity: 0; }
-  100% { transform: scale(0.85); opacity: 0; }
+  0% { transform: scale(0.85); opacity: 0.75; }
+  65% { transform: scale(2.2); opacity: 0; }
+  100% { transform: scale(2.2); opacity: 0; }
 }
 
 .status-content {
@@ -318,17 +364,17 @@ body {
 }
 
 .status-title {
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 700;
   color: var(--text-main);
   line-height: 1.25;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
 .status-desc {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-muted);
-  line-height: 1.3;
+  line-height: 1.35;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -342,10 +388,10 @@ body {
   gap: 7px;
   background: var(--bg-card-subtle);
   border: 1px solid var(--border-hairline);
-  padding: 4px 10px;
+  padding: 4px 11px;
   border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: all 0.25s var(--ease-smooth);
+  transition: all 0.25s var(--ease-spring);
   width: fit-content;
   position: relative;
   z-index: 2;
@@ -354,12 +400,25 @@ body {
 .ip-capsule:hover {
   background: var(--bg-card);
   border-color: var(--border-subtle);
-  transform: translateY(-0.5px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
 }
 
 .ip-capsule:active {
-  transform: scale(0.97);
+  transform: scale(0.96);
+}
+
+.ip-capsule.copied {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: var(--success);
+  animation: spring-bounce 0.4s var(--ease-spring);
+}
+
+@keyframes spring-bounce {
+  0% { transform: scale(0.94); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
 }
 
 .ip-prefix {
@@ -382,7 +441,7 @@ body {
 .ip-text {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-weight: 600;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-main);
 }
 
@@ -402,12 +461,12 @@ body {
 }
 
 .copy-svg {
-  width: 12px;
-  height: 12px;
+  width: 12.5px;
+  height: 12.5px;
 }
 
 /* ==========================================================================
-   Seamless Metrics Dock (消灭生硬小方盒，一体化通透展台)
+   Seamless Metrics Dock (通透无界展台)
    ========================================================================== */
 .metrics-dock {
   background: var(--bg-dock);
@@ -417,19 +476,19 @@ body {
   grid-template-columns: 1fr 1fr;
   box-shadow: var(--shadow-dock);
   overflow: hidden;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
 }
 
 .dock-item {
-  padding: 10px 12px;
+  padding: 10px 13px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  transition: background 0.2s var(--ease-smooth);
+  transition: all 0.2s var(--ease-smooth);
   position: relative;
 }
 
-/* Hairline dividers between items (no heavy boxes) */
+/* Hairline dividers */
 .dock-item:nth-child(1) {
   border-right: 1px solid var(--border-hairline);
   border-bottom: 1px solid var(--border-hairline);
@@ -442,22 +501,27 @@ body {
 }
 
 .dock-item:hover {
-  background: rgba(148, 163, 184, 0.05);
+  background: rgba(37, 99, 235, 0.035);
 }
 
 .dock-head {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 5.5px;
   font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
 }
 
 .dock-icon {
-  width: 13px;
-  height: 13px;
+  width: 13.5px;
+  height: 13.5px;
   flex-shrink: 0;
+  transition: transform 0.25s var(--ease-spring);
+}
+
+.dock-item:hover .dock-icon {
+  transform: scale(1.15);
 }
 
 .dock-icon.amber { color: #f59e0b; }
@@ -479,54 +543,89 @@ body {
   font-size: 13.5px;
 }
 
-.dock-value.accent {
-  color: var(--primary);
-}
-
 .dock-value.ellipsis {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* Live Ping Beacon */
+.ping-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+}
+
+.ping-badge::before {
+  content: "";
+  display: inline-block;
+  width: 6.5px;
+  height: 6.5px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+  animation: ping-pulse 1.8s ease-in-out infinite;
+}
+
+.ping-badge.speed-fast {
+  color: #10b981;
+}
+
+.ping-badge.speed-normal {
+  color: #3b82f6;
+}
+
+@keyframes ping-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.35); opacity: 0.7; }
+}
+
 /* ==========================================================================
-   Fluid Meta Strip (Subtle single-line row)
+   Sleek Meta Capsule Bar
    ========================================================================== */
-.meta-row {
+.meta-capsule-bar {
+  display: flex;
+  gap: 8px;
+}
+
+.meta-pill {
+  flex: 1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 4px;
-  font-size: 10.5px;
-  color: var(--text-light);
-}
-
-.meta-tag {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.meta-tag svg {
-  width: 11px;
-  height: 11px;
-  opacity: 0.7;
-  flex-shrink: 0;
-}
-
-.meta-tag strong {
-  font-weight: 600;
+  gap: 5px;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-hairline);
+  padding: 4.5px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
   color: var(--text-muted);
 }
 
-.meta-bullet {
-  opacity: 0.35;
+.meta-icon {
+  width: 12px;
+  height: 12px;
+  color: var(--text-light);
+  flex-shrink: 0;
+}
+
+.meta-caption {
+  font-weight: 500;
+  color: var(--text-light);
+}
+
+.meta-value {
+  font-weight: 600;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ==========================================================================
-   Toast Notification Capsule
+   Alert / Toast Box
    ========================================================================== */
-.toast-capsule, .msg-box {
+.msg-box {
   display: none;
   align-items: center;
   gap: 7px;
@@ -536,7 +635,7 @@ body {
   animation: fadeIn 0.25s var(--ease-smooth);
 }
 
-.toast-capsule.show, .msg-box.show {
+.msg-box.show {
   display: flex;
 }
 
@@ -555,7 +654,7 @@ body {
 .msg-box.info {
   background: rgba(37, 99, 235, 0.08);
   color: #1d4ed8;
-  border: 1px solid rgba(37, 99, 235, 0.2);
+  border: 1px solid rgba(37, 99, 235, 0.25);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -564,13 +663,13 @@ body {
   .msg-box.info { color: #93c5fd; }
 }
 
-.toast-icon, .msg-icon {
+.msg-icon {
   display: flex;
   align-items: center;
   flex-shrink: 0;
 }
 
-.toast-text, .msg-text {
+.msg-text {
   flex: 1;
   line-height: 1.35;
 }
@@ -581,15 +680,18 @@ body {
 }
 
 /* ==========================================================================
-   Fluid Pill Actions
+   Action Buttons with Shimmer Light Beam
    ========================================================================== */
-.actions-group, .action-dock {
+.actions-group {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
+  margin-top: 1px;
 }
 
-.btn-primary, .pill-btn.primary {
+.btn-primary {
+  position: relative;
+  overflow: hidden;
   background: var(--primary-gradient);
   color: #ffffff;
   border: none;
@@ -603,28 +705,46 @@ body {
   gap: 7px;
   cursor: pointer;
   box-shadow: var(--primary-shadow);
-  transition: all 0.25s var(--ease-smooth);
+  transition: all 0.25s var(--ease-spring);
 }
 
-.btn-primary:hover, .pill-btn.primary:hover {
-  filter: brightness(1.05);
-  box-shadow: 0 6px 20px -2px rgba(37, 99, 235, 0.45);
-  transform: translateY(-1px);
+/* Shimmer Light Sweep */
+.btn-shimmer {
+  position: absolute;
+  top: -50%;
+  left: -80%;
+  width: 45%;
+  height: 200%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.32), transparent);
+  transform: rotate(25deg);
+  animation: btn-sweep 4.5s ease-in-out infinite;
+  pointer-events: none;
 }
 
-.btn-primary:active, .pill-btn.primary:active {
-  transform: scale(0.97);
-  box-shadow: 0 2px 8px -1px rgba(37, 99, 235, 0.3);
+@keyframes btn-sweep {
+  0%, 75% { left: -80%; }
+  100% { left: 150%; }
 }
 
-.btn-primary:disabled, .pill-btn.primary:disabled {
+.btn-primary:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 8px 24px -2px rgba(37, 99, 235, 0.55);
+  transform: translateY(-1.5px) scale(1.015);
+}
+
+.btn-primary:active {
+  transform: scale(0.96);
+  box-shadow: 0 2px 8px -1px rgba(37, 99, 235, 0.35);
+}
+
+.btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
 
-.btn-icon, .btn-svg {
+.btn-icon {
   width: 14px;
   height: 14px;
 }
@@ -643,42 +763,43 @@ body {
   display: inline-block;
 }
 .btn-primary.loading .btn-icon,
-.btn-primary.loading .btn-svg {
+.btn-primary.loading .btn-shimmer {
   display: none;
 }
 
-.btn-secondary, .pill-btn.ghost {
+.btn-secondary {
   background: var(--bg-card-subtle);
   color: var(--text-muted);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-pill);
-  padding: 10px 14px;
+  padding: 10px 15px;
   font-size: 12.5px;
   font-weight: 500;
   display: flex;
   align-items: center;
   gap: 5px;
   cursor: pointer;
-  transition: all 0.25s var(--ease-smooth);
+  transition: all 0.25s var(--ease-spring);
 }
 
-.btn-secondary svg, .pill-btn.ghost svg {
+.btn-secondary svg {
   width: 13px;
   height: 13px;
 }
 
-.btn-secondary:hover, .pill-btn.ghost:hover {
+.btn-secondary:hover {
   background: var(--danger-bg);
   color: var(--danger);
   border-color: var(--danger-border);
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 4px 14px -2px var(--danger-glow);
 }
 
-.btn-secondary:active, .pill-btn.ghost:active {
-  transform: scale(0.97);
+.btn-secondary:active {
+  transform: scale(0.96);
 }
 
-.btn-secondary:disabled, .pill-btn.ghost:disabled {
+.btn-secondary:disabled {
   opacity: 0.45;
   cursor: not-allowed;
   transform: none;
@@ -692,10 +813,10 @@ body {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding-top: 4px;
+  padding-top: 3px;
 }
 
-.foot-link, .foot-btn {
+.foot-link {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -707,18 +828,18 @@ body {
   border-radius: var(--radius-pill);
 }
 
-.foot-link svg, .foot-btn svg {
+.foot-link svg {
   width: 12.5px;
   height: 12.5px;
   opacity: 0.8;
 }
 
-.foot-link:hover, .foot-btn:hover {
+.foot-link:hover {
   color: var(--primary);
   background: var(--bg-card-subtle);
 }
 
-.foot-sep, .foot-divider {
+.foot-sep {
   width: 3px;
   height: 3px;
   background: var(--text-light);

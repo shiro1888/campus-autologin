@@ -12,7 +12,12 @@ const durationTicker = createTicker((text) => {
 /** 设置状态卡片UI */
 function setStatus(title, desc, cls) {
   const card = $('statusCard');
-  card.className = 'card status-card' + (cls ? ' ' + cls : '');
+  card.className = 'card status-card ' + (cls ? cls : '');
+
+  const av = $('avatarBeacon');
+  if (av) {
+    av.className = 'avatar-beacon ' + (cls === 'on' ? 'on' : 'off');
+  }
 
   const titleEl = $('statusTitle');
   const descEl = $('statusDesc');
@@ -21,11 +26,17 @@ function setStatus(title, desc, cls) {
   descEl.textContent = desc;
 }
 
-/** 显示提示信息条 */
-function setMsg(text, kind) {
+let msgTimer = null;
+/** 显示提示信息条 (支持自动淡出) */
+function setMsg(text, kind, autoDismissMs = 3200) {
   const box = $('msgBox');
   const msgEl = $('msg');
   const iconEl = $('msgIcon');
+
+  if (msgTimer) {
+    clearTimeout(msgTimer);
+    msgTimer = null;
+  }
 
   if (!text) {
     box.className = 'msg-box';
@@ -38,6 +49,12 @@ function setMsg(text, kind) {
   iconEl.innerHTML = kind === 'ok'
     ? '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>'
     : '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+
+  if (autoDismissMs && kind === 'ok') {
+    msgTimer = setTimeout(() => {
+      box.className = 'msg-box';
+    }, autoDismissMs);
+  }
 }
 
 let currentIp = '';
@@ -77,7 +94,7 @@ function refresh() {
         const t = r.time.indexOf(' ') !== -1 ? r.time.split(' ')[1] : r.time;
         $('lastTime').textContent = t;
       }
-      if (r && r.message) {
+      if (r && r.message && (!r.ok || r.message.indexOf('无需登录') === -1)) {
         setMsg(r.message, r.ok ? 'ok' : 'err');
       }
     }
@@ -96,7 +113,8 @@ function refresh() {
 
     // 网关延迟与已用流量
     if (res.pingMs !== undefined && res.pingMs >= 0) {
-      $('popPing').textContent = res.pingMs + ' ms';
+      const isFast = res.pingMs < 60;
+      $('popPing').innerHTML = `<span class="ping-badge ${isFast ? 'speed-fast' : 'speed-normal'}">${res.pingMs} ms</span>`;
     } else {
       $('popPing').textContent = res.reachable ? '< 10 ms' : '超时';
     }
@@ -196,16 +214,19 @@ $('ipChip').addEventListener('click', () => {
   if (!currentIp || currentIp === '未检测到') return;
 
   navigator.clipboard.writeText(currentIp).then(() => {
+    const chip = $('ipChip');
     const copyIcon = $('copyIcon');
     const oldHtml = copyIcon.innerHTML;
+    chip.classList.add('copied');
     copyIcon.innerHTML = '<polyline points="20 6 9 17 4 12" stroke="#10b981" stroke-width="2.5" fill="none"/>';
-    setMsg(`已复制 IP: ${currentIp}`, 'ok');
+    setMsg(`已复制 IP: ${currentIp}`, 'ok', 1800);
 
     setTimeout(() => {
       copyIcon.innerHTML = oldHtml;
+      chip.classList.remove('copied');
     }, 1500);
   }).catch(() => {
-    setMsg(`IP 地址: ${currentIp}`, 'info');
+    setMsg(`IP 地址: ${currentIp}`, 'info', 2500);
   });
 });
 
