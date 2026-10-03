@@ -248,7 +248,7 @@ dr1002({"result":1,"uid":"REDACTED_CAMPUS_ACCOUNT","v4ip":"10.102.4.51",...});
 | **不存在的账号** | ✅ 返回**认证失败页** `Dr.COMWebLoginID_2.htm`（`userid error1`） |
 | Python 脚本登录 | ✅ `login --force` → 登录成功，复核已在线 |
 | Python 脚本自检 | ✅ `test` → 全部接口 HTTP 200 |
-| 批处理启动器 | ✅ `登录.bat` / `autostart.bat` 中文输出正常，日志正常写入 |
+| 批处理启动器 | ✅ `login.bat` / `gui.bat` / `autostart.bat` 运行正常，日志正常写入 |
 | Chrome 插件网络层 | ✅ 11 项自动化检查全部通过（含真实门户请求） |
 | Chrome 插件间隔逻辑 | ✅ 17 项边界检查全部通过（含 30 秒闹钟） |
 | Chrome 插件图标 | ✅ 16/32/48/128 PNG 签名与尺寸校验通过 |
