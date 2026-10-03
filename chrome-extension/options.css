@@ -790,6 +790,18 @@ body {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  overflow: visible;
+  position: relative;
+}
+
+.card:has(.select-wrap.open) {
+  z-index: 50;
+  position: relative;
+}
+
+.field:has(.select-wrap.open) {
+  z-index: 60;
+  position: relative;
 }
 
 .card-header {
@@ -924,6 +936,267 @@ select:focus {
   height: 18px;
 }
 
+/* ==========================================================================
+   Custom Select Enhanced UI Component
+   ========================================================================== */
+.select-wrap {
+  position: relative;
+  width: 100%;
+}
+
+/* 隐藏原生 select 保持表单与无障碍兼容 */
+.custom-select-hidden {
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  clip: rect(0, 0, 0, 0) !important;
+  overflow: hidden !important;
+}
+
+/* 自定义触发按钮 (模拟标准输入框) */
+.custom-select-trigger {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-main);
+  font-size: 14px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+  text-align: left;
+  transition: all 0.2s var(--ease-smooth);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.custom-select-trigger:hover {
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
+.custom-select-trigger:focus-visible,
+.select-wrap.open .custom-select-trigger {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.18);
+}
+
+.custom-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.custom-select-arrow {
+  width: 16px;
+  height: 16px;
+  color: var(--text-light);
+  flex-shrink: 0;
+  transition: transform 0.25s var(--ease-spring), color 0.2s ease;
+}
+
+.select-wrap.open .custom-select-arrow {
+  transform: rotate(180deg);
+  color: var(--primary);
+}
+
+/* 优雅毛玻璃下拉菜单浮层 */
+.custom-select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 6px;
+  background: var(--bg-card);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-8px) scale(0.98);
+  transform-origin: top center;
+  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 0.18s;
+}
+
+.custom-select-menu.placement-top {
+  top: auto;
+  bottom: calc(100% + 6px);
+  transform-origin: bottom center;
+  transform: translateY(8px) scale(0.98);
+}
+
+.select-wrap.open .custom-select-menu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.custom-select-menu::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-select-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-select-menu::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+}
+
+.custom-select-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}
+
+/* 单个选项样式 */
+.custom-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8.5px 12px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  color: var(--text-main);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.opt-body {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.opt-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+/* 标签小徽章 (推荐/后缀等) */
+.opt-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1.5px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--stat-bg);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  line-height: 1.3;
+}
+
+.opt-badge.primary {
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--primary);
+  border-color: rgba(37, 99, 235, 0.2);
+  font-weight: 600;
+}
+
+.opt-badge.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  background: rgba(16, 185, 129, 0.08);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.custom-select-option:hover {
+  background: rgba(37, 99, 235, 0.07);
+}
+
+.custom-select-option:hover .opt-label {
+  color: var(--primary);
+}
+
+.custom-select-option.active {
+  background: rgba(37, 99, 235, 0.11);
+}
+
+.custom-select-option.active .opt-label {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* 选项勾选图标 */
+.custom-select-check {
+  width: 15px;
+  height: 15px;
+  color: var(--primary);
+  flex-shrink: 0;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: all 0.2s var(--ease-spring);
+}
+
+.custom-select-option.active .custom-select-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* 深色模式精细适配 */
+[data-theme="dark"] .custom-select-option:hover {
+  background: rgba(59, 130, 246, 0.14);
+}
+
+[data-theme="dark"] .custom-select-option:hover .opt-label {
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .custom-select-option.active {
+  background: rgba(59, 130, 246, 0.22);
+}
+
+[data-theme="dark"] .custom-select-option.active .opt-label {
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .custom-select-option.active .custom-select-check {
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .opt-badge.primary {
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="dark"] .opt-badge.mono {
+  background: rgba(16, 185, 129, 0.16);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+/* 兼容未初始化时的原生 select 基础外观 */
 .select-wrap select {
   width: 100%;
   height: 46px;

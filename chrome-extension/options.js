@@ -227,6 +227,244 @@ function initNavigation() {
   updateActiveNav();
 }
 
+/** HTML 特殊字符转义 */
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, (m) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[m]));
+}
+
+/** 格式化下拉选项展示内容（提取括号内的提示并转为美观微型徽章） */
+function formatOptionContent(text) {
+  const trimmed = String(text || '').trim();
+  const match = trimmed.match(/^(.*?)[（\(](.*?)[）\)]$/);
+  if (!match) {
+    return `<span class="opt-label">${escapeHtml(trimmed)}</span>`;
+  }
+  const main = match[1].trim();
+  const sub = match[2].trim();
+  let badgeClass = 'opt-badge';
+  if (sub.includes('推荐') || sub.includes('最快') || sub.includes('最灵敏')) {
+    badgeClass += ' primary';
+  } else if (sub.startsWith('@')) {
+    badgeClass += ' mono';
+  }
+  return `<div class="opt-body"><span class="opt-label">${escapeHtml(main)}</span><span class="${badgeClass}">${escapeHtml(sub)}</span></div>`;
+}
+
+/** 同步自定义下拉选框显示状态 */
+function syncCustomSelect(target) {
+  const el = typeof target === 'string' ? $(target) : target;
+  if (el && typeof el._syncCustomSelect === 'function') {
+    el._syncCustomSelect();
+  }
+}
+
+/** 关闭页面所有开启的自定义下拉选框 */
+function closeAllCustomSelects() {
+  document.querySelectorAll('.select-wrap.open').forEach((w) => {
+    w.classList.remove('open');
+    const t = w.querySelector('.custom-select-trigger');
+    if (t) t.setAttribute('aria-expanded', 'false');
+    const card = w.closest('.card');
+    if (card) card.style.zIndex = '';
+  });
+}
+
+/** 初始化现代美化下拉选框组件 */
+function initCustomSelects() {
+  const wraps = document.querySelectorAll('.select-wrap');
+  wraps.forEach((wrap) => {
+    const select = wrap.querySelector('select');
+    if (!select || wrap.dataset.customized === 'true') return;
+    wrap.dataset.customized = 'true';
+
+    // 隐藏原生 select（保持可访问性与表单兼容）
+    select.classList.add('custom-select-hidden');
+    select.tabIndex = -1;
+    select.setAttribute('aria-hidden', 'true');
+
+    // 移除原有静态小箭头
+    const oldArrow = wrap.querySelector('.select-arrow');
+    if (oldArrow) oldArrow.remove();
+
+    // 创建触发按钮
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'custom-select-trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+
+    const labelWrap = document.createElement('div');
+    labelWrap.className = 'custom-select-label';
+
+    const arrowSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    arrowSvg.setAttribute('class', 'custom-select-arrow');
+    arrowSvg.setAttribute('viewBox', '0 0 24 24');
+    arrowSvg.setAttribute('fill', 'none');
+    arrowSvg.setAttribute('stroke', 'currentColor');
+    arrowSvg.setAttribute('stroke-width', '2');
+    arrowSvg.innerHTML = '<polyline points="6 9 12 15 18 9"/>';
+
+    trigger.appendChild(labelWrap);
+    trigger.appendChild(arrowSvg);
+    wrap.appendChild(trigger);
+
+    // 创建浮层菜单
+    const menu = document.createElement('div');
+    menu.className = 'custom-select-menu';
+    menu.setAttribute('role', 'listbox');
+
+    // 生成选项
+    Array.from(select.options).forEach((opt, idx) => {
+      const item = document.createElement('div');
+      item.className = 'custom-select-option' + (idx === select.selectedIndex ? ' active' : '');
+      item.setAttribute('role', 'option');
+      item.setAttribute('data-value', opt.value);
+      item.setAttribute('data-index', String(idx));
+      item.setAttribute('aria-selected', idx === select.selectedIndex ? 'true' : 'false');
+
+      item.innerHTML = formatOptionContent(opt.textContent) +
+        '<svg class="custom-select-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectOption(idx);
+        closeMenu();
+        trigger.focus();
+      });
+
+      menu.appendChild(item);
+    });
+
+    wrap.appendChild(menu);
+
+    function selectOption(index) {
+      if (select.selectedIndex !== index) {
+        select.selectedIndex = index;
+        syncUI();
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        syncUI();
+      }
+    }
+
+    function syncUI() {
+      const curOpt = select.options[select.selectedIndex];
+      if (curOpt) {
+        labelWrap.innerHTML = formatOptionContent(curOpt.textContent);
+      }
+      const allItems = menu.querySelectorAll('.custom-select-option');
+      allItems.forEach((it, idx) => {
+        const isMatch = idx === select.selectedIndex;
+        it.classList.toggle('active', isMatch);
+        it.setAttribute('aria-selected', isMatch ? 'true' : 'false');
+      });
+    }
+
+    // 挂载到 select 元素对象便于外界调用
+    select._syncCustomSelect = syncUI;
+    select.addEventListener('change', syncUI);
+    syncUI();
+
+    function openMenu() {
+      closeAllCustomSelects();
+
+      // 检测视口下方空间，不足时向上弹出
+      const rect = trigger.getBoundingClientRect();
+      const menuHeight = 240;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+        menu.classList.add('placement-top');
+      } else {
+        menu.classList.remove('placement-top');
+      }
+
+      wrap.classList.add('open');
+      trigger.setAttribute('aria-expanded', 'true');
+
+      const parentCard = wrap.closest('.card');
+      if (parentCard) parentCard.style.zIndex = '50';
+
+      const activeItem = menu.querySelector('.custom-select-option.active');
+      if (activeItem) {
+        activeItem.scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    function closeMenu() {
+      wrap.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+      const parentCard = wrap.closest('.card');
+      if (parentCard) parentCard.style.zIndex = '';
+    }
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (wrap.classList.contains('open')) {
+        closeMenu();
+      } else {
+        openMenu();
+      }
+    });
+
+    // 键盘支持
+    trigger.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        if (!wrap.classList.contains('open')) {
+          openMenu();
+        } else {
+          let curIdx = select.selectedIndex;
+          if (e.key === 'ArrowDown') {
+            curIdx = Math.min(select.options.length - 1, curIdx + 1);
+          } else if (e.key === 'ArrowUp') {
+            curIdx = Math.max(0, curIdx - 1);
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            closeMenu();
+            return;
+          }
+          selectOption(curIdx);
+        }
+      } else if (e.key === 'Escape' || e.key === 'Tab') {
+        closeMenu();
+      }
+    });
+
+    // 点击 label 自动聚焦打开
+    if (select.id) {
+      const label = document.querySelector(`label[for="${select.id}"]`);
+      if (label) {
+        label.addEventListener('click', (e) => {
+          e.preventDefault();
+          trigger.focus();
+          openMenu();
+        });
+      }
+    }
+  });
+}
+
+// 点击空白区域自动关闭
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.select-wrap')) {
+    closeAllCustomSelects();
+  }
+});
+
+// ESC 键收起
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeAllCustomSelects();
+  }
+});
+
 /** 从本地存储加载配置到表单 */
 function load() {
   try {
@@ -240,6 +478,7 @@ function load() {
     $('account').value = s.account || '';
     $('password').value = s.password || '';
     $('isp').value = String(s.isp || '1');
+    syncCustomSelect('isp');
 
     pickClosest('intervalMin', s.intervalMin === undefined ? 1 / 60 : s.intervalMin);
     pickClosest('offlineIntervalMin', s.offlineIntervalMin === undefined ? 1 / 60 : s.offlineIntervalMin);
@@ -258,7 +497,11 @@ function load() {
 function pickClosest(id, value) {
   const sel = $(id);
   const v = parseFloat(value);
-  if (!Number.isFinite(v)) { sel.selectedIndex = 0; return; }
+  if (!Number.isFinite(v)) {
+    sel.selectedIndex = 0;
+    syncCustomSelect(sel);
+    return;
+  }
   let best = 0;
   let bestDiff = Infinity;
   for (let i = 0; i < sel.options.length; i++) {
@@ -266,6 +509,7 @@ function pickClosest(id, value) {
     if (diff < bestDiff) { bestDiff = diff; best = i; }
   }
   sel.selectedIndex = best;
+  syncCustomSelect(sel);
 }
 
 /** 自适应关闭时，隐藏「掉线重连间隔」 */
@@ -623,6 +867,7 @@ $('adaptive').addEventListener('change', () => {
 // --- 启动初始化 ---
 initTheme();
 initNavigation();
+initCustomSelects();
 load();
 
 // 当偏好设置页面在前台激活时，每 15 秒自动向后台刷新一次网关状态（流量与Ping）
