@@ -138,9 +138,6 @@ function initNavigation() {
 
 /** 从本地存储加载配置到表单 */
 function load() {
-  initTheme();
-  initNavigation();
-
   try {
     const ver = chrome.runtime.getManifest().version;
     $('ver').textContent = 'v' + (ver || '1.3.0');
@@ -446,6 +443,9 @@ $('adaptive').addEventListener('change', () => {
   });
 });
 
+// --- 启动初始化 ---
+initTheme();
+initNavigation();
 load();
 
 // 当偏好设置页面在前台激活时，每 15 秒自动向后台刷新一次网关状态（流量与Ping）

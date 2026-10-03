@@ -249,5 +249,11 @@ $('openOptions').addEventListener('click', (e) => {
   });
 });
 
+// --- 同步设置页选择的主题 ---
+chrome.storage.local.get({ theme: 'auto' }, (s) => {
+  if (s && s.theme && s.theme !== 'auto') {
+    document.documentElement.setAttribute('data-theme', s.theme);
+  }
+});
 
 refresh();

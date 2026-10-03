@@ -46,7 +46,7 @@
 
 /* --- Dark Mode Palette --- */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg-page: #080c15;
     --bg-card: rgba(18, 26, 42, 0.88);
     --bg-dock: rgba(15, 22, 36, 0.92);
@@ -62,6 +62,23 @@
     --shadow-card: 0 8px 26px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     --shadow-dock: 0 4px 18px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
+}
+
+[data-theme="dark"] {
+  --bg-page: #080c15;
+  --bg-card: rgba(18, 26, 42, 0.88);
+  --bg-dock: rgba(15, 22, 36, 0.92);
+  --bg-card-subtle: rgba(26, 36, 56, 0.75);
+
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-light: #64748b;
+
+  --border-hairline: rgba(255, 255, 255, 0.09);
+  --border-subtle: rgba(255, 255, 255, 0.18);
+
+  --shadow-card: 0 8px 26px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-dock: 0 4px 18px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 * {
@@ -658,10 +675,14 @@ body {
 }
 
 @media (prefers-color-scheme: dark) {
-  .msg-box.ok { color: #34d399; }
-  .msg-box.err { color: #f87171; }
-  .msg-box.info { color: #93c5fd; }
+  :root:not([data-theme="light"]) .msg-box.ok { color: #34d399; }
+  :root:not([data-theme="light"]) .msg-box.err { color: #f87171; }
+  :root:not([data-theme="light"]) .msg-box.info { color: #93c5fd; }
 }
+
+[data-theme="dark"] .msg-box.ok { color: #34d399; }
+[data-theme="dark"] .msg-box.err { color: #f87171; }
+[data-theme="dark"] .msg-box.info { color: #93c5fd; }
 
 .msg-icon {
   display: flex;
