@@ -1038,38 +1038,16 @@ body {
   color: #ffffff;
   border: none;
   border-radius: var(--radius-pill);
-  padding: 10px 13px 10px 16px;
+  padding: 10px 18px;
   font-size: 13px;
   font-weight: 600;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
   cursor: pointer;
   box-shadow: var(--primary-shadow);
   transition: all 0.25s var(--ease-spring);
-}
-
-/* Raycast-style KBD Shortcut Pill */
-.btn-kbd {
-  margin-left: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 9.5px;
-  font-weight: 600;
-  line-height: 1;
-  padding: 2.5px 6px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-  letter-spacing: 0.02em;
-  pointer-events: none;
-  transition: all 0.2s ease;
-}
-
-.btn-primary:hover .btn-kbd {
-  background: rgba(255, 255, 255, 0.26);
-  border-color: rgba(255, 255, 255, 0.45);
 }
 
 /* Shimmer Light Sweep */

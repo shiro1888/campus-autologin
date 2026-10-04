@@ -423,17 +423,6 @@ if (btnTheme) {
   });
 }
 
-// --- 适配当前操作系统快捷键显示 (Mac: ⌥⇧L, Win/Linux: Alt+Shift+L) ---
-try {
-  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '');
-  const kbd = $('btnShortcutKbd');
-  if (kbd) {
-    kbd.textContent = isMac ? '⌥⇧L' : 'Alt+Shift+L';
-    kbd.title = `全局快捷键: ${isMac ? 'Option+Shift+L' : 'Alt+Shift+L'}`;
-  }
-} catch (e) {
-  // 忽略
-}
 
 chrome.storage.local.get({ theme: 'auto' }, (s) => {
   applyPopupTheme(s && s.theme);
