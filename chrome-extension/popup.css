@@ -254,10 +254,21 @@ body {
 .icon-refresh {
   width: 13.5px;
   height: 13.5px;
+  display: block;
+  transform-origin: center center;
+}
+
+.icon-btn.spinning {
+  pointer-events: none;
+  color: var(--primary);
+  border-color: rgba(37, 99, 235, 0.4);
+  background: var(--bg-card);
+  transform: none;
 }
 
 .icon-btn.spinning .icon-refresh {
-  animation: spin 0.8s linear infinite;
+  animation: spin 0.65s linear infinite;
+  transform-origin: center center;
 }
 
 @keyframes spin {

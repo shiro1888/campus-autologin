@@ -66,7 +66,18 @@ function setLocalIp(ip) {
 /** 刷新面板状态 */
 function refresh() {
   const refreshBtn = $('btnRefresh');
+  const spinStart = Date.now();
   if (refreshBtn) refreshBtn.classList.add('spinning');
+
+  const stopSpin = () => {
+    if (!refreshBtn) return;
+    const elapsed = Date.now() - spinStart;
+    const minSpinMs = 600;
+    const remaining = Math.max(0, minSpinMs - elapsed);
+    setTimeout(() => {
+      refreshBtn.classList.remove('spinning');
+    }, remaining);
+  };
 
   try {
     const ver = chrome.runtime.getManifest().version;
@@ -112,7 +123,7 @@ function refresh() {
   );
 
   chrome.runtime.sendMessage({ type: 'status' }, (res) => {
-    if (refreshBtn) refreshBtn.classList.remove('spinning');
+    stopSpin();
 
     if (chrome.runtime.lastError || !res) {
       setStatus('后台无响应', '扩展 Service Worker 可能休眠，请重试', 'off');

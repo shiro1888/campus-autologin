@@ -539,7 +539,18 @@ function syncOfflineRow() {
 /** 刷新顶部诊断卡片状态 */
 function refreshStatus(cb) {
   const checkBtn = $('btnCheckStatus');
+  const spinStart = Date.now();
   if (checkBtn) checkBtn.classList.add('spinning');
+
+  const stopSpin = () => {
+    if (!checkBtn) return;
+    const elapsed = Date.now() - spinStart;
+    const minSpinMs = 600;
+    const remaining = Math.max(0, minSpinMs - elapsed);
+    setTimeout(() => {
+      checkBtn.classList.remove('spinning');
+    }, remaining);
+  };
 
   chrome.storage.local.get(['lastResult'], (s) => {
     const r = s && s.lastResult;
@@ -547,7 +558,7 @@ function refreshStatus(cb) {
   });
 
   chrome.runtime.sendMessage({ type: 'status' }, (res) => {
-    if (checkBtn) checkBtn.classList.remove('spinning');
+    stopSpin();
 
     const pill = $('stPill');
     const textEl = $('stOnline');
