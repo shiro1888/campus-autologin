@@ -11,17 +11,18 @@
     <!-- Header -->
     <header class="header">
       <div class="brand">
-        <div class="brand-icon">
+        <div class="brand-avatar-box">
           <img src="icons/icon32.png" alt="Logo" class="brand-img">
+          <span class="avatar-beacon" id="avatarBeacon"></span>
         </div>
-        <div class="brand-info">
-          <div class="brand-title">校园网自动登录</div>
-          <div class="brand-sub">Dr.COM ePortal</div>
+        <div class="brand-meta">
+          <span class="brand-name">校园网自动登录</span>
+          <span class="brand-sub">Dr.COM ePortal</span>
         </div>
       </div>
-      <div class="header-actions">
-        <span class="version-badge" id="ver">v1.3.0</span>
-        <button type="button" id="btnRefresh" class="btn-icon" title="刷新状态">
+      <div class="header-tools">
+        <span class="ver-pill" id="ver">v1.3.0</span>
+        <button type="button" id="btnRefresh" class="icon-btn" title="刷新状态">
           <svg class="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
           </svg>
@@ -29,108 +30,105 @@
       </div>
     </header>
 
-    <!-- Hero Status Card -->
-    <div class="card status-card" id="statusCard">
-      <div class="status-top">
-        <div class="status-indicator">
+    <!-- Ambient Hero Status Card (Live Glowing Mesh Card) -->
+    <section class="card status-card" id="statusCard">
+      <div class="status-glow"></div>
+      
+      <div class="status-main">
+        <div class="status-beacon">
           <span class="pulse-ring" id="pulseRing"></span>
           <span class="dot" id="dot"></span>
         </div>
-        <div class="status-texts">
+        <div class="status-content">
           <div class="status-title" id="statusTitle">正在检测…</div>
           <div class="status-desc" id="statusDesc">正在查询校园网状态</div>
         </div>
       </div>
 
-      <div class="ip-row">
-        <div class="ip-chip" id="ipChip" title="点击复制 IP">
-          <svg class="ip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-            <line x1="6" y1="6" x2="6.01" y2="6"></line>
-            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+      <!-- Pill IP Tag with Click Feedback -->
+      <div class="ip-capsule" id="ipChip" title="点击复制本机 IP">
+        <div class="ip-prefix">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span>IP</span>
+        </div>
+        <span class="ip-text" id="localIp">正在获取…</span>
+        <button type="button" class="copy-hint" id="btnCopyIp" title="复制 IP">
+          <svg class="copy-svg" id="copyIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
           </svg>
-          <span class="ip-label">本机 IP</span>
-          <span class="ip-val" id="localIp">正在获取…</span>
-          <button type="button" class="ip-copy-btn" id="btnCopyIp" title="复制 IP">
-            <svg class="icon-copy" id="copyIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-          </button>
-        </div>
+        </button>
       </div>
-    </div>
+    </section>
 
-    <!-- Bento Grid (2x2 Dashboard Metrics) -->
-    <div class="bento-grid">
+    <!-- Seamless Metrics Dock (真正的无界通透展台) -->
+    <section class="metrics-dock">
       <!-- 1: 在线时长 -->
-      <div class="bento-card" title="在线时长">
-        <div class="bento-header">
-          <div class="bento-badge amber">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
-          <span class="bento-label">在线时长</span>
+      <div class="dock-item" title="当前已在线时长">
+        <div class="dock-head">
+          <svg class="dock-icon amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>在线时长</span>
         </div>
-        <div class="bento-val mono" id="onlineDuration">—</div>
+        <div class="dock-value mono" id="onlineDuration">—</div>
       </div>
 
-      <!-- 2: 已用流量 -->
-      <div class="bento-card" title="已用流量 (悬停查看上传/下载)">
-        <div class="bento-header">
-          <div class="bento-badge purple">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          </div>
-          <span class="bento-label">已用流量</span>
+      <!-- 2: 已用流量 (专业双向数据传输图标) -->
+      <div class="dock-item" title="本期已消耗流量 (悬停查看上传/下载)">
+        <div class="dock-head">
+          <svg class="dock-icon purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 10l5-5 5 5"/>
+            <path d="M12 5v14"/>
+            <path d="M17 14l-5 5-5-5"/>
+          </svg>
+          <span>已用流量</span>
         </div>
-        <div class="bento-val" id="popFlow">—</div>
+        <div class="dock-value" id="popFlow">—</div>
       </div>
 
-      <!-- 3: 网关延迟 -->
-      <div class="bento-card" title="网关延迟">
-        <div class="bento-header">
-          <div class="bento-badge emerald">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-          </div>
-          <span class="bento-label">网关延迟</span>
+      <!-- 3: 网关延迟 (动态信号脉冲波) -->
+      <div class="dock-item" title="网关响应延迟">
+        <div class="dock-head">
+          <svg class="dock-icon emerald" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span>网关延迟</span>
         </div>
-        <div class="bento-val accent" id="popPing">—</div>
+        <div class="dock-value" id="popPing">—</div>
       </div>
 
-      <!-- 4: 当前账号 -->
-      <div class="bento-card" title="当前认证账号">
-        <div class="bento-header">
-          <div class="bento-badge blue">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          </div>
-          <span class="bento-label">认证账号</span>
+      <!-- 4: 当前账号 (安全认证身份徽章) -->
+      <div class="dock-item" title="当前登录上网账号与运营商">
+        <div class="dock-head">
+          <svg class="dock-icon blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span>认证账号</span>
+          <span class="isp-badge" id="accountIsp">校园</span>
         </div>
-        <div class="bento-val mono ellipsis" id="account">—</div>
+        <div class="dock-value mono ellipsis" id="account">—</div>
+      </div>
+    </section>
+
+    <!-- Sleek Meta Capsule Bar (告别奇怪的孤立小句号，对称双胶囊) -->
+    <div class="meta-capsule-bar">
+      <div class="meta-pill">
+        <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span class="meta-caption">轮询:</span>
+        <span class="meta-value" id="interval">—</span>
+      </div>
+      <div class="meta-pill">
+        <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="meta-caption">上次:</span>
+        <span class="meta-value" id="lastTime">—</span>
       </div>
     </div>
 
-    <!-- Meta Status Pill / Sub-bar (检查机制 & 上次检查) -->
-    <div class="meta-strip">
-      <div class="meta-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        <span class="meta-txt"><span class="meta-muted">心跳:</span> <span id="interval">—</span></span>
-      </div>
-      <span class="meta-dot">·</span>
-      <div class="meta-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-        <span class="meta-txt"><span class="meta-muted">上次:</span> <span id="lastTime">—</span></span>
-      </div>
-    </div>
-
-    <!-- Alert / Toast Message -->
+    <!-- Alert / Toast Capsule (操作或异常时灵动滑入) -->
     <div class="msg-box" id="msgBox">
       <span class="msg-icon" id="msgIcon"></span>
       <span class="msg-text" id="msg"></span>
     </div>
 
-    <!-- Action Buttons -->
+    <!-- Action Buttons with Animated Shimmer Light Beam -->
     <div class="actions-group">
       <button type="button" id="btnLogin" class="btn-primary">
+        <span class="btn-shimmer"></span>
         <span class="btn-spinner" id="loginSpinner"></span>
         <svg class="btn-icon" id="loginIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <polygon points="5 3 19 12 5 21 5 3"/>
@@ -138,7 +136,7 @@
         <span id="btnLoginText">立即登录</span>
       </button>
 
-      <button type="button" id="btnLogout" class="btn-secondary" title="注销下线">
+      <button type="button" id="btnLogout" class="btn-secondary" title="注销下线当前校园网会话">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
           <polyline points="16 17 21 12 16 7"/>
@@ -157,7 +155,7 @@
       <span class="foot-sep"></span>
       <a href="http://172.30.100.2/" target="_blank" class="foot-link">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-        <span>校园门户</span>
+        <span>网页门户</span>
       </a>
     </footer>
   </div>
