@@ -58,6 +58,7 @@ function setMsg(text, kind, autoDismissMs = 3200) {
 }
 
 let currentIp = '';
+let currentAccount = '';
 function setLocalIp(ip) {
   currentIp = ip || '';
   $('localIp').textContent = currentIp || '未检测到';
@@ -89,7 +90,9 @@ function refresh() {
   chrome.storage.local.get(
     ['account', 'isp', 'intervalMin', 'offlineIntervalMin', 'adaptive', 'lastResult'],
     (s) => {
-      $('account').textContent = (s && s.account) || '未设置';
+      currentAccount = (s && s.account) || '';
+      $('account').textContent = currentAccount || '未设置';
+      $('account').title = currentAccount ? `点击复制账号: ${currentAccount}` : '尚未设置认证账号';
 
       const ispNames = { '1': '校园', '2': '电信', '3': '联通', '4': '其他' };
       const ispFullNames = { '1': '校园用户 (默认)', '2': '校园电信 (@dx)', '3': '校园联通 (@lt)', '4': '校园其他' };
@@ -278,6 +281,47 @@ $('ipChip').addEventListener('click', () => {
     setMsg(`IP 地址: ${currentIp}`, 'info', 2500);
   });
 });
+
+// --- 一键复制账号 ---
+function copyAccount() {
+  if (!currentAccount || currentAccount === '未设置') {
+    setMsg('当前未设置认证账号', 'info', 2000);
+    return;
+  }
+
+  navigator.clipboard.writeText(currentAccount).then(() => {
+    const btn = $('btnCopyAccount');
+    const icon = $('copyAccountIcon');
+    if (btn) btn.classList.add('copied');
+    if (icon) {
+      const oldHtml = icon.innerHTML;
+      icon.innerHTML = '<polyline points="20 6 9 17 4 12" stroke="#10b981" stroke-width="2.5" fill="none"/>';
+      setTimeout(() => {
+        icon.innerHTML = oldHtml;
+        if (btn) btn.classList.remove('copied');
+      }, 1500);
+    }
+    setMsg(`已复制账号: ${currentAccount}`, 'ok', 1800);
+  }).catch(() => {
+    setMsg(`账号: ${currentAccount}`, 'info', 2500);
+  });
+}
+
+const btnCopyAcc = $('btnCopyAccount');
+if (btnCopyAcc) {
+  btnCopyAcc.addEventListener('click', (e) => {
+    e.stopPropagation();
+    copyAccount();
+  });
+}
+
+const accEl = $('account');
+if (accEl) {
+  accEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    copyAccount();
+  });
+}
 
 // --- 刷新按钮 ---
 $('btnRefresh').addEventListener('click', refresh);

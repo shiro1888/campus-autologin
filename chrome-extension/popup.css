@@ -615,6 +615,63 @@ body {
   white-space: nowrap;
 }
 
+.dock-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dock-value-row .dock-value {
+  flex: 1;
+  min-width: 0;
+}
+
+#account {
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+
+#account:hover {
+  color: var(--primary);
+}
+
+.dock-copy-btn {
+  background: transparent;
+  border: none;
+  padding: 2px 3px;
+  cursor: pointer;
+  color: var(--text-light);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s var(--ease-spring);
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.dock-copy-btn svg {
+  width: 12.5px;
+  height: 12.5px;
+  transition: transform 0.2s var(--ease-spring);
+}
+
+.dock-copy-btn:hover {
+  color: var(--primary);
+  background: rgba(37, 99, 235, 0.08);
+  transform: scale(1.15);
+}
+
+.dock-copy-btn:active {
+  transform: scale(0.9);
+}
+
+.dock-copy-btn.copied {
+  color: #10b981;
+}
+
 /* Live Ping Beacon */
 .ping-badge {
   display: inline-flex;
