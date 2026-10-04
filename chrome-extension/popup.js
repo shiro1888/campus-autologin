@@ -107,9 +107,12 @@ function refresh() {
       const off = s && s.offlineIntervalMin !== undefined ? parseFloat(s.offlineIntervalMin) : 1 / 60;
       const adaptive = !s || s.adaptive !== false;
 
+      const ivText = fmt(iv).replace(/\s+/g, '');
+      const offText = fmt(off).replace(/\s+/g, '');
+
       $('interval').textContent = adaptive
-        ? `${fmt(iv)} (掉线${fmt(off)})`
-        : fmt(iv);
+        ? `${ivText} (掉线${offText})`
+        : ivText;
       $('interval').title = adaptive ? `正常在线: ${fmt(iv)} / 掉线急救: ${fmt(off)}` : `巡检频率: ${fmt(iv)}`;
 
       const r = s && s.lastResult;

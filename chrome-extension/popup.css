@@ -795,6 +795,9 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-variant-numeric: tabular-nums lining-nums;
   font-feature-settings: "tnum" 1;
+}
+
+.dock-value.mono {
   font-size: 13.5px;
 }
 
@@ -918,7 +921,7 @@ body {
   gap: 5.5px;
   background: var(--bg-card-subtle);
   border: 1px solid var(--border-hairline);
-  padding: 5px 10px;
+  padding: 5px 9px;
   border-radius: var(--radius-pill);
   font-size: 11px;
   color: var(--text-muted);
@@ -927,7 +930,7 @@ body {
 }
 
 .meta-pill:first-child {
-  flex: 1.25;
+  flex: 1.35;
 }
 
 .meta-pill:last-child {
@@ -944,9 +947,12 @@ body {
 .meta-caption {
   font-weight: 500;
   color: var(--text-light);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .meta-value {
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-main);
   overflow: hidden;
