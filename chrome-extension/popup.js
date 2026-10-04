@@ -22,8 +22,11 @@ function setStatus(title, desc, cls) {
   const titleEl = $('statusTitle');
   const descEl = $('statusDesc');
 
-  titleEl.textContent = title;
-  descEl.textContent = desc;
+  if (titleEl) titleEl.textContent = title;
+  if (descEl) {
+    descEl.textContent = desc || '';
+    descEl.style.display = desc ? 'block' : 'none';
+  }
 }
 
 let msgTimer = null;
@@ -195,7 +198,7 @@ function refresh() {
       $('btnLoginText').textContent = '立即登录';
       $('btnLogout').disabled = true;
     } else if (res.online) {
-      setStatus('已在线 · 认证通过', '校园网互联网访问已畅通', 'on');
+      setStatus('已在线 · 认证通过', '', 'on');
       $('btnLogin').classList.add('online-mode');
       $('btnLoginText').textContent = '重新验证';
       $('btnLogout').disabled = false;
