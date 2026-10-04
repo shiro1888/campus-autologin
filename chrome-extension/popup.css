@@ -60,8 +60,8 @@
     --border-hairline: rgba(255, 255, 255, 0.09);
     --border-subtle: rgba(255, 255, 255, 0.18);
 
-    --shadow-card: 0 8px 26px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    --shadow-dock: 0 4px 18px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --shadow-card: 0 10px 30px -5px rgba(0, 0, 0, 0.65), 0 2px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    --shadow-dock: 0 6px 20px -3px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.09);
   }
 }
@@ -79,8 +79,8 @@
   --border-hairline: rgba(255, 255, 255, 0.09);
   --border-subtle: rgba(255, 255, 255, 0.18);
 
-  --shadow-card: 0 8px 26px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  --shadow-dock: 0 4px 18px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-card: 0 10px 30px -5px rgba(0, 0, 0, 0.65), 0 2px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  --shadow-dock: 0 6px 20px -3px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.09);
 }
 
@@ -251,7 +251,8 @@ body {
 }
 
 .icon-btn:active {
-  transform: scale(0.9);
+  transform: scale(0.88);
+  transition: transform 0.12s var(--ease-spring);
 }
 
 /* Header Quick Theme Toggle */
@@ -507,6 +508,7 @@ body {
 
 .ip-capsule:active {
   transform: scale(0.96);
+  transition: transform 0.12s var(--ease-spring);
 }
 
 .ip-capsule.copied {
@@ -579,27 +581,34 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-lg);
-  padding: 9.5px 12px;
+  padding: 9.5px 11.5px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  justify-content: space-between;
+  min-height: 65px;
+  gap: 5px;
   box-shadow: var(--shadow-dock), var(--glass-highlight);
   backdrop-filter: blur(14px);
-  transition: all 0.2s var(--ease-smooth);
+  transition: all 0.25s var(--ease-spring);
   position: relative;
 }
 
 .dock-item:hover {
   background: var(--bg-card-subtle);
   border-color: var(--border-subtle);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.08), var(--glass-highlight);
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 18px -2px rgba(15, 23, 42, 0.08), var(--glass-highlight);
+}
+
+.dock-item:active {
+  transform: scale(0.985);
+  transition: transform 0.12s var(--ease-spring);
 }
 
 .dock-head {
   display: flex;
   align-items: center;
-  gap: 5.5px;
+  gap: 6.5px;
   font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
@@ -608,7 +617,7 @@ body {
 .isp-badge {
   font-size: 10px;
   font-weight: 600;
-  padding: 1px 6px;
+  padding: 1.5px 6.5px;
   border-radius: var(--radius-pill);
   background: rgba(59, 130, 246, 0.12);
   color: var(--primary);
@@ -617,15 +626,23 @@ body {
   line-height: 1.25;
 }
 
+/* iOS-style Micro-tray Badges */
 .dock-icon {
-  width: 13.5px;
-  height: 13.5px;
+  width: 12px;
+  height: 12px;
+  box-sizing: content-box;
+  padding: 3.5px;
+  border-radius: 6px;
   flex-shrink: 0;
-  transition: transform 0.25s var(--ease-spring);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.25s var(--ease-spring), filter 0.2s ease;
 }
 
 .dock-item:hover .dock-icon {
-  transform: scale(1.15);
+  transform: scale(1.08);
+  filter: brightness(1.08);
 }
 
 .dock-item:hover .dock-icon.purple {
@@ -633,8 +650,8 @@ body {
 }
 
 @keyframes data-stream {
-  0% { transform: translateY(0) scale(1.15); }
-  100% { transform: translateY(-2.2px) scale(1.2); }
+  0% { transform: translateY(0) scale(1.08); }
+  100% { transform: translateY(-2px) scale(1.15); }
 }
 
 .dock-item:hover .dock-icon.amber {
@@ -642,14 +659,38 @@ body {
 }
 
 @keyframes clock-tick {
-  0% { transform: rotate(0deg) scale(1.15); }
-  100% { transform: rotate(14deg) scale(1.2); }
+  0% { transform: rotate(0deg) scale(1.08); }
+  100% { transform: rotate(12deg) scale(1.15); }
 }
 
-.dock-icon.amber { color: #f59e0b; }
-.dock-icon.purple { color: #a855f7; }
-.dock-icon.emerald { color: #10b981; }
-.dock-icon.blue { color: #3b82f6; }
+.dock-icon.amber {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+.dock-icon.purple {
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.1);
+}
+.dock-icon.emerald {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+.dock-icon.blue {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .dock-icon.amber { background: rgba(245, 158, 11, 0.16); }
+  :root:not([data-theme="light"]) .dock-icon.purple { background: rgba(168, 85, 247, 0.16); }
+  :root:not([data-theme="light"]) .dock-icon.emerald { background: rgba(16, 185, 129, 0.16); }
+  :root:not([data-theme="light"]) .dock-icon.blue { background: rgba(59, 130, 246, 0.16); }
+}
+
+[data-theme="dark"] .dock-icon.amber { background: rgba(245, 158, 11, 0.16); }
+[data-theme="dark"] .dock-icon.purple { background: rgba(168, 85, 247, 0.16); }
+[data-theme="dark"] .dock-icon.emerald { background: rgba(16, 185, 129, 0.16); }
+[data-theme="dark"] .dock-icon.blue { background: rgba(59, 130, 246, 0.16); }
 
 .dock-value {
   font-size: 14.5px;
@@ -983,8 +1024,9 @@ body {
 }
 
 .btn-primary:active {
-  transform: scale(0.96);
+  transform: scale(0.965);
   box-shadow: 0 2px 8px -1px rgba(37, 99, 235, 0.35);
+  transition: transform 0.12s var(--ease-spring), box-shadow 0.12s ease;
 }
 
 .btn-primary.online-mode {
@@ -998,7 +1040,9 @@ body {
 }
 
 .btn-primary.online-mode:active {
+  transform: scale(0.965);
   box-shadow: 0 2px 8px -1px rgba(16, 185, 129, 0.35);
+  transition: transform 0.12s var(--ease-spring), box-shadow 0.12s ease;
 }
 
 .btn-primary:disabled {
@@ -1060,7 +1104,8 @@ body {
 }
 
 .btn-secondary:active {
-  transform: scale(0.96);
+  transform: scale(0.95);
+  transition: transform 0.12s var(--ease-spring);
 }
 
 .btn-secondary.confirming {
