@@ -150,10 +150,31 @@ function formatInterval(min) {
   return min + ' 分钟';
 }
 
+/** 更新浏览器工具栏图标角标 (Action Badge) */
+function updateActionBadge(online, text) {
+  try {
+    if (!chrome.action || !chrome.action.setBadgeText) return;
+    if (text !== undefined) {
+      chrome.action.setBadgeText({ text: text });
+      chrome.action.setBadgeBackgroundColor({ color: '#3b82f6' });
+      return;
+    }
+    if (online) {
+      chrome.action.setBadgeText({ text: '' });
+    } else {
+      chrome.action.setBadgeText({ text: '!' });
+      chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
+    }
+  } catch (e) {
+    // 忽略异常
+  }
+}
+
 /** 把结果写入 storage（popup / options 直接读这里） */
 async function saveResult(result) {
   try {
     await chrome.storage.local.set({ lastResult: result });
+    updateActionBadge(result && result.online);
   } catch (e) {
     // 忽略
   }
@@ -364,6 +385,7 @@ async function autoLogin(trigger) {
 
     // 2) 登录
     console.log(tag + '未在线，开始登录：' + settings.account);
+    updateActionBadge(false, '...');
     await maybeSwitchCadence(false);
     let r = await doLogin(settings);
 
@@ -580,3 +602,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   return false;
 });
+
+// ---------------------------------------------------------------------------
+// 快捷键快速登录监听 (Alt+Shift+L)
+// ---------------------------------------------------------------------------
+if (chrome.commands && chrome.commands.onCommand) {
+  chrome.commands.onCommand.addListener((command) => {
+    if (command === 'quick-login') {
+      console.log('[command] 快捷键触发登录');
+      autoLogin('shortcut');
+    }
+  });
+}
+

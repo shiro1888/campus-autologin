@@ -489,6 +489,7 @@ function load() {
 
   chrome.storage.local.get(DEFAULTS, (s) => {
     $('account').value = s.account || '';
+    syncClearBtn();
     $('password').value = s.password || '';
     $('isp').value = String(s.isp || '1');
     syncCustomSelect('isp');
@@ -837,6 +838,111 @@ $('btnResetDefaults').addEventListener('click', () => {
     showToast('已恢复为默认配置。', 'ok');
   });
 });
+
+// --- 上网账号快速清空按钮 ---
+function syncClearBtn() {
+  const btn = $('clearAccount');
+  const acct = $('account');
+  if (btn && acct) {
+    btn.classList.toggle('visible', acct.value.trim().length > 0);
+  }
+}
+
+if ($('account')) {
+  $('account').addEventListener('input', syncClearBtn);
+  $('account').addEventListener('change', syncClearBtn);
+}
+
+if ($('clearAccount')) {
+  $('clearAccount').addEventListener('click', () => {
+    const acct = $('account');
+    if (acct) {
+      acct.value = '';
+      syncClearBtn();
+      acct.focus();
+      $('btnSave').classList.add('has-changes');
+    }
+  });
+}
+
+// --- 配置一键导出 (JSON 备份) ---
+if ($('btnExportConfig')) {
+  $('btnExportConfig').addEventListener('click', () => {
+    chrome.storage.local.get(null, (all) => {
+      const cfg = {
+        _app: 'Campus AutoLogin',
+        _version: chrome.runtime.getManifest().version || '1.3.0',
+        _exported_at: new Date().toLocaleString(),
+        account: all.account || '',
+        password: all.password || '',
+        isp: all.isp || '1',
+        intervalMin: all.intervalMin !== undefined ? all.intervalMin : DEFAULTS.intervalMin,
+        offlineIntervalMin: all.offlineIntervalMin !== undefined ? all.offlineIntervalMin : DEFAULTS.offlineIntervalMin,
+        adaptive: all.adaptive !== false,
+        autoOnStartup: all.autoOnStartup !== false,
+        contentAutoFill: all.contentAutoFill !== false,
+        instantTrigger: all.instantTrigger !== false
+      };
+      const jsonStr = JSON.stringify(cfg, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `campus-autologin-config-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('配置已导出为 JSON 备份文件。', 'ok');
+    });
+  });
+}
+
+// --- 配置一键导入 (JSON 还原) ---
+if ($('btnImportConfig') && $('importFileInput')) {
+  $('btnImportConfig').addEventListener('click', () => {
+    $('importFileInput').click();
+  });
+
+  $('importFileInput').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const text = evt.target.result;
+        const data = JSON.parse(text);
+        if (!data || typeof data !== 'object') {
+          throw new Error('无效的 JSON 配置文件');
+        }
+
+        const toSave = {};
+        if (typeof data.account === 'string') toSave.account = data.account;
+        if (typeof data.password === 'string') toSave.password = data.password;
+        if (data.isp !== undefined) toSave.isp = String(data.isp);
+        if (data.intervalMin !== undefined) toSave.intervalMin = parseFloat(data.intervalMin);
+        if (data.offlineIntervalMin !== undefined) toSave.offlineIntervalMin = parseFloat(data.offlineIntervalMin);
+        if (data.adaptive !== undefined) toSave.adaptive = !!data.adaptive;
+        if (data.autoOnStartup !== undefined) toSave.autoOnStartup = !!data.autoOnStartup;
+        if (data.contentAutoFill !== undefined) toSave.contentAutoFill = !!data.contentAutoFill;
+        if (data.instantTrigger !== undefined) toSave.instantTrigger = !!data.instantTrigger;
+
+        chrome.storage.local.set(toSave, () => {
+          load();
+          chrome.runtime.sendMessage({ type: 'settingsChanged' });
+          showToast('配置已成功导入并生效！', 'ok');
+          $('btnSave').classList.remove('has-changes');
+        });
+      } catch (err) {
+        showToast('导入失败：文件格式错误 (' + err.message + ')', 'err');
+      } finally {
+        $('importFileInput').value = '';
+      }
+    };
+    reader.readAsText(file, 'utf-8');
+  });
+}
 
 // --- 显示/隐藏密码 ---
 $('togglePwd').addEventListener('click', () => {

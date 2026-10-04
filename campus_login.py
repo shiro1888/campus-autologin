@@ -40,6 +40,7 @@ import json
 import os
 import re
 import socket
+import subprocess
 import sys
 import time
 import unicodedata
@@ -734,7 +735,7 @@ def cmd_gui(args, cfg) -> int:
     root.configure(bg="#0f172a")
 
     # 窗口尺寸与屏幕居中
-    win_w, win_h = 470, 650
+    win_w, win_h = 470, 660
     root.minsize(440, 580)
     root.update_idletasks()
     sw = root.winfo_screenwidth()
@@ -801,7 +802,7 @@ def cmd_gui(args, cfg) -> int:
 
     # Form Card
     form_card = tk.Frame(root, bg=card_bg, padx=16, pady=14, highlightthickness=1, highlightbackground="#334155")
-    form_card.pack(fill="x", padx=18, pady=10)
+    form_card.pack(fill="x", padx=18, pady=(8, 8))
 
     # 上网账号
     tk.Label(form_card, text="上网账号", font=("Microsoft YaHei", 9, "bold"), fg=text_color, bg=card_bg).pack(anchor="w")
@@ -846,10 +847,6 @@ def cmd_gui(args, cfg) -> int:
                            highlightthickness=0)
         r.pack(side="left", padx=(0, 4))
 
-    # Actions Frame
-    btn_frame = tk.Frame(root, bg=bg, padx=18, pady=6)
-    btn_frame.pack(fill="x")
-
     def run_async(fn, *a):
         threading.Thread(target=fn, args=a, daemon=True).start()
 
@@ -860,8 +857,86 @@ def cmd_gui(args, cfg) -> int:
         except (tk.TclError, RuntimeError):
             pass
 
+    # Autostart Card (Windows 计划任务开机自启)
+    auto_card = tk.Frame(root, bg=card_bg, padx=16, pady=10, highlightthickness=1, highlightbackground="#334155")
+    auto_card.pack(fill="x", padx=18, pady=(0, 8))
+
+    auto_head = tk.Frame(auto_card, bg=card_bg)
+    auto_head.pack(fill="x")
+    tk.Label(auto_head, text="Windows 计划任务开机自启", font=("Microsoft YaHei", 9, "bold"), fg=text_color, bg=card_bg).pack(side="left")
+    auto_st_lbl = tk.Label(auto_head, text="● 检测中…", font=("Microsoft YaHei", 9), fg="#f59e0b", bg=card_bg)
+    auto_st_lbl.pack(side="right")
+
+    auto_body = tk.Frame(auto_card, bg=card_bg)
+    auto_body.pack(fill="x", pady=(4, 0))
+    tk.Label(auto_body, text="系统启动及网络连接时静默后台认证", font=("Microsoft YaHei", 8), fg=text_muted, bg=card_bg).pack(side="left")
+
+    autostart_active = [False]
+
+    def check_autostart() -> bool:
+        try:
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            res = subprocess.run(
+                ["schtasks", "/query", "/tn", "CampusNetAutoLogin"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=creationflags,
+                timeout=3,
+            )
+            return res.returncode == 0
+        except Exception:
+            return False
+
+    def update_autostart_ui():
+        def _task():
+            is_active = check_autostart()
+            autostart_active[0] = is_active
+            def _ui():
+                if is_active:
+                    auto_st_lbl.config(text="● 计划任务生效中", fg=success_color)
+                    btn_autostart.config(text="卸载自启", bg="#334155", fg="#f87171",
+                                         activebackground="#475569", activeforeground="#fca5a5")
+                else:
+                    auto_st_lbl.config(text="○ 未配置自启任务", fg=text_muted)
+                    btn_autostart.config(text="一键配置", bg="#2563eb", fg="#ffffff",
+                                         activebackground="#1d4ed8", activeforeground="#ffffff")
+            safe_ui(_ui)
+        run_async(_task)
+
+    def toggle_autostart():
+        if autostart_active[0]:
+            if not messagebox.askyesno("卸载确认", "确定要移除 Windows 开机自启计划任务吗？\n移除后开机将不会自动登录校园网。"):
+                return
+            bat_path = os.path.join(BASE_DIR, "uninstall_autostart.bat")
+            if not os.path.isfile(bat_path):
+                messagebox.showerror("错误", "未找到卸载脚本:\n%s" % bat_path)
+                return
+            try:
+                os.startfile(bat_path)
+            except Exception as e:
+                messagebox.showerror("启动失败", str(e))
+        else:
+            bat_path = os.path.join(BASE_DIR, "install_autostart.bat")
+            if not os.path.isfile(bat_path):
+                messagebox.showerror("错误", "未找到安装脚本:\n%s" % bat_path)
+                return
+            try:
+                os.startfile(bat_path)
+            except Exception as e:
+                messagebox.showerror("启动失败", str(e))
+        root.after(3000, update_autostart_ui)
+
+    btn_autostart = tk.Button(auto_body, text="—", font=("Microsoft YaHei", 8), bg="#334155", fg=text_color,
+                              relief="flat", cursor="hand2", padx=8, pady=1, command=toggle_autostart)
+    btn_autostart.pack(side="right")
+
+    # Actions Frame
+    btn_frame = tk.Frame(root, bg=bg, padx=18, pady=6)
+    btn_frame.pack(fill="x")
+
     def do_refresh():
         st_lbl.config(text="● 检测中…", fg="#f59e0b")
+        update_autostart_ui()
         def _task():
             try:
                 t0 = time.time()
