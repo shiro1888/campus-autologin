@@ -87,6 +87,12 @@
   padding: 0;
 }
 
+html {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
 body {
   width: 375px;
   background-color: var(--bg-page);
@@ -96,6 +102,10 @@ body {
   line-height: 1.5;
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
 @keyframes popupEntrance {
