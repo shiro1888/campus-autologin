@@ -292,6 +292,11 @@ function copyAccount() {
   navigator.clipboard.writeText(currentAccount).then(() => {
     const btn = $('btnCopyAccount');
     const icon = $('copyAccountIcon');
+    const card = $('accountDockItem');
+    if (card) {
+      card.classList.add('copied-flash');
+      setTimeout(() => card.classList.remove('copied-flash'), 450);
+    }
     if (btn) btn.classList.add('copied');
     if (icon) {
       const oldHtml = icon.innerHTML;
@@ -320,6 +325,16 @@ if (accEl) {
   accEl.addEventListener('click', (e) => {
     e.stopPropagation();
     copyAccount();
+  });
+}
+
+// --- 点击版本号胶囊快速打开设置页 ---
+const verEl = $('ver');
+if (verEl) {
+  verEl.addEventListener('click', (e) => {
+    e.preventDefault();
+    chrome.runtime.openOptionsPage();
+    window.close();
   });
 }
 

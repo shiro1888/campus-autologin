@@ -214,6 +214,16 @@ body {
   border: 1px solid var(--border-hairline);
   padding: 2.5px 8px;
   border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.2s var(--ease-spring);
+  user-select: none;
+}
+
+.ver-pill:hover {
+  color: var(--primary);
+  border-color: rgba(37, 99, 235, 0.35);
+  background: var(--bg-card);
+  transform: translateY(-0.5px) scale(1.04);
 }
 
 .icon-btn {
@@ -660,6 +670,17 @@ body {
 
 .dock-copy-btn.copied {
   color: #10b981;
+  transform: scale(1.15);
+}
+
+.dock-item.copied-flash {
+  animation: copy-flash 0.45s ease;
+}
+
+@keyframes copy-flash {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
+  50% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2); }
+  100% { box-shadow: var(--shadow-dock); }
 }
 
 /* Live Ping Beacon */
