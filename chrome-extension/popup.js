@@ -186,26 +186,6 @@ function refresh() {
       if (flowWrap) flowWrap.style.display = 'none';
     }
 
-    // 链路状态徽标 (有线百兆链路 / 校园网络)
-    const linkChip = $('linkChip');
-    const linkChipText = $('linkChipText');
-    if (linkChip && linkChipText) {
-      if (res.online && res.reachable) {
-        linkChip.style.display = 'inline-flex';
-        if (res.pingMs >= 0 && res.pingMs <= 20) {
-          linkChip.className = 'link-capsule';
-          linkChipText.textContent = '有线百兆链路';
-          linkChip.title = `极低内网延迟 (${res.pingMs} ms)，物理网线直连畅通`;
-        } else {
-          linkChip.className = 'link-capsule wireless';
-          linkChipText.textContent = '校园网络';
-          linkChip.title = `校园网已连接 (${res.pingMs >= 0 ? res.pingMs + ' ms' : '连通'})`;
-        }
-      } else {
-        linkChip.style.display = 'none';
-      }
-    }
-
     if (!res.reachable) {
       durationTicker.stop();
       setStatus('未连接校园网', '门户不可达，请连接校园 Wi-Fi 或插网线', 'off');

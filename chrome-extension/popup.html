@@ -61,31 +61,19 @@
         </div>
       </div>
 
-      <!-- Pill Capsule Row (IP Tag + Wired Link Badge) -->
-      <div class="capsules-row">
-        <div class="ip-capsule" id="ipChip" title="点击复制本机 IP">
-          <div class="ip-prefix">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            <span>IP</span>
-          </div>
-          <span class="ip-text" id="localIp">正在获取…</span>
-          <button type="button" class="copy-hint" id="btnCopyIp" title="复制 IP">
-            <svg class="copy-svg" id="copyIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-          </button>
+      <!-- Pill IP Tag with Click Feedback -->
+      <div class="ip-capsule" id="ipChip" title="点击复制本机 IP">
+        <div class="ip-prefix">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span>IP</span>
         </div>
-
-        <div class="link-capsule" id="linkChip" title="物理网线插线直连，内网延迟极低" style="display: none;">
-          <svg class="link-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <path d="M6 3v5a6 6 0 0 0 12 0V3"/>
-            <line x1="12" y1="14" x2="12" y2="21"/>
-            <line x1="9" y1="3" x2="9" y2="6"/>
-            <line x1="15" y1="3" x2="15" y2="6"/>
+        <span class="ip-text" id="localIp">正在获取…</span>
+        <button type="button" class="copy-hint" id="btnCopyIp" title="复制 IP">
+          <svg class="copy-svg" id="copyIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
           </svg>
-          <span id="linkChipText">有线百兆链路</span>
-        </div>
+        </button>
       </div>
     </section>
 
