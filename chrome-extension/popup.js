@@ -171,10 +171,12 @@ function refresh() {
       setStatus('未连接校园网', '门户不可达，请连接校园 Wi-Fi 或插网线', 'off');
       setLocalIp('');
       $('onlineDuration').textContent = '网络断开';
+      $('btnLogin').classList.remove('online-mode');
       $('btnLoginText').textContent = '立即登录';
       $('btnLogout').disabled = true;
     } else if (res.online) {
       setStatus('已在线 · 认证通过', '校园网互联网访问已畅通', 'on');
+      $('btnLogin').classList.add('online-mode');
       $('btnLoginText').textContent = '重新验证';
       $('btnLogout').disabled = false;
 
@@ -193,6 +195,7 @@ function refresh() {
     } else {
       durationTicker.stop();
       setStatus('未登录 · 需要认证', '已连上校园局域网，请点击登录', 'wait');
+      $('btnLogin').classList.remove('online-mode');
       $('btnLoginText').textContent = '立即登录';
       $('btnLogout').disabled = true;
 
