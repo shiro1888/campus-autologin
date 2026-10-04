@@ -136,10 +136,11 @@ powershell -ExecutionPolicy Bypass -File "install_autostart.ps1"
 
 ```powershell
 schtasks /Run /TN CampusNetAutoLogin          # 立即手动触发一次
-notepad "C:\Project\校园网自动登录脚本\logs\autologin.log"   # 查看运行日志
+notepad "C:\Project\campus-autologin\logs\autologin.log"   # 查看运行日志
 ```
 
 > 开机自启用的是 `wait` 模式：网卡还没拿到 IP 时会自动等待（最多 90 秒），等校园网就绪后再登录。
+> 也可在桌面控制台 `gui.bat` 中通过「Windows 计划任务开机自启」卡片一键配置或卸载。
 
 ---
 
@@ -152,7 +153,7 @@ notepad "C:\Project\校园网自动登录脚本\logs\autologin.log"   # 查看�
 1. 打开 Chrome，地址栏输入 `chrome://extensions/`
 2. 右上角开启 **开发者模式**
 3. 点击 **加载已解压的扩展程序**
-4. 选择 `C:\Project\校园网自动登录脚本\chrome-extension` 文件夹
+4. 选择 `C:\Project\campus-autologin\chrome-extension` 文件夹
 5. 点击插件图标 → 打开 **设置**，确认账号密码后保存
 
 插件重连很快，掉线基本无感（三层保障）：
@@ -179,6 +180,13 @@ notepad "C:\Project\校园网自动登录脚本\logs\autologin.log"   # 查看�
 > 重启后所有扩展都会重新从磁盘加载，等于自动刷新。
 >
 > 确认成功的标志：设置页标题右边出现版本号 **v1.3.0**。
+
+### 更多便捷特性
+
+* **图标角标状态**：工具栏插件图标动态反映网络状态（离线高亮红色 `!`，重连中显示 `...`，在线自动隐藏）。
+* **全局快捷键**：按下 **`Alt+Shift+L`** 即可在任意网页直接触发静默认证，无需呼出弹窗。
+* **配置备份与恢复**：设置页底部提供「导出配置」与「导入配置」，一键生成/恢复 JSON 备份。
+* **账号快速清空**：设置页上网账号输入框内置 `×` 清空按钮，编辑更高效。
 
 ---
 
