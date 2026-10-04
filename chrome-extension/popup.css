@@ -254,6 +254,54 @@ body {
   transform: scale(0.9);
 }
 
+/* Header Quick Theme Toggle */
+.theme-btn .icon-sun,
+.theme-btn .icon-moon {
+  width: 13.5px;
+  height: 13.5px;
+  display: block;
+  transition: transform 0.35s var(--ease-spring), opacity 0.2s ease;
+}
+
+.theme-btn .icon-sun {
+  display: none;
+}
+.theme-btn .icon-moon {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-btn .icon-sun {
+    display: block;
+  }
+  :root:not([data-theme="light"]) .theme-btn .icon-moon {
+    display: none;
+  }
+}
+
+[data-theme="dark"] .theme-btn .icon-sun {
+  display: block !important;
+}
+[data-theme="dark"] .theme-btn .icon-moon {
+  display: none !important;
+}
+
+[data-theme="light"] .theme-btn .icon-sun {
+  display: none !important;
+}
+[data-theme="light"] .theme-btn .icon-moon {
+  display: block !important;
+}
+
+.theme-btn:hover {
+  transform: rotate(20deg) scale(1.08);
+  color: #f59e0b;
+}
+
+[data-theme="dark"] .theme-btn:hover {
+  color: #fbbf24;
+}
+
 .icon-refresh {
   width: 13.5px;
   height: 13.5px;
@@ -434,6 +482,16 @@ body {
   margin-top: 1px;
 }
 
+/* Capsules Row & Link Badge */
+.capsules-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 2;
+}
+
 /* Warm IP Capsule Tag */
 .ip-capsule {
   display: inline-flex;
@@ -516,6 +574,56 @@ body {
 .copy-svg {
   width: 12.5px;
   height: 12.5px;
+}
+
+.link-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #059669;
+  padding: 3.5px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: default;
+  transition: all 0.25s var(--ease-spring);
+  user-select: none;
+  line-height: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .link-capsule {
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.35);
+  }
+}
+
+[data-theme="dark"] .link-capsule {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.link-capsule:hover {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgba(16, 185, 129, 0.45);
+  transform: translateY(-0.5px);
+}
+
+.link-capsule.wireless {
+  background: var(--bg-card-subtle);
+  border-color: var(--border-hairline);
+  color: var(--text-muted);
+}
+
+.link-svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+  flex-shrink: 0;
 }
 
 /* ==========================================================================
@@ -612,6 +720,39 @@ body {
   transition: color 0.2s ease;
 }
 
+/* Micro Dual-color Traffic Ratio Bar */
+.flow-bar-wrap {
+  display: flex;
+  gap: 1.5px;
+  width: 100%;
+  height: 3px;
+  border-radius: 99px;
+  background: var(--border-hairline);
+  overflow: hidden;
+  margin-top: 5px;
+  opacity: 0.85;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.dock-item:hover .flow-bar-wrap {
+  opacity: 1;
+  transform: scaleY(1.35);
+}
+
+.flow-bar-dl {
+  background: linear-gradient(90deg, #3b82f6, #06b6d4);
+  height: 100%;
+  border-radius: 99px 0 0 99px;
+  transition: width 0.5s var(--ease-smooth);
+}
+
+.flow-bar-ul {
+  background: linear-gradient(90deg, #a855f7, #ec4899);
+  height: 100%;
+  border-radius: 0 99px 99px 0;
+  transition: width 0.5s var(--ease-smooth);
+}
+
 .dock-value.ping-fast {
   color: #10b981;
   display: inline-flex;
@@ -643,9 +784,17 @@ body {
   color: #ef4444;
 }
 
-.dock-value.mono {
+.dock-value.mono,
+.mono,
+.meta-value,
+.ip-text,
+#onlineDuration,
+#localIp,
+#popPing,
+#account {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1;
   font-size: 13.5px;
 }
 
@@ -883,16 +1032,38 @@ body {
   color: #ffffff;
   border: none;
   border-radius: var(--radius-pill);
-  padding: 10px 18px;
+  padding: 10px 13px 10px 16px;
   font-size: 13px;
   font-weight: 600;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 7px;
   cursor: pointer;
   box-shadow: var(--primary-shadow);
   transition: all 0.25s var(--ease-spring);
+}
+
+/* Raycast-style KBD Shortcut Pill */
+.btn-kbd {
+  margin-left: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 2.5px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover .btn-kbd {
+  background: rgba(255, 255, 255, 0.26);
+  border-color: rgba(255, 255, 255, 0.45);
 }
 
 /* Shimmer Light Sweep */

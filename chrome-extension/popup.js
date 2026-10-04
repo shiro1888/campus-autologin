@@ -157,13 +157,50 @@ function refresh() {
     }
 
     const rawData = res.raw || {};
+    const flowWrap = $('flowBarWrap');
+    const flowDl = $('flowBarDl');
+    const flowUl = $('flowBarUl');
+
     if (rawData.flow !== undefined) {
       $('popFlow').textContent = fmtFlow(rawData.flow);
-      if (rawData.actdf !== undefined && rawData.actuf !== undefined) {
-        $('popFlow').title = `下载: ${fmtFlow(rawData.actdf)} / 上传: ${fmtFlow(rawData.actuf)}`;
+      const dl = parseFloat(rawData.actdf) || 0;
+      const ul = parseFloat(rawData.actuf) || 0;
+      const total = dl + ul;
+
+      if (total > 0 && flowDl && flowUl && flowWrap) {
+        const dlPct = Math.max(6, Math.min(94, Math.round((dl / total) * 100)));
+        const ulPct = 100 - dlPct;
+        flowDl.style.width = dlPct + '%';
+        flowUl.style.width = ulPct + '%';
+        flowWrap.style.display = 'flex';
+        flowWrap.title = `下载 ${dlPct}% (${fmtFlow(dl)}) · 上传 ${ulPct}% (${fmtFlow(ul)})`;
+        $('popFlow').title = `已用: ${fmtFlow(rawData.flow)} (下载: ${fmtFlow(dl)} / 上传: ${fmtFlow(ul)})`;
+      } else if (flowWrap) {
+        flowWrap.style.display = 'none';
       }
     } else {
       $('popFlow').textContent = res.online ? '计量中' : '—';
+      if (flowWrap) flowWrap.style.display = 'none';
+    }
+
+    // 链路状态徽标 (有线百兆链路 / 校园网络)
+    const linkChip = $('linkChip');
+    const linkChipText = $('linkChipText');
+    if (linkChip && linkChipText) {
+      if (res.online && res.reachable) {
+        linkChip.style.display = 'inline-flex';
+        if (res.pingMs >= 0 && res.pingMs <= 20) {
+          linkChip.className = 'link-capsule';
+          linkChipText.textContent = '有线百兆链路';
+          linkChip.title = `极低内网延迟 (${res.pingMs} ms)，物理网线直连畅通`;
+        } else {
+          linkChip.className = 'link-capsule wireless';
+          linkChipText.textContent = '校园网络';
+          linkChip.title = `校园网已连接 (${res.pingMs >= 0 ? res.pingMs + ' ms' : '连通'})`;
+        }
+      } else {
+        linkChip.style.display = 'none';
+      }
     }
 
     if (!res.reachable) {
@@ -358,6 +395,41 @@ function applyPopupTheme(theme) {
   } else {
     document.documentElement.removeAttribute('data-theme');
   }
+}
+
+// --- 一键切换深色/浅色主题 (太阳/月亮) ---
+const btnTheme = $('btnThemeToggle');
+if (btnTheme) {
+  btnTheme.addEventListener('click', () => {
+    chrome.storage.local.get({ theme: 'auto' }, (s) => {
+      const cur = s && s.theme ? s.theme : 'auto';
+      let next = 'dark';
+      if (cur === 'dark') {
+        next = 'light';
+      } else if (cur === 'light') {
+        next = 'dark';
+      } else {
+        const sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        next = sysDark ? 'light' : 'dark';
+      }
+      chrome.storage.local.set({ theme: next }, () => {
+        applyPopupTheme(next);
+        setMsg(`已切换为${next === 'dark' ? '深色' : '浅色'}模式`, 'info', 1800);
+      });
+    });
+  });
+}
+
+// --- 适配当前操作系统快捷键显示 (Mac: ⌥⇧L, Win/Linux: Alt+Shift+L) ---
+try {
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '');
+  const kbd = $('btnShortcutKbd');
+  if (kbd) {
+    kbd.textContent = isMac ? '⌥⇧L' : 'Alt+Shift+L';
+    kbd.title = `全局快捷键: ${isMac ? 'Option+Shift+L' : 'Alt+Shift+L'}`;
+  }
+} catch (e) {
+  // 忽略
 }
 
 chrome.storage.local.get({ theme: 'auto' }, (s) => {
