@@ -1817,3 +1817,202 @@ details[open] .faq-arrow {
   transform: translateX(0);
 }
 
+/* ==========================================================================
+   Mobile & Tablet Responsive Adaptations (移动端与手机屏幕自适应适配)
+   ========================================================================== */
+@media (max-width: 768px) {
+  body {
+    padding: 24px 16px 100px;
+  }
+
+  .grid-2-col {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .btn-main {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .aux-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .btn-aux,
+  .btn-ghost-danger {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn-ghost-danger {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    padding: 14px 12px 90px;
+  }
+
+  .page-container {
+    gap: 18px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .header-main {
+    gap: 12px;
+    width: 100%;
+  }
+
+  .logo-box {
+    width: 44px;
+    height: 44px;
+  }
+
+  .title-row h1 {
+    font-size: 17px;
+  }
+
+  .subtitle {
+    font-size: 12px;
+  }
+
+  .header-actions-bar {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .theme-toggle-btn,
+  .portal-link-btn {
+    padding: 5px 12px;
+    font-size: 12px;
+  }
+
+  .sticky-nav {
+    margin: -4px 0 0;
+    top: 8px;
+  }
+
+  .nav-track {
+    padding: 4px 6px;
+    gap: 2px;
+  }
+
+  .nav-item {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .nav-item svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .status-hero {
+    padding: 16px 14px;
+    gap: 16px;
+  }
+
+  .hero-top-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .hero-status-pill-wrap {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .hero-action-buttons {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .btn-action {
+    width: 100%;
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 12.5px;
+  }
+
+  .hero-stat-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 12px 14px;
+  }
+
+  .stat-card.full-span {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .form-card {
+    padding: 18px 14px;
+    border-radius: var(--radius-lg);
+  }
+
+  .card-header {
+    gap: 10px;
+  }
+
+  .card-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .card-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .card-title-box h2 {
+    font-size: 15px;
+  }
+
+  .card-title-box p {
+    font-size: 12px;
+  }
+
+  .aux-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .btn-aux,
+  .btn-ghost-danger {
+    grid-column: auto;
+    font-size: 12.5px;
+  }
+
+  .back-to-top {
+    bottom: 18px;
+    right: 14px;
+    width: 40px;
+    height: 40px;
+  }
+}
+
+
