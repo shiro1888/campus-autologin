@@ -696,6 +696,30 @@ body {
   gap: 6px;
   box-shadow: var(--shadow-sm);
   transition: all 0.25s var(--ease-spring);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Stat Card Top Specular Highlight */
+.stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 14px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.16) 50%, transparent 100%);
+  pointer-events: none;
+  z-index: 2;
+  transition: background 0.25s ease;
+}
+
+[data-theme="dark"] .stat-card::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.14) 50%, transparent 100%);
+}
+
+.stat-card:hover::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.35) 50%, transparent 100%);
 }
 
 .stat-card:hover {
@@ -729,12 +753,18 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: transform 0.25s var(--ease-spring);
+  transition: transform 0.25s var(--ease-spring), box-shadow 0.25s ease;
 }
 
 .stat-card:hover .stat-badge {
   transform: scale(1.1);
 }
+
+.stat-card:hover .stat-badge.blue { box-shadow: 0 0 14px rgba(59, 130, 246, 0.35); }
+.stat-card:hover .stat-badge.amber { box-shadow: 0 0 14px rgba(245, 158, 11, 0.35); }
+.stat-card:hover .stat-badge.emerald { box-shadow: 0 0 14px rgba(16, 185, 129, 0.35); }
+.stat-card:hover .stat-badge.purple { box-shadow: 0 0 14px rgba(168, 85, 247, 0.35); }
+.stat-card:hover .stat-badge.gray { box-shadow: 0 0 14px rgba(100, 116, 139, 0.35); }
 
 .stat-badge svg {
   width: 14px;
@@ -763,7 +793,8 @@ body {
 
 .stat-val.mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.02em;
   font-size: 15px;
 }
 
