@@ -113,17 +113,23 @@ function refresh() {
       const ivText = fmt(iv).replace(/\s+/g, '');
       const offText = fmt(off).replace(/\s+/g, '');
 
-      $('interval').textContent = adaptive
-        ? `${ivText} (掉线${offText})`
-        : ivText;
-      $('interval').title = adaptive ? `正常在线: ${fmt(iv)} / 掉线急救: ${fmt(off)}` : `巡检频率: ${fmt(iv)}`;
+      const ivEl = $('interval');
+      if (ivEl) {
+        ivEl.textContent = adaptive
+          ? `${ivText} (掉线${offText})`
+          : ivText;
+        ivEl.title = adaptive ? `正常在线: ${fmt(iv)} / 掉线急救: ${fmt(off)}` : `巡检频率: ${fmt(iv)}`;
+      }
 
       const r = s && s.lastResult;
       if (r && r.time) {
         // 只保留时分秒以节省空间
         const t = r.time.indexOf(' ') !== -1 ? r.time.split(' ')[1] : r.time;
-        $('lastTime').textContent = t;
-        $('lastTime').title = '上次检查记录: ' + r.time;
+        const ltEl = $('lastTime');
+        if (ltEl) {
+          ltEl.textContent = t;
+          ltEl.title = '上次检查记录: ' + r.time;
+        }
       }
       if (r && r.message && (!r.ok || r.message.indexOf('无需登录') === -1)) {
         setMsg(r.message, r.ok ? 'ok' : 'err');
