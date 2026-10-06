@@ -499,7 +499,10 @@ function load() {
     $('account').value = typeof s.account === 'string' ? s.account : '';
     syncClearBtn();
     $('password').value = typeof s.password === 'string' ? s.password : '';
-    $('isp').value = typeof s.isp === 'string' ? s.isp : String(s.isp || '1');
+    // 非法 isp（手改 storage / 旧版本残留）赋给 select 会静默失败：
+    // selectedIndex 变 -1，界面显示与实际生效值脱节，统一归一到默认档
+    const storedIsp = typeof s.isp === 'string' ? s.isp : String(s.isp || '1');
+    $('isp').value = ['1', '2', '3', '4'].indexOf(storedIsp) !== -1 ? storedIsp : '1';
     syncCustomSelect('isp');
 
     pickClosest('intervalMin', s.intervalMin === undefined ? DEFAULTS.intervalMin : s.intervalMin);
@@ -578,6 +581,9 @@ function refreshStatus(cb) {
     const textEl = $('stOnline');
 
     if (chrome.runtime.lastError || !res) {
+      // 与 !reachable 分支保持一致：停掉计时器，否则上一轮在线状态启动的
+      // 秒表会继续每秒跳动，把这里的占位符覆盖掉，显示一个无人校验的时长
+      durationTicker.stop();
       pill.className = 'status-pill off';
       textEl.textContent = '后台未响应';
       $('stIp').textContent = '—';
@@ -681,8 +687,8 @@ function readForm() {
     account: $('account').value.trim(),
     password: $('password').value,
     isp: $('isp').value,
-    intervalMin: Number.isFinite(interval) ? interval : 1 / 60,
-    offlineIntervalMin: Number.isFinite(offline) ? offline : 1 / 60,
+    intervalMin: Number.isFinite(interval) ? interval : DEFAULTS.intervalMin,
+    offlineIntervalMin: Number.isFinite(offline) ? offline : DEFAULTS.offlineIntervalMin,
     adaptive: $('adaptive').checked,
     autoOnStartup: $('autoOnStartup').checked,
     contentAutoFill: $('contentAutoFill').checked,
@@ -986,7 +992,15 @@ if ($('btnImportConfig') && $('importFileInput')) {
         if (data.password !== undefined && toSave.password === undefined) {
           throw new Error('password 字段格式不对（应为字符串）');
         }
-        if (data.isp !== undefined) toSave.isp = String(data.isp);
+        // isp 只接受四个合法档位。非法值（手改 / 恶意构造的字符串）若流入
+        // content.js 会拼进 CSS 选择器直接抛异常，把自动填单整条链路炸断。
+        if (data.isp !== undefined) {
+          const ispVal = String(data.isp);
+          if (['1', '2', '3', '4'].indexOf(ispVal) === -1) {
+            throw new Error('isp 只能为 1-4（校园/电信/联通/其他）');
+          }
+          toSave.isp = ispVal;
+        }
         if (data.intervalMin !== undefined) toSave.intervalMin = parseFloat(data.intervalMin);
         if (data.offlineIntervalMin !== undefined) toSave.offlineIntervalMin = parseFloat(data.offlineIntervalMin);
         if (data.adaptive !== undefined) toSave.adaptive = !!data.adaptive;

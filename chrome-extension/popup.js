@@ -155,6 +155,9 @@ function refresh() {
     stopSpin();
 
     if (chrome.runtime.lastError || !res) {
+      // 与 !reachable 分支保持一致：停掉计时器，否则上一轮在线状态启动的
+      // 秒表会继续跳动，把占位符覆盖成不断增长的时长
+      durationTicker.stop();
       setStatus('后台无响应', '扩展 Service Worker 可能休眠，请重试', 'off');
       setLocalIp('');
       $('onlineDuration').textContent = '—';

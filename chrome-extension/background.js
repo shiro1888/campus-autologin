@@ -406,8 +406,21 @@ async function doLogin(settings) {
 
   const data = parseJsonp(text);
   if (!data) {
-    // 部分版本直接返回 ok 纯文本
-    if (/ok/i.test(text)) return ok('登录成功', true);
+    // 非结构化响应：只认明确的成功标记（判定标准与 campus_login.py 对齐：
+    // 纯文本 "ok"、Dr.COMWebLoginID_3 成功结果页、"认证成功" 字样）。
+    // 绝不能退回宽松的 /ok/ 子串匹配 —— 错误页里的 "network"/"token" 都含 "ok"，
+    // 宽松匹配会把任意失败页误判成登录成功，且这一假成功还可能被二次验证坐实。
+    // 成功标记必须先于 validateContentType 检查：成功结果页本身就是 HTML。
+    const t = String(text || '');
+    if (/^\s*ok[\s;]*$/i.test(t) || t.indexOf('Dr.COMWebLoginID_3') !== -1 || t.indexOf('认证成功') !== -1) {
+      return ok('登录成功', true);
+    }
+    // 剩余内容若形似 HTML，多为强制门户 / 运营商错误页，明确按失败处理
+    try {
+      validateContentType(text);
+    } catch (e) {
+      return fail('门户返回的是网页而非认证数据（可能处于强制登录网络）', false);
+    }
     return fail('门户返回数据无法解析（可能认证页已变更）', false);
   }
 
@@ -656,17 +669,22 @@ async function autoLogin(trigger, manual) {
       return lr;
     }
 
-    // 5) 登录后二次验证
+    // 5) 登录后二次验证（三态：确认在线 / 确认未在线 / 什么都没确认到）
     if (r.ok) {
       const st2 = await checkStatus();
       await updateConnState(st2);
-      if (st2.reachable && !st2.online) {
+      if (st2.reachable && st2.online) {
+        r = ok('登录成功，已确认在线', true);
+      } else if (st2.reachable) {
         // 注意：这里**不能**判为凭据类错误。门户已接受认证（result:1），
         // 只是内核生效有延迟 —— 这属于「真掉线」场景，必须保持 1 秒快速重试。
         // 若在此置 permanent，会把正常的秒级抢修降成 10 秒，破坏核心能力。
         r = fail('登录请求已提交，但状态仍未在线（可能密码错误或账号被占用）', false);
       } else {
-        r = ok('登录成功，已确认在线', true);
+        // 门户已接受认证，但复查时突然不可达（网络抖动 / 网关重启）：
+        // 此刻什么都没确认到 —— 不能报「已确认在线」，也不能改判失败。
+        // 按已提交处理，交给下一轮巡检裁决（updateConnState 已切到退避节奏）。
+        r = ok('登录请求已提交，网络波动，待下一轮巡检确认', true);
       }
     }
 
@@ -741,7 +759,7 @@ async function ensureAlarm() {
       lastAlarmPeriod = period;
       return;
     }
-    await chrome.alarms.clear(ALARM_NAME);
+    // create 对同名闹钟本身就是原子替换语义（官方文档明确），无需先 clear
     await chrome.alarms.create(ALARM_NAME, { delayInMinutes: period, periodInMinutes: period });
     lastAlarmPeriod = period;
     console.log('[alarm] 已设置每 ' + formatInterval(period) + ' 检查一次');

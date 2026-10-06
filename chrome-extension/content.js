@@ -133,12 +133,19 @@
   /** 选中运营商（单选按钮或下拉框） */
   function selectIsp(isp) {
     if (!isp) return;
-    // 下拉框
+    // 下拉框。isp 来自 storage（可能被手改 / 恶意导入注入任意字符串），
+    // 不能拼进 CSS 选择器 —— 非法选择器会抛 SyntaxError 炸穿整条填单流程
+    // （HUD 会卡在 loading 态），改为线性匹配 option 的 value。
     const sel = document.querySelector('select[name="ISP_select"]');
     if (sel) {
-      const opt = sel.querySelector('option[value="' + isp + '"]');
-      if (opt) { sel.value = isp; fire(sel); }
-      return;
+      for (let i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === isp) {
+          sel.value = isp;
+          fire(sel);
+          return;
+        }
+      }
+      return;   // 无匹配项：保持页面默认选择，不误选
     }
     // 单选按钮组
     const radios = document.querySelectorAll('div[name="ISP_radio"] input[name="network"], div[name="ISP_radio"] input[type="radio"]');
@@ -352,7 +359,14 @@
           withLock(function () {
             return new Promise(function (resolveFlow) {
               showHud('校园网自动登录：正在提交认证…', 'loading');
-              const submitted = fillAndSubmit(s.account, s.password, s.isp);
+              // 兜底：fillAndSubmit 内部任何未预期的 DOM 异常都不能让
+              // loading 态 HUD 永久挂在页面上（loading 态不会自动淡出）。
+              let submitted = false;
+              try {
+                submitted = fillAndSubmit(s.account, s.password, s.isp);
+              } catch (e) {
+                submitted = false;
+              }
               if (!submitted) {
                 // 找不到登录按钮 / 点击异常。
                 // 注意：loading 态的 HUD 不会自动淡出（只有 success/error 才会），
