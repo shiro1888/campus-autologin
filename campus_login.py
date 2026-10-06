@@ -66,12 +66,14 @@ VERSION = "1.0.0"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 
+# 账号密码一律留空：真实凭据只应写在 config.json（已被 .gitignore 忽略），
+# 绝不硬编码进源码。空值会触发 _make_portal 的「账号或密码为空」配置错误提示。
 DEFAULT_CONFIG = {
     "portal_host": "172.30.100.2",
     "portal_port": 80,
     "eportal_port": 801,
-    "username": "REDACTED_CAMPUS_ACCOUNT",
-    "password": "REDACTED_CAMPUS_PASSWORD",
+    "username": "",
+    "password": "",
     "isp": "1",
     "timeout": 8,
     "retry": 3,
@@ -90,19 +92,41 @@ EXIT_FAIL = 1
 EXIT_CONFIG = 2
 
 _QUIET = False
+_JSON_MODE = False
 
 
 # --------------------------------------------------------------------------
 # 输出
 # --------------------------------------------------------------------------
 def say(msg: str = "") -> None:
-    """按需输出到控制台(静默模式下只保留错误)。"""
+    """按需输出到控制台(静默模式下不输出)。"""
     if not _QUIET and sys.stdout is not None:
         try:
             print(msg, flush=True)
         except (UnicodeEncodeError, OSError):
             enc = getattr(sys.stdout, "encoding", None) or "utf-8"
             print(msg.encode(enc, "replace").decode(enc, "replace"), flush=True)
+
+
+def say_err(msg: str = "") -> None:
+    """输出错误信息。静默模式下**仍然输出** —— 否则 -q 会把失败原因一起吞掉，
+    autostart.bat 的日志里就只剩一个 EXIT 码，完全无法排查。
+
+    例外：--json 模式下 stdout 必须保持只有 JSON，此时改写到 stderr，
+    这样既不影响人类排查，也不会污染给程序消费的 JSON。"""
+    if sys.stdout is None:
+        return
+    stream = sys.stderr if _JSON_MODE else sys.stdout
+    if stream is None:
+        return
+    try:
+        print(msg, file=stream, flush=True)
+    except (UnicodeEncodeError, OSError):
+        try:
+            enc = getattr(stream, "encoding", None) or "utf-8"
+            print(msg.encode(enc, "replace").decode(enc, "replace"), file=stream, flush=True)
+        except OSError:
+            pass
 
 
 def emit_json(payload: dict) -> None:
@@ -131,7 +155,12 @@ def load_config() -> dict:
             with open(config_file, "r", encoding="utf-8-sig") as fh:
                 user_cfg = json.load(fh)
             if isinstance(user_cfg, dict):
-                cfg.update({k: v for k, v in user_cfg.items() if v is not None})
+                # 过滤 None 与以 _ 开头的说明字段（config.example.json 用 _xxx 写注释）。
+                # 否则回退读模板时会把 _说明/_username 等 12 个文档键并入 cfg，
+                # 而 GUI 的「保存账号」是直接把 cfg 写回 config.json 的 ——
+                # 用户的配置文件就被塞进一堆说明字段（且会被后续读写反复携带）。
+                cfg.update({k: v for k, v in user_cfg.items()
+                            if v is not None and not str(k).startswith("_")})
         except (OSError, ValueError) as exc:
             raise ConfigError("配置文件 %s 无法解析: %s" % (os.path.basename(config_file), exc))
     return cfg
@@ -144,14 +173,43 @@ class ConfigError(Exception):
 # --------------------------------------------------------------------------
 # 网络工具
 # --------------------------------------------------------------------------
-def decode_body(raw: bytes) -> str:
-    """门户页面存在 gb2312 / utf-8 混用，依次尝试解码。"""
-    for enc in ("utf-8", "gb18030"):
+def decode_body(raw: bytes, declared: str | None = None) -> str:
+    """解码门户响应体。门户页面 gb2312 / utf-8 混用。
+
+    优先使用响应头声明的 charset（实测门户会明确声明：
+      http://172.30.100.2/          -> text/html; charset=gbk
+      .../drcom/chkstatus           -> application/javascript; charset=gbk
+      ...:801/eportal/              -> text/html; charset=utf-8
+    ）。声明缺失或不可用时，再按「utf-8 -> gb18030」猜测。
+
+    不遵从声明的风险：GBK 里存在「字节序列恰好也是合法 UTF-8」的组合，
+    此时 raw.decode('utf-8') 会“成功”返回乱码而不抛异常，于是静默错译。
+    """
+    order: list[str] = []
+    if declared:
+        order.append(declared)
+    order.extend(["utf-8", "gb18030"])
+    seen = set()
+    for enc in order:
+        key = enc.lower()
+        if key in seen:
+            continue
+        seen.add(key)
         try:
             return raw.decode(enc)
         except (UnicodeDecodeError, LookupError):
             continue
     return raw.decode("utf-8", "replace")
+
+
+def _declared_charset(headers) -> str | None:
+    """从响应头安全地取出 charset；任何异常都返回 None（退回猜测策略）。"""
+    try:
+        if headers is None:
+            return None
+        return headers.get_content_charset()
+    except Exception:
+        return None
 
 
 def http_request(url: str, timeout: float, data: dict | None = None) -> tuple[int, str]:
@@ -164,9 +222,9 @@ def http_request(url: str, timeout: float, data: dict | None = None) -> tuple[in
         req.add_header("Content-Type", "application/x-www-form-urlencoded")
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.getcode(), decode_body(resp.read())
+            return resp.getcode(), decode_body(resp.read(), _declared_charset(resp.headers))
     except urllib.error.HTTPError as exc:
-        return exc.code, decode_body(exc.read() or b"")
+        return exc.code, decode_body(exc.read() or b"", _declared_charset(getattr(exc, "headers", None)))
     except urllib.error.URLError as exc:
         safe_url = urllib.parse.urlunparse(urllib.parse.urlparse(url)._replace(query=""))
         raise NetworkError("无法连接门户 %s (%s)" % (safe_url, exc.reason))
@@ -215,9 +273,25 @@ class Portal:
         host = str(cfg["portal_host"]).strip()
         host = re.sub(r"^https?://", "", host).rstrip("/")
         self.host_only = host.split(":")[0]
-        self.web_base = "http://%s:%s" % (self.host_only, int(cfg["portal_port"]))
-        self.ep_base = "http://%s:%s" % (self.host_only, int(cfg["eportal_port"]))
-        self.timeout = float(cfg["timeout"])
+        if not self.host_only:
+            raise ConfigError("portal_host 不能为空，请检查 config.json")
+        # 端口/超时可能是用户手写的内容，类型不对时给配置错误提示，
+        # 而不是抛裸的 ValueError traceback（main 只捕获 ConfigError/NetworkError）。
+        try:
+            web_port = int(cfg["portal_port"])
+            ep_port = int(cfg["eportal_port"])
+        except (KeyError, TypeError, ValueError):
+            raise ConfigError("portal_port / eportal_port 必须是数字，请检查 config.json")
+        try:
+            self.timeout = float(cfg["timeout"])
+        except (KeyError, TypeError, ValueError):
+            raise ConfigError("timeout 必须是数字（秒），请检查 config.json")
+        if not (0 < web_port < 65536) or not (0 < ep_port < 65536):
+            raise ConfigError("portal_port / eportal_port 必须在 1~65535 之间")
+        if self.timeout <= 0:
+            raise ConfigError("timeout 必须大于 0 秒")
+        self.web_base = "http://%s:%s" % (self.host_only, web_port)
+        self.ep_base = "http://%s:%s" % (self.host_only, ep_port)
         self.js_version = str(cfg["js_version"])
         self._seq = 1000
 
@@ -437,7 +511,13 @@ def _explain_error(msg: str) -> str:
 # --------------------------------------------------------------------------
 # 命令实现
 # --------------------------------------------------------------------------
-def _make_portal(args, cfg) -> Portal:
+def _make_portal(args, cfg, require_credentials: bool = True) -> Portal:
+    """构造 Portal 对象。
+
+    require_credentials=False 用于「不需要账号密码」的命令（status / test /
+    logout 等）——这些操作只查询状态或注销会话，门户并不校验凭据。
+    此前无条件校验会导致 config.json 里没填账号时连 `status` / `test` 都用不了。
+    """
     if args.user:
         cfg["username"] = args.user
     if args.password:
@@ -446,8 +526,10 @@ def _make_portal(args, cfg) -> Portal:
         cfg["timeout"] = args.timeout
     if args.retry is not None:
         cfg["retry"] = args.retry
-    if not str(cfg.get("username", "")).strip() or not str(cfg.get("password", "")).strip():
-        raise ConfigError("账号或密码为空，请检查 config.json")
+    if require_credentials and (
+        not str(cfg.get("username", "")).strip() or not str(cfg.get("password", "")).strip()
+    ):
+        raise ConfigError("账号或密码为空，请在 config.json 中填写，或使用 --user/--password 临时指定")
     return Portal(cfg)
 
 
@@ -473,13 +555,21 @@ def _card_line(text: str, width: int = 51) -> str:
 
 
 def cmd_status(args, cfg) -> int:
-    portal = _make_portal(args, cfg)
+    # 只查状态，不需要账号密码
+    portal = _make_portal(args, cfg, require_credentials=False)
     st = portal.status()
     online = int(st.get("result", 0)) == 1
     ip = st.get("v4ip") or st.get("ss5") or detect_local_ip(portal.host_only)
     flow_text = _format_flow(st.get("flow", 0))
-    fee_val = st.get("fee", 0)
-    fee_text = ("%.2f 元" % (float(fee_val) / 10000)) if fee_val else "—"
+    # fee 由门户返回，可能是空串/非数字。此处必须容错，
+    # 否则一个畸形字段就会让整个 status 命令抛 ValueError 崩掉。
+    fee_text = "—"
+    try:
+        fee_val = float(st.get("fee") or 0)
+        if fee_val:
+            fee_text = "%.2f 元" % (fee_val / 10000)
+    except (TypeError, ValueError):
+        fee_text = "—"
 
     # 计算在线会话时长
     dur_text = ""
@@ -557,8 +647,12 @@ def cmd_login(args, cfg) -> int:
             say("● 当前已在线，无需重复登录。")
         return EXIT_OK
 
-    retry = max(1, int(cfg.get("retry", 3)))
-    delay = float(cfg.get("retry_delay", 3))
+    # 这两个值来自用户手写的 config.json，类型不对时给配置错误而不是裸 traceback
+    try:
+        retry = max(1, int(cfg.get("retry", 3)))
+        delay = float(cfg.get("retry_delay", 3))
+    except (TypeError, ValueError):
+        raise ConfigError("retry / retry_delay 必须是数字，请检查 config.json")
     last = {}
     for attempt in range(1, retry + 1):
         if retry > 1:
@@ -569,7 +663,7 @@ def cmd_login(args, cfg) -> int:
             resp = portal.login(user, str(cfg["password"]))
         except NetworkError as exc:
             last = {"ok": False, "message": str(exc)}
-            say("✗ %s" % exc)
+            say_err("✗ %s" % exc)
         else:
             if resp["ok"]:
                 # 复核一次，确认真的上线
@@ -590,7 +684,7 @@ def cmd_login(args, cfg) -> int:
                 return EXIT_OK
 
             last = resp
-            say("✗ 登录失败: %s" % resp["message"])
+            say_err("✗ 登录失败: %s" % resp["message"])
             # 账号/密码类错误重试没有意义
             if any(k in resp["message"] for k in ("账号", "密码", "锁定", "停机")):
                 break
@@ -604,7 +698,8 @@ def cmd_login(args, cfg) -> int:
 
 
 def cmd_logout(args, cfg) -> int:
-    portal = _make_portal(args, cfg)
+    # 注销只需要会话参数（从 chkstatus 取），不需要账号密码
+    portal = _make_portal(args, cfg, require_credentials=False)
 
     # 执行注销前进行二次确认，防止手滑断网（可用 -y 或 --yes 跳过）
     if not getattr(args, "yes", False) and not args.json and not _QUIET:
@@ -622,7 +717,7 @@ def cmd_logout(args, cfg) -> int:
     except NetworkError as exc:
         if args.json:
             emit_json({"action": "logout", "success": False, "error": str(exc)})
-        say("✗ 注销失败: %s" % exc)
+        say_err("✗ 注销失败: %s" % exc)
         return EXIT_FAIL
 
     success = bool(resp.get("offline"))
@@ -633,40 +728,71 @@ def cmd_logout(args, cfg) -> int:
         if success:
             say("✓ 已注销下线。")
         elif resp.get("ok"):
-            say("✗ 注销请求已被接受，但会话仍在(部分 AC 不支持自助注销)。")
+            say_err("✗ 注销请求已被接受，但会话仍在(部分 AC 不支持自助注销)。")
             say("  如需下线，请到门户页面手动操作: %s/" % portal.web_base)
         else:
-            say("✗ 注销失败。")
+            say_err("✗ 注销失败。")
             say("  如需下线，请到门户页面手动操作: %s/" % portal.web_base)
     return EXIT_OK if success else EXIT_FAIL
 
 
 def cmd_wait(args, cfg) -> int:
-    """等待门户可达(适合开机自启：网卡还在获取 IP 时先等一会儿)。"""
-    portal = _make_portal(args, cfg)
-    deadline = time.time() + float(cfg.get("wait_seconds", 90))
+    """等待门户可达(适合开机自启：网卡还在获取 IP 时先等一会儿)。
+
+    注意：必须用 portal.status() 而不是 portal.is_online() 来探测可达性。
+    is_online() 内部已经捕获了 NetworkError 并返回 False，它无法区分
+    「门户不可达（网卡还没拿到 IP）」和「门户可达但未认证」。原实现依赖它抛
+    NetworkError 来 sleep，导致循环第一轮就 break —— 配置了 wait_seconds=90
+    却 0 秒就直奔登录，开机自启的等待逻辑形同虚设。
+    """
+    portal = _make_portal(args, cfg, require_credentials=False)
+    try:
+        wait_seconds = float(cfg.get("wait_seconds", 90) or 0)
+    except (TypeError, ValueError):
+        raise ConfigError("wait_seconds 必须是数字（秒），请检查 config.json")
+    deadline = time.time() + wait_seconds
     waited = False
-    while time.time() < deadline:
+    while True:
         try:
-            if portal.is_online():
+            if int(portal.status().get("result", 0)) == 1:
                 say("● 已在线。")
                 return EXIT_OK
+            # 门户可达但未认证 -> 无需继续等待，直接去登录
             break
         except NetworkError:
+            # 门户不可达：多半是网卡还在获取 IP，继续等到超时
+            if time.time() >= deadline:
+                break
             if not waited:
-                say("… 等待校园网就绪 (最多 %ss)..." % int(cfg.get("wait_seconds", 90)))
+                say("… 等待校园网就绪 (最多 %ss)..." % int(wait_seconds))
                 waited = True
-            time.sleep(3)
+            time.sleep(min(3, max(0.1, deadline - time.time())))
     return cmd_login(args, cfg)
 
 
 def cmd_test(args, cfg) -> int:
-    portal = _make_portal(args, cfg)
+    """自检：校验「配置 + 门户连通性」是否都已就绪。
+
+    安装脚本 install_autostart.ps1 用它做开工前检查（其提示语即「config.json +
+    门户连通性」）。因此这里必须**同时**检查凭据是否已填写：只探连通性的话，
+    未填账号密码时也会报「一切正常」，用户以为配好了，而计划任务每次开机都会
+    因缺凭据失败（日志里只有 EXIT: 2）。
+    """
+    portal = _make_portal(args, cfg, require_credentials=False)
     ip = detect_local_ip(portal.host_only)
+    username = str(cfg.get("username", "") or "").strip()
+    password = str(cfg.get("password", "") or "").strip()
+
     say("配置:")
     say("  门户: %s" % portal.web_base)
-    say("  账号: %s" % cfg["username"])
+    say("  账号: %s" % (username or "(未填写)"))
     say("  运营商(R3): %s (%s)" % (cfg.get("isp", "1"), ISP_CHOICES.get(str(cfg.get("isp", "1")), "自定义")))
+    has_credentials = bool(username and password)
+    if has_credentials:
+        say("  [OK] 账号密码已填写")
+    else:
+        say_err("  [!!] 账号密码未填写 —— 无法自动登录，请编辑 config.json")
+
     say("本机出口 IP: %s" % (ip or "未探测到"))
     checks = {}
     for name, url in (
@@ -679,7 +805,7 @@ def cmd_test(args, cfg) -> int:
             say("  [OK] %s -> HTTP %s" % (name, code))
         except NetworkError as exc:
             checks[name] = 0
-            say("  [!!] %s -> %s" % (name, exc))
+            say_err("  [!!] %s -> %s" % (name, exc))
 
     # 认证接口必须带 jsonp callback，否则门户返回 400
     online = False
@@ -690,30 +816,49 @@ def cmd_test(args, cfg) -> int:
         say("  [OK] 认证接口 -> HTTP 200 (result=%s)" % st.get("result"))
     except NetworkError as exc:
         checks["认证接口"] = 0
-        say("  [!!] 认证接口 -> %s" % exc)
+        say_err("  [!!] 认证接口 -> %s" % exc)
 
     say("当前状态: %s" % ("在线" if online else "不在线"))
-    ok = checks.get("认证接口", 0) == 200
+    reachable = checks.get("认证接口", 0) == 200
+    ok = reachable and has_credentials
     if args.json:
-        emit_json({"action": "test", "ok": ok, "local_ip": ip, "checks": checks, "online": online})
-    say("\n结论: %s" % ("一切正常" if ok else "门户不可达，请确认已连接校园网"))
+        # 同时给出 success 与 ok：其余子命令（login/logout/auto）统一用 success，
+        # 只有 test 曾用 ok，消费方要按命令分别判断很容易踩坑。
+        # 保留 ok 以兼容既有脚本，新增 success 作为统一字段。
+        emit_json({"action": "test", "success": ok, "ok": ok, "local_ip": ip, "checks": checks,
+                   "online": online, "has_credentials": has_credentials})
+    else:
+        # 注意：必须放在 else 里。--json 时 _QUIET 为 True（见 main），
+        # say() 会被静默；但仍不能把结论写在 emit_json 之后的分支外，
+        # 否则任何文本都可能混进 stdout，导致 `json.loads(stdout)` 失败。
+        if not reachable:
+            say("\n结论: 门户不可达，请确认已连接校园网")
+        elif not has_credentials:
+            say("\n结论: 门户正常，但账号密码未填写 —— 请先编辑 config.json 再装开机自启")
+        else:
+            say("\n结论: 一切正常")
     return EXIT_OK if ok else EXIT_FAIL
 
 
 def cmd_auto(args, cfg) -> int:
     """默认智能模式：在线即通过，否则尝试登录。"""
-    portal = _make_portal(args, cfg)
+    # 先只查状态：已在线时压根不需要账号密码。
+    # 真正需要登录时再交给 cmd_login 校验凭据并给出清晰提示。
+    portal = _make_portal(args, cfg, require_credentials=False)
+    # 用 status() 而非 is_online()：后者内部吞掉 NetworkError 只返回 False，
+    # 无法区分「门户不可达」和「门户可达但未认证」，会让下面的 except 变成死代码，
+    # 导致断网时给出「账号或密码错误」这种误导性提示。
     try:
-        online = portal.is_online()
+        st = portal.status()
     except NetworkError as exc:
-        say("✗ 无法连接门户: %s" % exc)
+        say_err("✗ 无法连接门户: %s" % exc)
         if args.json:
             emit_json({"action": "auto", "success": False, "error": str(exc)})
         return EXIT_FAIL
-    if online:
+    if int(st.get("result", 0)) == 1:
         if args.json:
             emit_json({"action": "auto", "success": True, "already_online": True,
-                       "account": cfg["username"]})
+                       "account": cfg.get("username", "")})
         else:
             say("● 网络正常，已在线。")
         return EXIT_OK
@@ -727,7 +872,7 @@ def cmd_gui(args, cfg) -> int:
         import tkinter as tk
         from tkinter import messagebox
     except ImportError:
-        say("✗ 当前 Python 环境未安装 tkinter，无法启动图形界面。")
+        say_err("✗ 当前 Python 环境未安装 tkinter，无法启动图形界面。")
         return EXIT_FAIL
 
     root = tk.Tk()
@@ -847,8 +992,28 @@ def cmd_gui(args, cfg) -> int:
                            highlightthickness=0)
         r.pack(side="left", padx=(0, 4))
 
-    def run_async(fn, *a):
-        threading.Thread(target=fn, args=a, daemon=True).start()
+    # 单飞（single-flight）保护：同类网络操作尚未结束时，忽略重复触发。
+    # 只做后台静默跳过，不改变按钮外观（不置灰），因此不影响界面表现；
+    # 但能避免用户连点「立即登录」时并发发起多次认证 —— 校园网 AC 对同一账号的
+    # 并发认证会返回「该 IP 已经在线」，反而把刚建立的会话踢掉，并弹出多个互相矛盾的结果框。
+    _busy = set()
+    _busy_lock = threading.Lock()
+
+    def run_async(fn, key=None):
+        if key is not None:
+            with _busy_lock:
+                if key in _busy:
+                    return
+                _busy.add(key)
+            def _wrapped():
+                try:
+                    fn()
+                finally:
+                    with _busy_lock:
+                        _busy.discard(key)
+            threading.Thread(target=_wrapped, daemon=True).start()
+            return
+        threading.Thread(target=fn, daemon=True).start()
 
     def safe_ui(fn):
         """将 UI 更新调度到主线程。线程安全：不直接查询控件状态。"""
@@ -901,7 +1066,7 @@ def cmd_gui(args, cfg) -> int:
                     btn_autostart.config(text="一键配置", bg="#2563eb", fg="#ffffff",
                                          activebackground="#1d4ed8", activeforeground="#ffffff")
             safe_ui(_ui)
-        run_async(_task)
+        run_async(_task, 'autostart')
 
     def toggle_autostart():
         if autostart_active[0]:
@@ -958,12 +1123,15 @@ def cmd_gui(args, cfg) -> int:
                     meta_lbl.config(text="流量: %s  |  延迟: %d ms%s" % (flow, ping_ms, dur_text))
                 safe_ui(_ui)
             except Exception as e:
+                # 同样必须在 except 块内先取出消息：Python 会在块结束时删除 e，
+                # 内层 def 闭包引用 e 时回调会抛 NameError，界面就永远停在「检测中…」。
+                err_msg = "%s" % e
                 def _err():
                     st_lbl.config(text="! 网络不可达", fg=danger_color)
-                    ip_lbl.config(text="错误: %s" % e)
+                    ip_lbl.config(text="错误: %s" % err_msg)
                     meta_lbl.config(text="已用流量: —  |  时长: —")
                 safe_ui(_err)
-        run_async(_task)
+        run_async(_task, 'refresh')
 
     def do_test():
         st_lbl.config(text="→ 正在运行网络自检…", fg="#3b82f6")
@@ -994,8 +1162,11 @@ def cmd_gui(args, cfg) -> int:
                 )
                 safe_ui(lambda: [messagebox.showinfo("网络自检诊断", diag), do_refresh()])
             except Exception as e:
-                safe_ui(lambda: [messagebox.showerror("自检异常", "网络自检失败: %s" % e), do_refresh()])
-        run_async(_task)
+                # 必须在 except 块内先把消息取出来：Python 会在块结束时删除变量 e，
+                # 若让 lambda 延迟引用 e，回调执行时会抛 NameError 而不是弹出错误框。
+                err_msg = "网络自检失败: %s" % e
+                safe_ui(lambda m=err_msg: [messagebox.showerror("自检异常", m), do_refresh()])
+        run_async(_task, 'selftest')
 
     def do_login():
         cfg["username"] = user_ent.get().strip()
@@ -1014,8 +1185,10 @@ def cmd_gui(args, cfg) -> int:
                     do_refresh()
                 safe_ui(_ui)
             except Exception as e:
-                safe_ui(lambda: messagebox.showerror("错误", str(e)))
-        run_async(_task)
+                # 同上：先取值再交给延迟回调，避免 NameError
+                err_msg = str(e)
+                safe_ui(lambda m=err_msg: messagebox.showerror("错误", m))
+        run_async(_task, 'login')
 
     def do_logout():
         if not messagebox.askyesno("注销确认", "确定要注销下线当前校园网会话吗？\n注销后电脑将断开互联网连接。"):
@@ -1033,8 +1206,10 @@ def cmd_gui(args, cfg) -> int:
                     do_refresh()
                 safe_ui(_ui)
             except Exception as e:
-                safe_ui(lambda: messagebox.showerror("错误", str(e)))
-        run_async(_task)
+                # 同上：先取值再交给延迟回调，避免 NameError
+                err_msg = str(e)
+                safe_ui(lambda m=err_msg: messagebox.showerror("错误", m))
+        run_async(_task, 'logout')
 
     def do_save():
         cfg["username"] = user_ent.get().strip()
@@ -1102,9 +1277,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    global _QUIET
+    global _QUIET, _JSON_MODE
     args = build_parser().parse_args(argv)
-    _QUIET = bool(args.quiet) and not args.json
+    # --json 时一律静默：JSON 是给程序消费的，stdout 必须只有一行 JSON。
+    # 原先写成 `quiet and not json`，等于「带 --json 就强制不静默」，
+    # 于是所有在 emit_json 之前的进度输出都会混进 stdout，
+    # 导致 `json.loads(stdout)` 失败。
+    _JSON_MODE = bool(args.json)
+    _QUIET = bool(args.quiet) or _JSON_MODE
     try:
         cfg = load_config()
         handler = {
@@ -1118,7 +1298,7 @@ def main(argv: list[str] | None = None) -> int:
         }[args.command]
         return handler(args, cfg)
     except ConfigError as exc:
-        say("✗ 配置错误: %s" % exc)
+        say_err("✗ 配置错误: %s" % exc)
         if args.json:
             emit_json({"success": False, "error": str(exc)})
         return EXIT_CONFIG
@@ -1126,7 +1306,7 @@ def main(argv: list[str] | None = None) -> int:
         say("\n已取消。")
         return EXIT_FAIL
     except NetworkError as exc:
-        say("✗ %s" % exc)
+        say_err("✗ %s" % exc)
         if args.json:
             emit_json({"success": False, "error": str(exc)})
         return EXIT_FAIL

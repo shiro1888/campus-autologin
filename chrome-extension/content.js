@@ -43,18 +43,21 @@
     return new Promise(function (resolve) {
       try {
         chrome.storage.local.get(
-          { account: '', password: '', isp: '1', contentAutoFill: true },
+          { account: '', password: '', isp: '1', contentAutoFill: true, manualLogout: false },
           function (s) {
             resolve({
               account: (s && s.account) || '',
               password: (s && s.password) || '',
               isp: (s && s.isp) || '1',
-              enabled: !s || s.contentAutoFill !== false
+              enabled: !s || s.contentAutoFill !== false,
+              // 用户手动注销后暂停一切自动登录（含本脚本的自动填单），
+              // 否则断网被跳转到门户时这里又会把人登回去，注销依然无效。
+              paused: !!(s && s.manualLogout)
             });
           }
         );
       } catch (e) {
-        resolve({ account: '', password: '', isp: '1', enabled: false });
+        resolve({ account: '', password: '', isp: '1', enabled: false, paused: true });
       }
     });
   }
@@ -222,6 +225,16 @@
     })();
   }
 
+  /** 移除 HUD（加载态卡住时兜底用） */
+  function hideHud() {
+    try {
+      const hud = document.getElementById('campus-login-hud');
+      if (hud && hud.parentNode) hud.parentNode.removeChild(hud);
+    } catch (e) {
+      /* 忽略 */
+    }
+  }
+
   /** 在门户页面顶部显示现代浮动指示条 */
   function showHud(text, state) {
     try {
@@ -255,7 +268,15 @@
       }
       const icon = state === 'success' ? '✓' : (state === 'error' ? '✗' : '⚡');
       const iconBg = state === 'success' ? '#10b981' : (state === 'error' ? '#ef4444' : '#3b82f6');
-      hud.innerHTML = '<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:' + iconBg + ';color:#fff;font-size:11px;font-weight:bold;">' + icon + '</span> <span>' + text + '</span>';
+      // 只把「结构」交给 innerHTML，动态文本一律用 textContent 赋值。
+      // text 里可能含门户返回的内容（如登录失败原因 r.msg），而门户是明文 HTTP，
+      // 同网段可被篡改 —— 若直接拼进 innerHTML，等价于把任意 HTML/JS 注入门户页面
+      // （实测 <img src=x onerror=...> 会真的执行）。
+      hud.innerHTML = '<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:' + iconBg + ';color:#fff;font-size:11px;font-weight:bold;"></span> <span></span>';
+      const iconEl = hud.firstChild;
+      if (iconEl) iconEl.textContent = icon;
+      const textEl = hud.lastChild;
+      if (textEl) textEl.textContent = String(text == null ? '' : text);
       if (state === 'success' || state === 'error') {
         setTimeout(function () {
           if (!hud) return;
@@ -269,9 +290,49 @@
     }
   }
 
+  /**
+   * 跨标签轻量互斥：同一时刻只让一个门户标签发起自动认证。
+   *
+   * 为什么需要：manifest 的 content_scripts 会给**每个**匹配的门户标签独立注入本脚本。
+   * 用户同时开着登录页 + 注销页 + 历史标签很常见，这些实例彼此无感知，
+   * 会各自提交认证。而门户对同一账号的并发认证会返回「该 IP 已经在线」，
+   * 甚至把刚建立的会话踢掉（Python GUI 的单飞保护就是针对同一问题加的）。
+   *
+   * 实现：用 **Web Locks API**（navigator.locks）做跨标签互斥。
+   * 最初用的是 localStorage 时间戳方案，但实测**在真正同时争用时失效**：
+   * 两个标签若在同一毫秒写入，会写入相同的时间戳，回读比对「等于自己写的值」
+   * 对双方都成立 —— 于是两个标签都以为自己拿到了锁（实测 2 个标签都返回 WON）。
+   * Web Locks 是浏览器为跨标签互斥提供的原生能力，实测同一竞态下正确只放行 1 个。
+   *
+   * 流程：认证全程持有锁；不等待（ifAvailable），拿不到就直接退出，避免标签排队。
+   * 浏览器不支持 navigator.locks 时降级为「不协调」——退回加锁前的行为，
+   * 不会因为缺少 API 而完全丧失自动登录能力。
+   */
+  var LOCK_NAME = 'campus-auto-login';
+
+  /** 尝试在跨标签互斥下执行 fn；拿不到锁则安静跳过（fn 不执行） */
+  function withLock(fn) {
+    try {
+      if (!navigator || !navigator.locks || !navigator.locks.request) {
+        fn();   // 无 Web Locks：不做协调，保持原行为
+        return;
+      }
+      navigator.locks.request(LOCK_NAME, { ifAvailable: true }, function (lock) {
+        if (!lock) return undefined;   // 已有标签在认证，安静退出
+        return fn();                   // 返回 Promise 时锁会持续到其结束
+      }).catch(function () {
+        /* 忽略：取锁失败不影响主流程 */
+      });
+    } catch (e) {
+      fn();
+    }
+  }
+
   function main() {
     getSettings().then(function (s) {
       if (!s.enabled || !s.account || !s.password) return;
+      // 用户手动注销后不要自动填单提交
+      if (s.paused) return;
 
       checkStatus().then(function (online) {
         if (online) {
@@ -285,37 +346,57 @@
             return;
           }
 
-          showHud('校园网自动登录：正在提交认证…', 'loading');
-          const submitted = fillAndSubmit(s.account, s.password, s.isp);
-          if (!submitted) return;
-
-          report({ ok: true, online: false, message: '已自动填写并提交登录表单' });
-
-          // 兜底：4 秒后仍未上线，用同源 fetch 再试一次
-          setTimeout(function () {
-            if (done) return;
-            checkStatus().then(function (ok) {
-              if (ok) {
-                done = true;
-                showHud('校园网认证成功！已在线', 'success');
-                report({ ok: true, online: true, message: '登录成功，已确认在线' });
+          // 多标签协调：已有标签在认证中就拿不到锁，安静退出。
+          // 锁由 Web Locks 在回调返回的 Promise 结束后自动释放，
+          // 因此这里不需要（也无法）手工释放，更不会在用户浏览器里留残留。
+          withLock(function () {
+            return new Promise(function (resolveFlow) {
+              showHud('校园网自动登录：正在提交认证…', 'loading');
+              const submitted = fillAndSubmit(s.account, s.password, s.isp);
+              if (!submitted) {
+                // 找不到登录按钮 / 点击异常。
+                // 注意：loading 态的 HUD 不会自动淡出（只有 success/error 才会），
+                // 所以这里必须显式收掉，否则页面顶部会永久挂着「正在提交认证…」。
+                hideHud();
+                resolveFlow();
                 return;
               }
-              directLogin(s.account, s.password, s.isp).then(function (r) {
-                done = true;
-                if (r.ok) {
-                  showHud('校园网认证成功！已在线', 'success');
-                } else {
-                  showHud('登录失败：' + (r.msg || '请检查密码'), 'error');
-                }
-                report({
-                  ok: r.ok,
-                  online: r.ok,
-                  message: r.ok ? '登录成功（兜底请求）' : ('登录失败：' + (r.msg || '账号或密码可能不正确'))
+
+              report({ ok: true, online: false, message: '已自动填写并提交登录表单' });
+
+              // 兜底：3.5 秒后仍未上线，用同源 fetch 再试一次
+              setTimeout(function () {
+                if (done) { resolveFlow(); return; }
+                checkStatus().then(function (ok) {
+                  if (ok) {
+                    done = true;
+                    showHud('校园网认证成功！已在线', 'success');
+                    report({ ok: true, online: true, message: '登录成功，已确认在线' });
+                    resolveFlow();
+                    return;
+                  }
+                  directLogin(s.account, s.password, s.isp).then(function (r) {
+                    done = true;
+                    if (r.ok) {
+                      showHud('校园网认证成功！已在线', 'success');
+                    } else {
+                      showHud('登录失败：' + (r.msg || '请检查密码'), 'error');
+                    }
+                    report({
+                      ok: r.ok,
+                      online: r.ok,
+                      message: r.ok ? '登录成功（兜底请求）' : ('登录失败：' + (r.msg || '账号或密码可能不正确'))
+                    });
+                    resolveFlow();
+                  }).catch(function () {
+                    resolveFlow();   // 异常也要结束流程，让锁释放
+                  });
+                }).catch(function () {
+                  resolveFlow();
                 });
-              });
+              }, 3500);
             });
-          }, 3500);
+          });
         });
       });
     });

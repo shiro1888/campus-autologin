@@ -1543,6 +1543,13 @@ select:focus {
   animation: pulse-dot 1.5s infinite ease-in-out;
 }
 
+/* 表单有未保存改动时（options.js 给 #btnSave 加 .has-changes）点亮提示 */
+.has-changes .unsaved-dot { display: block; }
+
+.has-changes {
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.45), var(--primary-shadow, none);
+}
+
 @keyframes pulse-dot {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.35); opacity: 0.75; }

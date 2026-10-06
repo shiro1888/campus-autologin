@@ -13,7 +13,8 @@
 // 常量
 // ---------------------------------------------------------------------------
 
-const PORTAL_ORIGIN = 'http://172.30.100.2';
+const PORTAL_HOST = '172.30.100.2';
+const PORTAL_ORIGIN = 'http://' + PORTAL_HOST;
 const URL_CHKSTATUS = PORTAL_ORIGIN + '/drcom/chkstatus';
 const URL_LOGIN = PORTAL_ORIGIN + '/drcom/login';
 const JS_VERSION = '4.1.3';
@@ -25,12 +26,41 @@ const DEFAULT_INTERVAL_MIN = 10 / 60;   // 默认 10 秒（自适应在线巡检
 const MIN_INTERVAL_MIN = 1 / 60;
 const MAX_INTERVAL_MIN = 60;
 
+// 门户探测失败时的退避参数：前 BACKOFF_GRACE_ATTEMPTS 次仍按掉线间隔快速重试
+// （校园网瞬断一般几秒到几十秒），之后指数退避并封顶 BACKOFF_MAX_MIN，
+// 避免人不在校园网内（在家 / 热点）时变成每秒一次的无意义空转。
+const BACKOFF_MAX_MIN = 1;
+const BACKOFF_GRACE_ATTEMPTS = 10;
+
+// 瞬时触发的节流窗口：短时间内的连续导航失败只触发一次
+const INSTANT_THROTTLE_MS = 15000;
+
+// 只有「网络层」错误才可能意味着校园网断了。白名单之外的（如 net::ERR_ABORTED
+// —— 用户按 ESC 中断加载）一律忽略，否则随便一个打不开的页面都会白唤醒一次门户请求。
+const INSTANT_ERROR_WHITELIST = [
+  'net::ERR_INTERNET_DISCONNECTED',
+  'net::ERR_NAME_NOT_RESOLVED',
+  'net::ERR_NAME_RESOLUTION_FAILED',
+  'net::ERR_ADDRESS_UNREACHABLE',
+  'net::ERR_CONNECTION_TIMED_OUT',
+  'net::ERR_CONNECTION_RESET',
+  'net::ERR_CONNECTION_REFUSED',
+  'net::ERR_CONNECTION_CLOSED',
+  'net::ERR_CONNECTION_FAILED',
+  'net::ERR_CONNECTION_ABORTED',
+  'net::ERR_NETWORK_CHANGED',
+  'net::ERR_NETWORK_ACCESS_DENIED',
+  'net::ERR_PROXY_CONNECTION_FAILED',
+  'net::ERR_TIMED_OUT',
+  'net::ERR_EMPTY_RESPONSE'
+];
+
 const NET_TIMEOUT_MS = 8000;
 
-// 首次运行默认值（仅作初始值，之后完全以 chrome.storage.local 为准）
+// 首次运行默认值。账号密码留空 —— 绝不写入任何真实凭据，由用户到设置页填写。
 const DEFAULT_SETTINGS = {
-  account: 'REDACTED_CAMPUS_ACCOUNT',
-  password: 'REDACTED_CAMPUS_PASSWORD',
+  account: '',
+  password: '',
   isp: '1',
   intervalMin: DEFAULT_INTERVAL_MIN,   // 在线时的检查间隔
   offlineIntervalMin: 1 / 60,          // 掉线后的检查间隔（默认 1 秒）
@@ -38,6 +68,9 @@ const DEFAULT_SETTINGS = {
   autoOnStartup: true,
   contentAutoFill: true,
   instantTrigger: true,
+  manualLogout: false,                 // 用户手动注销后置真：暂停一切自动登录
+  unreachableStreak: 0,                // 连续探测失败次数（用于指数退避）
+  authError: false,                    // 上次登录因凭据类错误失败（重试无意义，降频）
   initialized: true
 };
 
@@ -55,11 +88,24 @@ const ERROR_MAP = {
   'error3': '账号或密码错误'
 };
 
+// 连接状态机的全部取值（用于校验从 storage 恢复的值是否合法）
+const CONN_STATES = ['unknown', 'online', 'offline', 'unreachable', 'unparseable'];
+
 // 并发保护：防止定时器与手动点击同时发起登录
 let running = false;
 
-// 上一次检查的在线状态（用于自适应轮询）。null = 尚未检查过
-let lastOnline = null;
+// 连接状态机与退避计数（详见 updateConnState 注释）
+let connState = 'unknown';
+let unreachableStreak = 0;
+
+// 已落盘的 streak 值，用于避免重复写入 storage
+let lastPersistedStreak = -1;
+
+// 当前闹钟周期（分钟），用于判断是否需要重建定时器
+let lastAlarmPeriod = null;
+
+// 是否已从 storage 恢复过运行态（见 hydrateState）
+let hydrated = false;
 
 // ---------------------------------------------------------------------------
 // 小工具
@@ -93,7 +139,30 @@ function parseJsonp(text) {
   }
 }
 
-/** 带超时的 fetch，返回文本 */
+/**
+ * 校验响应确实是门户的 JSONP，而不是被强制门户拦截后返回的 HTML。
+ * 不通过则抛异常，由调用方转成 unparseable 状态。
+ */
+function validateContentType(text) {
+  const t = String(text || '').trim();
+  if (!t) throw new Error('门户返回空内容');
+  const head = t.slice(0, 200).toLowerCase();
+  if (head.startsWith('<!doctype') || head.startsWith('<html') || head.indexOf('<head') !== -1 ||
+      head.indexOf('<body') !== -1 || head.indexOf('<?xml') !== -1) {
+    throw new Error('门户返回 HTML 页面而非认证数据');
+  }
+  return true;
+}
+
+/**
+ * 带超时的 fetch，返回文本。
+ *
+ * 必须按响应头声明的 charset 解码：门户实测声明 `charset=gbk`
+ * （chkstatus 为 application/javascript; charset=gbk），而 fetch 的 resp.text()
+ * **一律按 UTF-8** 解码、忽略该声明 —— 于是门户返回的中文（如 msga 错误原因）
+ * 会变成 U+FFFD 乱码，导致中文错误提示无法显示、也影响按中文匹配的判定。
+ * result/flow 等 ASCII 字段虽不受影响，但既然拿到了声明就应当遵照。
+ */
 async function fetchText(url) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), NET_TIMEOUT_MS);
@@ -104,7 +173,30 @@ async function fetchText(url) {
       credentials: 'omit',
       signal: ctrl.signal
     });
-    return await resp.text();
+    // 取原始字节后自行解码；ArrayBuffer 失败时退回 text()，保证不因解码而中断。
+    let buf;
+    try {
+      buf = await resp.arrayBuffer();
+    } catch (e) {
+      return await resp.text();
+    }
+    const ct = String(resp.headers && resp.headers.get ? (resp.headers.get('content-type') || '') : '');
+    const m = /charset\s*=\s*"?([\w-]+)"?/i.exec(ct);
+    const charset = m ? m[1].toLowerCase() : '';
+    const candidates = charset ? [charset, 'utf-8', 'gbk', 'gb18030'] : ['utf-8', 'gbk', 'gb18030'];
+    const bytes = new Uint8Array(buf);
+    for (const enc of candidates) {
+      try {
+        // fatal: true —— 遇到非法字节序列就抛错，才能"试错"下一个编码。
+        // 若用默认的 fatal:false，任何编码都会"成功"并产出 U+FFFD 乱码，
+        // 循环第一轮就返回，回退形同虚设（声明缺失/声明错误时必然乱码）。
+        return new TextDecoder(enc, { fatal: true }).decode(bytes);
+      } catch (e) {
+        // 该编码不可用，或字节序列在它下面非法 -> 换下一个
+      }
+    }
+    // 全部失败：按 UTF-8 容错解码，至少不抛异常
+    return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
   } finally {
     clearTimeout(timer);
   }
@@ -130,9 +222,44 @@ async function getSettings() {
     autoOnStartup: stored.autoOnStartup === undefined ? DEFAULT_SETTINGS.autoOnStartup : !!stored.autoOnStartup,
     contentAutoFill: stored.contentAutoFill === undefined ? DEFAULT_SETTINGS.contentAutoFill : !!stored.contentAutoFill,
     instantTrigger: stored.instantTrigger === undefined ? DEFAULT_SETTINGS.instantTrigger : !!stored.instantTrigger,
+    // 用户手动注销后为 true：暂停一切自动登录，直到用户重新点「立即登录」
+    manualLogout: stored.manualLogout === undefined ? DEFAULT_SETTINGS.manualLogout : !!stored.manualLogout,
+    // 上次登录因凭据类错误（密码错/账号不存在等）失败 -> 降频重试，不再每秒打门户
+    authError: stored.authError === undefined ? DEFAULT_SETTINGS.authError : !!stored.authError,
+    // 连续探测失败次数，用于指数退避（区分「不在校园网内」与「确认掉线」）
+    unreachableStreak: Math.max(0, parseInt(stored.unreachableStreak, 10) || 0),
+    // 上次的连接状态，便于 SW 重启后退避不归零
+    connState: CONN_STATES.indexOf(stored.connState) !== -1 ? stored.connState : 'unknown',
     initialized: !!stored.initialized
   };
   return s;
+}
+
+/** 写入运行态字段（manualLogout / unreachableStreak / connState） */
+async function setState(patch) {
+  try {
+    await chrome.storage.local.set(patch);
+  } catch (e) {
+    // 忽略
+  }
+}
+
+/**
+ * 从 storage 恢复运行态。MV3 的 Service Worker 随时会被回收，模块级变量
+ * （connState / unreachableStreak）每次唤醒都归零；不恢复的话退避计数会被不断
+ * 清零、闹钟退回基础间隔，指数退避就形同虚设。只在首次唤醒时恢复一次。
+ */
+async function hydrateState() {
+  if (hydrated) return;
+  hydrated = true;
+  try {
+    const s = await getSettings();
+    if (connState === 'unknown') connState = s.connState;
+    unreachableStreak = Math.max(unreachableStreak, s.unreachableStreak);
+    lastPersistedStreak = s.unreachableStreak;
+  } catch (e) {
+    // 忽略，按默认值继续
+  }
 }
 
 function clampInterval(v) {
@@ -194,7 +321,9 @@ function fail(message, online) {
 
 /**
  * 查询在线状态。
- * @returns {{reachable: boolean, online: boolean, raw: object|null, message: string}}
+ * reachable=false 门户连不上；unparseable=true 通了但拿不到门户数据
+ * ——典型场景是酒店 / 机场的强制门户把任意请求都拦成自家登录页，
+ * 这种情况重试再多次也不会成功，必须走退避而非 1 秒高频重试。
  */
 async function checkStatus() {
   const url = URL_CHKSTATUS + '?callback=dr1001&v=' + rand() + '&lang=zh&jsVersion=' + JS_VERSION;
@@ -206,19 +335,23 @@ async function checkStatus() {
     return { reachable: false, online: false, raw: null, pingMs: -1, message: '不在校园网内 / 门户不可达' };
   }
   const pingMs = Date.now() - t0;
-  const data = parseJsonp(text);
+
+  let bad = null;
+  try {
+    validateContentType(text);   // HTML 响应说明这压根不是门户接口
+  } catch (e) {
+    bad = '门户返回的是网页而非认证数据（可能处于酒店/机场等强制登录网络）';
+  }
+  const data = bad ? null : parseJsonp(text);
   if (!data) {
-    // 网络通但返回不是预期的 JSONP
-    return { reachable: true, online: false, raw: null, pingMs, message: '门户返回数据无法解析（可能认证页已变更）' };
+    return {
+      reachable: true, online: false, unparseable: true, raw: null, pingMs,
+      message: bad || '门户返回数据无法解析（可能认证页已变更）'
+    };
   }
   const online = Number(data.result) === 1;
-  return {
-    reachable: true,
-    online: online,
-    raw: data,
-    pingMs: pingMs,
-    message: online ? '当前已在线' : '当前未登录'
-  };
+  return { reachable: true, online: online, raw: data, pingMs: pingMs,
+           message: online ? '当前已在线' : '当前未登录' };
 }
 
 /** 把门户返回的失败原因翻译成中文 */
@@ -236,7 +369,18 @@ function friendlyError(data) {
   return joined ? '登录失败：' + joined : '登录失败：账号或密码错误';
 }
 
-/** 执行登录，返回统一结果对象 */
+/**
+ * 判断登录失败是否属于「重试也没用」的凭据类错误（密码错、账号不存在、被锁、欠费等）。
+ * 这类错误按 1 秒间隔无限重试毫无意义 —— 每天会产生上万次注定失败的认证请求，
+ * 门户侧还可能触发「该账号已在别处登录」等副作用。
+ * 对照：campus_login.py 的 cmd_login 早就有同样的判断（命中即 break 停止重试）。
+ */
+function isPermanentAuthError(msg) {
+  const m = String(msg || '');
+  return /密码|账号不存在|账号格式|被锁定|锁定|欠费|停机|已在别处|error1|error2|error3|error4|error5|error6/i.test(m);
+}
+
+/** 执行登录，返回统一结果对象。返回值的 permanent=true 表示凭据类错误、不应再高频重试。 */
 async function doLogin(settings) {
   const acct = String(settings.account || '').trim();
   const pwd = String(settings.password || '');
@@ -277,12 +421,18 @@ async function doLogin(settings) {
   if (code === '1' || code.toLowerCase() === 'ok') {
     return ok('登录成功', true);
   }
-  return fail(friendlyError(data), false);
+  const msg = friendlyError(data);
+  const r = fail(msg, false);
+  r.permanent = isPermanentAuthError(msg);   // 凭据类错误 -> 调度层改走退避
+  return r;
 }
 
 /**
  * 注销下线。
  * 先从 chkstatus 取出 wlan_user_ip / mac / ac_ip，再请求注销接口。
+ *
+ * 重要：注销成功后必须置上 manualLogout 抑制标志。否则下一次后台巡检
+ * （掉线间隔默认 1 秒）会立刻把用户重新认证上网，「注销」形同虚设。
  */
 async function doLogout() {
   const st = await checkStatus();
@@ -312,6 +462,16 @@ async function doLogout() {
     jsVersion: JS_VERSION
   });
 
+  // 若此刻正好有一次登录在进行中（用户点了「立即登录」后马上又点「注销」），
+  // 必须**先**落盘注销意图：否则那次登录会完成并把人重新认证上网，
+  // 而本次注销的校验又恰好跑在它之后、看到「会话仍在」，最终既没注销成功、
+  // 也没记下用户的注销意图（manualLogout 保持 false），插件还会继续守护重连。
+  // 提前置位后，在途的那次登录会在完成时看到该标志并让位（见 autoLogin 第 4.5 步）。
+  if (running) {
+    await setState({ manualLogout: true, unreachableStreak: 0 });
+    console.log('[logout] 检测到登录进行中，先记录注销意图');
+  }
+
   try {
     await fetchText(PORTAL_ORIGIN + '/drcom/logout?' + p1.toString());
   } catch (e) {}
@@ -322,85 +482,206 @@ async function doLogout() {
 
   await new Promise((r) => setTimeout(r, 600));
   const stAfter = await checkStatus();
-  const res = !stAfter.online
-    ? ok('已注销下线', false)
-    : fail('注销请求已提交，但会话仍在（可能需到门户页面手动注销）', true);
 
+  if (!stAfter.online) {
+    // 注销成功 -> 置上抑制标志，暂停自动登录。
+    // 否则下一轮后台巡检（掉线间隔默认 1 秒）会立刻把用户重新认证上网。
+    await setState({ manualLogout: true, unreachableStreak: 0 });
+    unreachableStreak = 0;
+    connState = stAfter.reachable ? 'offline' : 'unreachable';
+    const res = ok('已注销下线（自动登录已暂停，点「立即登录」可恢复）', false);
+    await saveResult(res);
+    // 需先落盘 manualLogout=true，ensureAlarm 才会按暂停态选空闲间隔
+    await ensureAlarm();
+    console.log('[logout] 已注销，自动登录暂停中');
+    return res;
+  }
+
+  const res = fail('注销请求已提交，但会话仍在（可能需到门户页面手动注销）', true);
+  // 会话仍在有两种可能：(a) 门户不支持自助注销；(b) 并发登录正在途中，稍后会完成。
+  // 无论哪种，用户点过注销就该保持暂停，否则下一轮巡检会立刻把人登回去，
+  // 「注销」形同虚设。登录完成时若发现该标志，会补发一次注销（见 autoLogin 第 4.5 步）。
+  if (!(await getSettings()).manualLogout) {
+    await setState({ manualLogout: true, unreachableStreak: 0 });
+    console.log('[logout] 会话未清除，但仍保持注销暂停以避免被立刻登回');
+  }
+  await updateConnState(stAfter);
   await saveResult(res);
-  await maybeSwitchCadence(stAfter.online);
+  await applyCadence();
   return res;
 }
 
 
 /**
- * 在线状态变化时切换轮询节奏。
- * 只在状态真的翻转时才重建闹钟，避免每次检查都重置计时。
+ * 连接状态机。区分多种「不通」的原因是避免无意义高频重试的关键：
+ *   unknown     尚未检测过
+ *   online      门户可达且已认证
+ *   offline     门户可达但未认证      -> 真·掉线，按 offlineIntervalMin 快速重连
+ *   unreachable 门户根本连不上        -> 多半不在校园网内，指数退避
+ *   unparseable 通但返回的不是门户数据 -> 强制门户 / 认证页变更，重试无意义，退避
  */
-async function maybeSwitchCadence(online) {
-  const changed = lastOnline !== online;
-  lastOnline = online;
-  if (!changed) return;
-  try {
-    const settings = await getSettings();
-    if (!settings.adaptive) return;
-    await ensureAlarm();
-    console.log('[adaptive] 状态变为 ' + (online ? '在线' : '掉线') +
-      '，检查间隔切到 ' +
-      formatInterval(clampInterval(online ? settings.intervalMin : settings.offlineIntervalMin)));
-  } catch (e) {
-    // 忽略
+function backoffPeriod(settings) {
+  // 宽限期内保持快速重连；超出后才指数退避（2x、4x…），封顶 BACKOFF_MAX_MIN
+  const base = clampInterval(settings.offlineIntervalMin);
+  const over = unreachableStreak - BACKOFF_GRACE_ATTEMPTS;
+  if (over <= 0) return base;
+  return clampInterval(Math.min(base * Math.pow(2, Math.min(over, 10)), BACKOFF_MAX_MIN));
+}
+
+/**
+ * 按当前连接状态调整轮询节奏，并在节奏变化时打一条日志。
+ * （ensureAlarm 内部已做「周期没变就不重建」，这里只负责记录变化。）
+ */
+async function applyCadence() {
+  const prev = lastAlarmPeriod;
+  await ensureAlarm();
+  if (prev !== lastAlarmPeriod) {
+    console.log('[cadence] 状态=' + connState +
+      (unreachableStreak ? '（连续探测失败 ' + unreachableStreak + ' 次）' : '') +
+      '，检查间隔切到 ' + formatInterval(lastAlarmPeriod));
   }
+}
+
+/** 根据一次状态检查结果更新连接状态机与退避计数，并持久化。 */
+async function updateConnState(st) {
+  const before = connState;
+  if (!st.reachable) {
+    unreachableStreak += 1;
+    connState = 'unreachable';
+  } else if (st.unparseable) {
+    // HTTP 通了但拿不到门户数据（强制门户拦截 / 认证页改版）：不是「掉线」，重试也不会成功
+    unreachableStreak += 1;
+    connState = 'unparseable';
+  } else {
+    unreachableStreak = 0;   // 能正常拿到门户数据 -> 确认在校园网内
+    connState = st.online ? 'online' : 'offline';
+  }
+  // 只要计数变了就要落盘（含 unparseable）。此处若只判断状态是否翻转，
+  // 那么一旦进入 unparseable，后续每次 +1 都只留在内存里；
+  // SW 被回收后 streak 回退到旧值，退避会重新从低档开始 —— 强制门户下又变回每秒空转。
+  if (before !== connState || unreachableStreak !== lastPersistedStreak) {
+    lastPersistedStreak = unreachableStreak;
+    await setState({ connState: connState, unreachableStreak: unreachableStreak });
+  }
+  return connState;
 }
 
 /**
  * 主流程：先查状态，未在线则登录，登录后再验证。
  * 永远不抛异常。
+ *
+ * @param {string} trigger 触发来源（仅用于日志/展示）
+ * @param {boolean} [manual] 是否为用户主动点击「立即登录」。手动登录会解除注销抑制。
  */
-async function autoLogin(trigger) {
+async function autoLogin(trigger, manual) {
   const tag = trigger ? '[' + trigger + '] ' : '';
   if (running) {
     return { ok: false, online: false, skipped: true, message: '正在登录中，已跳过本次请求', time: nowText() };
   }
   running = true;
   try {
+    await hydrateState();
     const settings = await getSettings();
 
-    // 1) 状态检查
-    const st = await checkStatus();
-    if (!st.reachable) {
-      const r = fail(st.message, false);
-      await saveResult(r);
-      console.log(tag + '门户不可达');
-      // 门户不可达（多半是断网），切到快速重连节奏
-      await maybeSwitchCadence(false);
-      return r;
+    // 0) 用户主动点「立即登录」/ 按快捷键 -> 解除注销暂停
+    let paused = settings.manualLogout;
+    if (manual && paused) {
+      await setState({ manualLogout: false, unreachableStreak: 0 });
+      paused = false;
+      console.log(tag + '用户手动登录，已解除注销暂停');
     }
-    if (st.online) {
-      const r = ok('已在线，无需登录', true);
+    // 用户手动点了登录，说明可能刚改过账号密码 —— 清掉凭据类错误标记，
+    // 让这一次重新按正常节奏去试（否则会被 authError 降频挡住，白点一下）。
+    if (manual && settings.authError) {
+      await setState({ authError: false });
+      console.log(tag + '用户手动登录，已清除凭据错误标记');
+    }
+
+    // 1) 未配置账号密码时不空转：否则新装插件（凭据默认为空）会每秒请求门户
+    if (!String(settings.account || '').trim() || !String(settings.password || '')) {
+      const r = fail('尚未配置账号密码，请点击插件图标 → 设置', false);
       await saveResult(r);
-      console.log(tag + '已在线，跳过登录');
-      await maybeSwitchCadence(true);
+      console.log(tag + '未配置账号密码，跳过（等待用户在设置页填写）');
+      await ensureAlarm();
       return r;
     }
 
-    // 2) 登录
+    // 2) 状态检查（每次巡检只查一次，暂停态的判定也复用这次结果）
+    const st = await checkStatus();
+
+    // 3) 注销暂停判定。若暂停中却探测到「已在线」，说明用户自己打开门户网页登了回来，
+    //    此时应自动恢复守护 —— 否则暂停态一直留着，界面显示「已在线」让用户看不出
+    //    异常，等之后真掉线了插件却不重连，表现为「时好时坏」。
+    if (paused && !(st.reachable && st.online)) {
+      await updateConnState(st);
+      console.log(tag + '处于手动注销暂停中，跳过');
+      await ensureAlarm();   // 暂停态由 ensureAlarm 内部识别，会降为常规间隔
+      return { ok: true, online: false, skipped: true, paused: true,
+               message: '已手动注销，自动登录已暂停', time: nowText() };
+    }
+    if (paused) {
+      await setState({ manualLogout: false, unreachableStreak: 0 });
+      console.log(tag + '检测到已在线（用户可能自行登录），自动恢复守护');
+    }
+
+    await updateConnState(st);
+
+    // 不可登录的三种情况（互斥）：已在线 / 拿不到门户数据 / 门户连不上
+    if (st.online || st.unparseable || !st.reachable) {
+      const r = st.online ? ok('已在线，无需登录', true) : fail(st.message, false);
+      await saveResult(r);
+      console.log(tag + (st.online ? '已在线，跳过登录'
+        : (st.unparseable ? '门户返回非认证数据' : '门户不可达') + '（连续第 ' + unreachableStreak + ' 次）'));
+      await applyCadence();
+      return r;
+    }
+
+    // 4) 登录（门户可达但未认证 -> 真·掉线，保持快速重连）
     console.log(tag + '未在线，开始登录：' + settings.account);
     updateActionBadge(false, '...');
-    await maybeSwitchCadence(false);
+    await applyCadence();
     let r = await doLogin(settings);
 
-    // 3) 登录后二次验证
+    // 4.5) 登录在途期间用户点了「注销」-> 用户意图优先，补发一次注销。
+    //   能走到这里说明本次进入时并未处于暂停态（否则第 3 步已早退），
+    //   所以此刻 manualLogout 为真，必然是这段时间里用户按了注销。
+    //   若不处理：本次登录会把用户刚注销掉的会话重新认证回来，
+    //   界面显示「已手动注销·已暂停」，而门户实际 online=true —— 用户以为断网了，
+    //   其实还在计费上网，且插件自认为暂停、不会再纠正。
+    if ((await getSettings()).manualLogout) {
+      console.log(tag + '登录期间用户已注销，补发注销以尊重用户意图');
+      const lr = await doLogout();
+      await saveResult(lr);
+      return lr;
+    }
+
+    // 5) 登录后二次验证
     if (r.ok) {
       const st2 = await checkStatus();
+      await updateConnState(st2);
       if (st2.reachable && !st2.online) {
+        // 注意：这里**不能**判为凭据类错误。门户已接受认证（result:1），
+        // 只是内核生效有延迟 —— 这属于「真掉线」场景，必须保持 1 秒快速重试。
+        // 若在此置 permanent，会把正常的秒级抢修降成 10 秒，破坏核心能力。
         r = fail('登录请求已提交，但状态仍未在线（可能密码错误或账号被占用）', false);
       } else {
         r = ok('登录成功，已确认在线', true);
       }
     }
 
+    // 6) 记录/清除「凭据类错误」标记，决定后续是按秒重试还是降频等待。
+    //    成功或非凭据类失败（如网络抖动）都要清掉，避免一直卡在低频。
+    const nextAuthError = !r.ok && !!r.permanent;
+    if (nextAuthError !== settings.authError) {
+      await setState({ authError: nextAuthError });
+      console.log(tag + (nextAuthError
+        ? '凭据类错误，已降为常规间隔重试（请检查账号密码与运营商）'
+        : '已恢复正常重试节奏'));
+    }
+
     await saveResult(r);
     console.log(tag + r.message);
+    await applyCadence();
     return r;
   } catch (e) {
     // 兜底：任何未预期错误都不能让 Service Worker 挂掉
@@ -421,19 +702,34 @@ async function autoLogin(trigger) {
 // ---------------------------------------------------------------------------
 
 /**
- * 按当前设置创建/更新定时闹钟。
+ * 按当前状态创建/更新定时闹钟。
  *
- * 支持自适应：在线时用「常规间隔」，一旦掉线就切到「掉线间隔」快速重连，
- * 重连成功后再切回常规间隔。这样既能秒级恢复，又不会一直高频空转。
+ * 间隔选择：
+ *   用户已手动注销          -> intervalMin        空闲巡检（不做登录尝试）
+ *   凭据类错误（密码错等）  -> 常规间隔            重试无意义，降频等待用户改配置
+ *   在线 / 未知            -> intervalMin        常规巡检
+ *   门户可达但未认证        -> offlineIntervalMin 真·掉线，快速抢修
+ *   连不上 / 拿不到门户数据 -> 指数退避            不在校园网内，避免每秒空转
  */
-async function ensureAlarm(forcePeriod) {
+async function ensureAlarm() {
   try {
     const settings = await getSettings();
     let period;
-    if (forcePeriod !== undefined && forcePeriod !== null) {
-      period = clampInterval(forcePeriod);
-    } else if (settings.adaptive && lastOnline === false) {
+    // 暂停态从设置里读，而不是靠调用方传参。
+    // 否则任何一个调用方（如 settingsChanged 处理器）忘了传，暂停期间就会被
+    // 按 connState==='offline' 设成「掉线间隔 1 秒」，浏览器又回到每秒空唤醒。
+    if (settings.manualLogout) {
+      period = clampInterval(settings.intervalMin);   // 空闲巡检
+    } else if (settings.authError) {
+      // 密码错 / 账号不存在等：按 1 秒重试一万次也不会成功，
+      // 反而每天打出上万次无效认证。降到常规间隔，等用户改好凭据再说。
+      period = clampInterval(settings.intervalMin);
+    } else if (!settings.adaptive) {
+      period = clampInterval(settings.intervalMin);   // 关闭自适应：统一常规间隔
+    } else if (connState === 'offline') {
       period = clampInterval(settings.offlineIntervalMin);
+    } else if (connState === 'unreachable' || connState === 'unparseable') {
+      period = backoffPeriod(settings);
     } else {
       period = clampInterval(settings.intervalMin);
     }
@@ -441,38 +737,25 @@ async function ensureAlarm(forcePeriod) {
     const existing = await chrome.alarms.get(ALARM_NAME);
     // 周期没变就不重建，避免每次唤醒都重置计时器
     if (existing && Math.abs((existing.periodInMinutes || 0) - period) < 1e-9) {
+      lastAlarmPeriod = period;
       return;
     }
-
     await chrome.alarms.clear(ALARM_NAME);
-    await chrome.alarms.create(ALARM_NAME, {
-      delayInMinutes: period,
-      periodInMinutes: period
-    });
+    await chrome.alarms.create(ALARM_NAME, { delayInMinutes: period, periodInMinutes: period });
+    lastAlarmPeriod = period;
     console.log('[alarm] 已设置每 ' + formatInterval(period) + ' 检查一次');
   } catch (e) {
     console.log('[alarm] 创建失败：' + (e && e.message ? e.message : String(e)));
   }
 }
 
-/** 首次安装：写入默认账号密码（仅此一次） */
+/** 首次安装：写入默认设置（仅此一次）。账号密码留空，绝不写入任何真实凭据。 */
 async function initDefaults() {
   try {
     const stored = await chrome.storage.local.get(null);
-    const patch = {};
     if (!stored || !stored.initialized) {
-      patch.account = DEFAULT_SETTINGS.account;
-      patch.password = DEFAULT_SETTINGS.password;
-      patch.isp = DEFAULT_SETTINGS.isp;
-      patch.intervalMin = DEFAULT_SETTINGS.intervalMin;
-      patch.offlineIntervalMin = DEFAULT_SETTINGS.offlineIntervalMin;
-      patch.adaptive = true;
-      patch.autoOnStartup = true;
-      patch.contentAutoFill = true;
-      patch.instantTrigger = true;
-      patch.initialized = true;
-      await chrome.storage.local.set(patch);
-      console.log('[init] 已写入首次运行默认账号');
+      await chrome.storage.local.set(DEFAULT_SETTINGS);
+      console.log('[init] 已写入首次运行默认设置（账号密码为空，请在设置页填写）');
     }
   } catch (e) {
     // 忽略
@@ -480,51 +763,66 @@ async function initDefaults() {
 }
 
 /**
- * 网页加载失败时立刻登录（最快的触发方式）。
+ * 网页加载失败时立刻登录（最快的触发方式）：断线时浏览器会把任意 http 请求
+ * 重定向到门户或直接报错，监听这两种情况即可无需等定时器。
  *
- * 校园网断线时，浏览器会把任意 http 请求重定向到门户，或者直接报错。
- * 这里监听这两种情况，一旦发生就马上认证，无需等定时器。
+ * onErrorOccurred 是全局事件，任何页面的任何导航失败都会触发它，包括用户按 ESC
+ * 中断加载（net::ERR_ABORTED）。故须用错误白名单 + 节流过滤，否则随便一个打不开
+ * 的页面都会白唤醒一次门户请求。
  */
 function setupInstantTriggers() {
   if (!chrome.webNavigation) return;
 
-  /** 用户是否开启了瞬时触发（默认开） */
-  function enabled() {
-    return new Promise((resolve) => {
-      try {
-        chrome.storage.local.get({ instantTrigger: true }, (s) => {
-          resolve(!s || s.instantTrigger !== false);
-        });
-      } catch (e) {
-        resolve(false);
-      }
-    });
+  let lastInstantAt = 0;   // 上次触发时间戳，用于节流
+
+  /** 节流通过返回 false；距上次触发不足 INSTANT_THROTTLE_MS 则返回 true */
+  function throttled() {
+    const now = Date.now();
+    if (now - lastInstantAt < INSTANT_THROTTLE_MS) return true;
+    lastInstantAt = now;
+    return false;
+  }
+
+  /**
+   * 统一入口：检查开关 -> 节流 -> 发起登录。
+   * @param {string} label 日志用的触发来源
+   * @param {function(): Promise<*>} [pre] 额外前置条件，返回 false 则放弃
+   */
+  function trigger(label, pre) {
+    try {
+      chrome.storage.local.get({ instantTrigger: true }, (s) => {
+        if (!s || s.instantTrigger === false) return;
+        if (pre && !pre()) return;
+        if (throttled()) return;
+        console.log('[instant] ' + label);
+        autoLogin(label);
+      });
+    } catch (e) {
+      // 忽略
+    }
   }
 
   // 1) 主框架导航被重定向到门户 -> 说明掉线了
-  chrome.webNavigation.onCommitted.addListener((details) => {
-    if (details.frameId !== 0) return;
-    enabled().then((on) => {
-      if (!on) return;
-      console.log('[instant] 检测到跳转到门户，立即登录');
-      return autoLogin('掉线跳转');
-    }).catch(() => {});
-  }, { url: [{ hostContains: '172.30.100.2' }] });
+  chrome.webNavigation.onCommitted.addListener((d) => {
+    if (d.frameId !== 0) return;
+    trigger('掉线跳转');
+  }, { url: [{ hostEquals: PORTAL_HOST }] });
 
-  // 2) 导航失败（DNS/连接错误）-> 也可能是掉线
-  chrome.webNavigation.onErrorOccurred.addListener((details) => {
-    if (details.frameId !== 0) return;
-    enabled().then((on) => {
-      if (!on) return;
-      return autoLogin('导航失败');
-    }).catch(() => {});
+  // 2) 导航失败 -> 也可能是掉线。只认网络层错误，用户主动中断等一律忽略。
+  chrome.webNavigation.onErrorOccurred.addListener((d) => {
+    if (d.frameId !== 0) return;
+    trigger('导航失败(' + d.error + ')', () => {
+      const e = String(d.error || '');
+      return !!e && INSTANT_ERROR_WHITELIST.some((code) => e.indexOf(code) !== -1);
+    });
   });
 }
 
 chrome.runtime.onInstalled.addListener(() => {
   // 异步流程统一 catch，避免未处理的 Promise 拒绝
   initDefaults()
-    .then(ensureAlarm)
+    .then(hydrateState)
+    .then(() => ensureAlarm())
     .then(() => autoLogin('安装'))
     .catch((e) => console.log('[onInstalled] ' + (e && e.message ? e.message : String(e))));
 });
@@ -534,10 +832,16 @@ chrome.runtime.onInstalled.addListener(() => {
 setupInstantTriggers();
 
 chrome.runtime.onStartup.addListener(() => {
-  getSettings()
+  hydrateState()
+    .then(getSettings)
     .then((s) => {
       if (!s.autoOnStartup) {
         console.log('[startup] 未开启开机自动登录');
+        return null;
+      }
+      // 用户上次是手动注销状态 -> 开机不要擅自把人登回去
+      if (s.manualLogout) {
+        console.log('[startup] 处于手动注销状态，跳过自动登录');
         return null;
       }
       return autoLogin('启动');
@@ -557,7 +861,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return false;
 
   if (msg.type === 'login') {
-    autoLogin('手动')
+    // manual=true：用户主动点「立即登录」，解除注销暂停
+    autoLogin('手动', true)
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse(fail('发生未知错误：' + (e && e.message ? e.message : String(e)), false)));
     return true; // 异步响应
@@ -572,9 +877,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 
   if (msg.type === 'status') {
-    checkStatus()
-      .then((st) => sendResponse(st))
-      .catch(() => sendResponse({ reachable: false, online: false, message: '不在校园网内 / 门户不可达' }));
+    // 附带 manualLogout，让 popup 与状态一次拿全，避免两次读取之间的竞态
+    Promise.all([checkStatus(), getSettings()])
+      .then(([st, s]) => sendResponse(Object.assign({}, st, { manualLogout: !!s.manualLogout })))
+      .catch(() => sendResponse({ reachable: false, online: false, manualLogout: false, message: '不在校园网内 / 门户不可达' }));
     return true;
   }
 
@@ -610,7 +916,9 @@ if (chrome.commands && chrome.commands.onCommand) {
   chrome.commands.onCommand.addListener((command) => {
     if (command === 'quick-login') {
       console.log('[command] 快捷键触发登录');
-      autoLogin('shortcut');
+      // manual=true：这是用户主动按键，与点「立即登录」等价，应解除注销暂停。
+      // 否则用户注销后按快捷键毫无反应，会以为快捷键坏了。
+      autoLogin('快捷键', true);
     }
   });
 }

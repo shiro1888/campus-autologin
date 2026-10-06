@@ -17,12 +17,23 @@ def main():
         print("当前 chrome-extension/icons/ 下的图标已预先生成完毕，日常使用插件无需安装任何依赖。")
         return 0
 
-    # 兼容旧版 Pillow（<9.1.0 无 Image.Resampling）
-    LANCZOS = getattr(Image.Resampling, 'LANCZOS', None) or getattr(Image, 'LANCZOS', getattr(Image, 'ANTIALIAS', None))
+    # 兼容旧版 Pillow（<9.1.0 无 Image.Resampling）。
+    # 注意不能写成 getattr(Image.Resampling, 'LANCZOS', ...)：当 Image 本身没有
+    # Resampling 时，求值 getattr 的第一个参数就会先抛 AttributeError，
+    # 后面的 or 回退永远执行不到（等于兼容代码是死代码）。
+    # 正确做法是先取到"容器"再取属性。
+    LANCZOS = getattr(getattr(Image, 'Resampling', Image), 'LANCZOS', None)
+    if LANCZOS is None:
+        LANCZOS = getattr(Image, 'LANCZOS', None) or getattr(Image, 'ANTIALIAS', None)
+    if LANCZOS is None:
+        LANCZOS = Image.BICUBIC if hasattr(Image, 'BICUBIC') else 1
 
     if not os.path.isfile(MASTER_PATH):
         print(f"错误: 未找到源图片 {MASTER_PATH}")
         return 1
+
+    # 输出目录可能被删除（例如手动清理过），缺失时补建，避免保存时抛异常
+    os.makedirs(OUT_DIR, exist_ok=True)
 
     img = Image.open(MASTER_PATH).convert("RGBA")
     w, h = img.size

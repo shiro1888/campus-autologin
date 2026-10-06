@@ -3,9 +3,10 @@
  */
 'use strict';
 
+// 默认设置。账号密码留空 —— 绝不在此处写入任何真实凭据。
 const DEFAULTS = {
-  account: 'REDACTED_CAMPUS_ACCOUNT',
-  password: 'REDACTED_CAMPUS_PASSWORD',
+  account: '',
+  password: '',
   isp: '1',
   intervalMin: 10 / 60,
   offlineIntervalMin: 1 / 60,
@@ -456,6 +457,10 @@ function initCustomSelects() {
       if (label) {
         label.addEventListener('click', (e) => {
           e.preventDefault();
+          // 必须阻止冒泡：label 是 .select-wrap 的兄弟节点（不在其内部），
+          // 事件冒泡到 document 时会被「点击空白处关闭」的监听器判定为外部点击，
+          // 于是刚打开的下拉框立刻又被关掉 —— 表现为点 label 完全没反应。
+          e.stopPropagation();
           trigger.focus();
           trigger.click();
         });
@@ -488,10 +493,13 @@ function load() {
   }
 
   chrome.storage.local.get(DEFAULTS, (s) => {
-    $('account').value = s.account || '';
+    // 只接受字符串：storage 里的值可能被手改或来自旧版本。
+    // 注意不能只用 String() —— String({}) 会得到字面量 "[object Object]"，照样显示难看。
+    // 非字符串一律当作空值处理（下面 isp 也用同样的思路）。
+    $('account').value = typeof s.account === 'string' ? s.account : '';
     syncClearBtn();
-    $('password').value = s.password || '';
-    $('isp').value = String(s.isp || '1');
+    $('password').value = typeof s.password === 'string' ? s.password : '';
+    $('isp').value = typeof s.isp === 'string' ? s.isp : String(s.isp || '1');
     syncCustomSelect('isp');
 
     pickClosest('intervalMin', s.intervalMin === undefined ? DEFAULTS.intervalMin : s.intervalMin);
@@ -554,7 +562,13 @@ function refreshStatus(cb) {
 
   chrome.storage.local.get(['lastResult'], (s) => {
     const r = s && s.lastResult;
-    $('stLast').textContent = r ? (r.time + ' · ' + r.message) : '暂无记录';
+    // 逐字段兜底：lastResult 可能来自旧版本或手改，缺字段时直接相加会显示成
+    // 「12345 · undefined」；而对象经 String() 会变成 "[object Object]"，同样难看。
+    // 故只接受字符串/数字（时间是 "HH:MM:SS" 字符串，也可能是时间戳）。
+    const text = (v) => (typeof v === 'string' || typeof v === 'number') ? String(v) : '';
+    const t = text(r && r.time);
+    const m = text(r && r.message);
+    $('stLast').textContent = [t, m].filter(Boolean).join(' · ') || '暂无记录';
   });
 
   chrome.runtime.sendMessage({ type: 'status' }, (res) => {
@@ -643,14 +657,14 @@ function refreshStatus(cb) {
     if (!res.reachable) {
       durationTicker.stop();
       pill.className = 'status-pill off';
-      textEl.textContent = '不在校园网内';
+      textEl.textContent = res.manualLogout ? '不在校园网内 · 已暂停' : '不在校园网内';
     } else if (res.online) {
       pill.className = 'status-pill on';
       textEl.textContent = '已在线 ✓';
     } else {
       durationTicker.stop();
       pill.className = 'status-pill wait';
-      textEl.textContent = '未登录';
+      textEl.textContent = res.manualLogout ? '已手动注销 · 自动登录暂停' : '未登录';
     }
 
     if (cb) cb();
@@ -677,21 +691,28 @@ function readForm() {
   };
 }
 
-/** 保存到 chrome.storage 并通知后台刷新定时器 */
+/**
+ * 保存当前表单到 chrome.storage 并通知后台刷新定时器。
+ *
+ * 注意：这里**不校验**账号密码。开关类与间隔类设置（自适应、开机自启、
+ * 轮询间隔、运营商等）本身就是合法的，与是否填写凭据无关；在此拦截会导致
+ * 全新安装（凭据默认为空）的用户无论怎么点都存不上，而且调用方还会弹出
+ * 「已自动保存」的成功提示，属于静默失败。凭据校验只放在「立即测试」那一步。
+ */
 function save(cb) {
-  const s = readForm();
-  if (!s.account || !s.password) {
-    showToast('请先填写上网账号和密码。', 'err');
-    if (cb) cb(false);
-    return;
-  }
-  chrome.storage.local.set(s, () => {
+  chrome.storage.local.set(readForm(), () => {
     $('btnSave').classList.remove('has-changes');
     chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => {
       void chrome.runtime.lastError;
       if (cb) cb(true);
     });
   });
+}
+
+/** 表单里是否已填写账号和密码（用于「保存并立即测试」） */
+function hasCredentials() {
+  const s = readForm();
+  return !!(s.account && s.password);
 }
 
 // --- 监听表单变更，实时提示未保存状态 ---
@@ -705,20 +726,21 @@ $('form').addEventListener('change', () => {
 // --- 保存并立即测试 ---
 $('form').addEventListener('submit', (e) => {
   e.preventDefault();
+
+  // 只有「测试登录」才需要凭据；设置本身先保存下来
+  if (!hasCredentials()) {
+    showToast('请先填写上网账号和密码，再点「保存并立即测试」。', 'err');
+    $('account').focus();
+    return;
+  }
+
   const btn = $('btnSave');
   btn.disabled = true;
   btn.classList.add('loading');
   $('btnSaveText').textContent = '正在保存并测试…';
   showToast('正在向校园网门户发起验证…', 'info');
 
-  save((okSaved) => {
-    if (!okSaved) {
-      btn.disabled = false;
-      btn.classList.remove('loading');
-      $('btnSaveText').textContent = '保存配置并立即测试';
-      return;
-    }
-
+  save(() => {
     chrome.runtime.sendMessage({ type: 'login' }, (res) => {
       btn.disabled = false;
       btn.classList.remove('loading');
@@ -839,14 +861,22 @@ $('btnLogoutNow').addEventListener('click', () => {
 
 // --- 恢复默认设置 ---
 $('btnResetDefaults').addEventListener('click', () => {
-  if (!confirm('确定要将所有设置恢复为默认值吗？\n（你的账号密码将被重置为初始配置）')) {
+  if (!confirm('确定要将所有设置恢复为默认值吗？\n（账号和密码会被清空，需要你重新填写）')) {
     return;
   }
-  chrome.storage.local.set(DEFAULTS, () => {
+  // 一并清除全部运行态标记：解除「手动注销暂停」、重置退避计数、
+  // 清掉「凭据类错误」标记（否则用户改好密码后点恢复默认，仍会被低频重试挡着）。
+  chrome.storage.local.set({
+    ...DEFAULTS,
+    manualLogout: false,
+    unreachableStreak: 0,
+    connState: 'unknown',
+    authError: false
+  }, () => {
     $('btnSave').classList.remove('has-changes');
     load();
     chrome.runtime.sendMessage({ type: 'settingsChanged' });
-    showToast('已恢复为默认配置。', 'ok');
+    showToast('已恢复为默认配置，请重新填写账号密码。', 'ok');
   });
 });
 
@@ -894,17 +924,22 @@ if ($('btnExportConfig')) {
         contentAutoFill: all.contentAutoFill !== false,
         instantTrigger: all.instantTrigger !== false
       };
-      const jsonStr = JSON.stringify(cfg, null, 2);
-      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `campus-autologin-config-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast('配置已导出为 JSON 备份文件。', 'ok');
+      try {
+        const jsonStr = JSON.stringify(cfg, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `campus-autologin-config-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('配置已导出为 JSON 备份文件。', 'ok');
+      } catch (err) {
+        // 导出失败时给明确反馈，避免点了没反应
+        showToast('导出失败：' + (err && err.message ? err.message : '未知错误'), 'err');
+      }
     });
   });
 }
@@ -920,6 +955,12 @@ if ($('btnImportConfig') && $('importFileInput')) {
     if (!file) return;
 
     const reader = new FileReader();
+    // 读取阶段的失败只触发 error、不触发 load，onload 里的 try/catch 兜不住。
+    // 不处理的话，用户点「导入配置」后会毫无反馈（静默失败）。
+    reader.onerror = () => {
+      showToast('导入失败：无法读取所选文件（可能已被移动、损坏或没有权限）', 'err');
+      $('importFileInput').value = '';
+    };
     reader.onload = (evt) => {
       try {
         const text = evt.target.result;
@@ -929,8 +970,22 @@ if ($('btnImportConfig') && $('importFileInput')) {
         }
 
         const toSave = {};
-        if (typeof data.account === 'string') toSave.account = data.account;
-        if (typeof data.password === 'string') toSave.password = data.password;
+        // 账号：手机号在 JSON 里很容易写成裸数字（13800000000 没加引号）。
+        // 若只接受 string，用户会"导入成功"但账号没进去 —— 静默丢数据。
+        // 这里接受 string 或 number 并归一为字符串；其他类型（对象/数组）才算非法。
+        if (typeof data.account === 'string' || typeof data.account === 'number') {
+          toSave.account = String(data.account).trim();
+        }
+        if (typeof data.password === 'string' || typeof data.password === 'number') {
+          toSave.password = String(data.password);
+        }
+        // 账号/密码存在但类型非法时明确报错，不要静默忽略
+        if (data.account !== undefined && toSave.account === undefined) {
+          throw new Error('account 字段格式不对（应为字符串）');
+        }
+        if (data.password !== undefined && toSave.password === undefined) {
+          throw new Error('password 字段格式不对（应为字符串）');
+        }
         if (data.isp !== undefined) toSave.isp = String(data.isp);
         if (data.intervalMin !== undefined) toSave.intervalMin = parseFloat(data.intervalMin);
         if (data.offlineIntervalMin !== undefined) toSave.offlineIntervalMin = parseFloat(data.offlineIntervalMin);
@@ -938,6 +993,10 @@ if ($('btnImportConfig') && $('importFileInput')) {
         if (data.autoOnStartup !== undefined) toSave.autoOnStartup = !!data.autoOnStartup;
         if (data.contentAutoFill !== undefined) toSave.contentAutoFill = !!data.contentAutoFill;
         if (data.instantTrigger !== undefined) toSave.instantTrigger = !!data.instantTrigger;
+
+        // 导入的是一份「新的」配置：清掉凭据错误标记，让新凭据立刻按正常节奏生效。
+        // 否则若之前因密码错而降频，导入正确配置后仍会被低频重试挡着。
+        toSave.authError = false;
 
         chrome.storage.local.set(toSave, () => {
           load();

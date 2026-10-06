@@ -1,4 +1,4 @@
-﻿# =====================================================================
+# =====================================================================
 #  校园网自动登录 —— 一键安装"开机自动登录"计划任务
 #  用法(右键 PowerShell "以管理员身份运行"):
 #      powershell -ExecutionPolicy Bypass -File "install_autostart.ps1"
@@ -53,12 +53,53 @@ if (-not $py) {
 }
 Write-Ok "Python: $py"
 
+# --- 2.5 先确认已填账号密码 ---
+# 计划任务开机跑的是 `campus_login.py wait`，未在线时会真的发起认证。
+# 若 config.json 里账号密码为空，任务每次开机都只会失败（日志里仅一个 EXIT: 2），
+# 因此这里直接拦下并退出，不创建一个注定失败的任务。
+$cfgFile = Join-Path $here "config.json"
+$cfgObj = $null
+$cfgParseError = $null
+if (Test-Path $cfgFile) {
+    try {
+        $cfgObj = Get-Content $cfgFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    } catch {
+        # 不能把解析失败悄悄吞成 $null，否则会误报「账号或密码未填写」，
+        # 用户去反复检查账号，而真正的问题是 JSON 语法坏了。
+        $cfgObj = $null
+        $cfgParseError = $_.Exception.Message
+    }
+}
+if ($cfgParseError) {
+    Write-Host ""
+    Write-Host "  [错误] config.json 无法解析（JSON 语法有误）。" -ForegroundColor Red
+    Write-Host "         $cfgParseError" -ForegroundColor Yellow
+    Write-Host "         请检查是否缺少引号/逗号，或直接复制 config.example.json 重填。" -ForegroundColor Yellow
+    Write-Host ""
+    exit 1
+}
+$cfgUser = if ($cfgObj) { [string]$cfgObj.username } else { "" }
+$cfgPass = if ($cfgObj) { [string]$cfgObj.password } else { "" }
+if (-not $cfgUser.Trim() -or -not $cfgPass.Trim()) {
+    Write-Host ""
+    Write-Host "  [错误] 账号或密码未填写，无法安装开机自启。" -ForegroundColor Red
+    if (-not (Test-Path $cfgFile)) {
+        Write-Host "         尚未创建 config.json。请先复制 config.example.json 为" -ForegroundColor Yellow
+        Write-Host "         config.json，填入你的校园网账号密码后再运行本安装脚本。" -ForegroundColor Yellow
+    } else {
+        Write-Host "         请编辑 config.json，填入 username 与 password 后重试。" -ForegroundColor Yellow
+    }
+    Write-Host ""
+    exit 1
+}
+Write-Ok "已检测到账号: $cfgUser"
+
 # --- 3. 先跑一次自检，确认配置和网络没问题 ---
 Write-Host ""
 Write-Step "正在自检 (config.json + 门户连通性)..."
 & $py (Join-Path $here "campus_login.py") test
 if ($LASTEXITCODE -ne 0) {
-    Write-Warn "自检未通过。仍会创建计划任务，但请先确认已连上校园网。"
+    Write-Warn "自检未通过（多为门户不可达）。仍会创建计划任务，开机连上校园网后即会生效。"
 } else {
     Write-Ok "自检通过"
 }

@@ -90,10 +90,15 @@ function refresh() {
     $('ver').textContent = '';
   }
 
+  // 是否处于「手动注销暂停」状态（由后台在 status 响应里一并返回）
+  let paused = false;
+
   chrome.storage.local.get(
     ['account', 'isp', 'intervalMin', 'offlineIntervalMin', 'adaptive', 'lastResult'],
     (s) => {
-      currentAccount = (s && s.account) || '';
+      // 只接受字符串：account 被手改/来自旧版本时可能不是字符串，
+      // 直接放进 textContent 会显示成 "[object Object]"。
+      currentAccount = (s && typeof s.account === 'string') ? s.account : '';
       $('account').textContent = currentAccount || '未设置';
       $('account').title = currentAccount ? `点击复制账号: ${currentAccount}` : '尚未设置认证账号';
 
@@ -122,17 +127,23 @@ function refresh() {
       }
 
       const r = s && s.lastResult;
-      if (r && r.time) {
+      // lastResult 可能来自旧版本/手改：time 与 message 都要先确认是字符串再调
+      // .indexOf / .split，否则会抛 TypeError。而这里处于 storage 回调内，
+      // 异常会中断整个 refresh()，让后面的状态卡片、IP、按钮全部不更新
+      // （面板卡在半渲染状态，看起来像"插件坏了"）。
+      const rTime = r && typeof r.time === 'string' ? r.time : '';
+      const rMsg = r && typeof r.message === 'string' ? r.message : '';
+      if (rTime) {
         // 只保留时分秒以节省空间
-        const t = r.time.indexOf(' ') !== -1 ? r.time.split(' ')[1] : r.time;
+        const t = rTime.indexOf(' ') !== -1 ? rTime.split(' ')[1] : rTime;
         const ltEl = $('lastTime');
         if (ltEl) {
           ltEl.textContent = t;
-          ltEl.title = '上次检查记录: ' + r.time;
+          ltEl.title = '上次检查记录: ' + rTime;
         }
       }
-      if (r && r.message && (!r.ok || r.message.indexOf('无需登录') === -1)) {
-        setMsg(r.message, r.ok ? 'ok' : 'err');
+      if (rMsg && (!r.ok || rMsg.indexOf('无需登录') === -1)) {
+        setMsg(rMsg, r.ok ? 'ok' : 'err');
       }
     }
   );
@@ -149,6 +160,8 @@ function refresh() {
     }
 
     // 网关延迟与已用流量
+    paused = !!res.manualLogout;
+
     const pingEl = $('popPing');
     if (res.pingMs !== undefined && res.pingMs >= 0) {
       pingEl.textContent = `${res.pingMs} ms`;
@@ -197,11 +210,13 @@ function refresh() {
 
     if (!res.reachable) {
       durationTicker.stop();
-      setStatus('未连接校园网', '门户不可达，请连接校园 Wi-Fi 或插网线', 'off');
+      setStatus('未连接校园网', paused
+        ? '门户不可达；自动登录当前处于暂停状态'
+        : '门户不可达，请连接校园 Wi-Fi 或插网线', 'off');
       setLocalIp('');
       $('onlineDuration').textContent = '网络断开';
       $('btnLogin').classList.remove('online-mode');
-      $('btnLoginText').textContent = '立即登录';
+      $('btnLoginText').textContent = paused ? '恢复登录' : '立即登录';
       $('btnLogout').disabled = true;
     } else if (res.online) {
       setStatus('已在线 · 认证通过', '', 'on');
@@ -223,9 +238,13 @@ function refresh() {
       }
     } else {
       durationTicker.stop();
-      setStatus('未登录 · 需要认证', '已连上校园局域网，请点击登录', 'wait');
+      if (paused) {
+        setStatus('已手动注销 · 自动登录暂停', '点「立即登录」可恢复自动重连', 'wait');
+      } else {
+        setStatus('未登录 · 需要认证', '已连上校园局域网，请点击登录', 'wait');
+      }
       $('btnLogin').classList.remove('online-mode');
-      $('btnLoginText').textContent = '立即登录';
+      $('btnLoginText').textContent = paused ? '恢复登录' : '立即登录';
       $('btnLogout').disabled = true;
 
       const ip = rawData.v4ip || rawData.ss5 || '';

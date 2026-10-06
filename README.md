@@ -9,7 +9,8 @@
 | **① Python 脚本** | 开机自动登录、命令行、计划任务 | 零依赖，双击即用 |
 | **② Chrome 插件** | 日常用浏览器上网 | 后台定时检测，掉线自动重连 |
 
-> 默认账号 `REDACTED_CAMPUS_ACCOUNT`，密码已写入配置模板 `config.example.json`。首次使用请复制为 `config.json` 并填入自己的账号密码。
+> **首次使用请先填账号密码**：Python 脚本请复制 `config.example.json` 为 `config.json` 并填入自己的账号密码；
+> Chrome 插件请在插件设置页里填写。源码与模板中都**不含任何真实凭据**，请勿把自己的密码提交进仓库。
 
 ---
 
@@ -95,7 +96,7 @@ python campus_login.py test
 
 # 供程序调用的 JSON 输出
 python campus_login.py status --json
-# => {"action": "status", "online": true, "ip": "10.102.4.51", "account": "REDACTED_CAMPUS_ACCOUNT", ...}
+# => {"action": "status", "online": true, "ip": "10.0.0.100", "account": "13800000000", ...}
 ```
 
 ### 修改账号密码
@@ -118,6 +119,10 @@ python campus_login.py status --json
 ---
 
 ## ② 设置开机自动登录
+
+> **前提：`config.json` 里必须已填好账号密码。** 计划任务开机跑的是 `wait` 模式，
+> 未在线时会真的发起认证；若凭据为空，任务每次开机都只会失败。
+> 安装脚本会提前检查并在未填写时直接拒绝安装（避免建出一个注定失败的任务）。
 
 **推荐方式（一键双击）**：
 * **安装**：直接双击运行项目根目录下的 **`install_autostart.bat`**。系统会自动弹出管理员授权窗口，点击「是」即自动完成自检并注册双触发器计划任务（开机 20 秒后启动 + 用户登录 10 秒后启动，完美兼容台式机常开与笔记本合盖休眠唤醒）。
@@ -203,7 +208,7 @@ notepad "C:\Project\campus-autologin\logs\autologin.log"   # 查看运行日志
 返回格式（JSONP 包了一层）：
 
 ```javascript
-dr1002({"result":1,"uid":"REDACTED_CAMPUS_ACCOUNT","v4ip":"10.102.4.51",...});
+dr1002({"result":1,"uid":"13800000000","v4ip":"10.0.0.100",...});
 ```
 
 - `result: 1` → 在线 / 登录成功
@@ -245,12 +250,12 @@ dr1002({"result":1,"uid":"REDACTED_CAMPUS_ACCOUNT","v4ip":"10.102.4.51",...});
 
 ## 已验证信息
 
-在 `10.102.4.51`（Ethernet 网卡）上对本门户实测通过：
+在 `10.0.0.100`（Ethernet 网卡）上对本门户实测通过：
 
 | 项目 | 结果 |
 | --- | --- |
 | 门户可达 | ✅ `http://172.30.100.2/` HTTP 200，`Server: DrCOMServer1.0` |
-| 状态查询 | ✅ 返回 `result: 1`，账号 `REDACTED_CAMPUS_ACCOUNT`，IP `10.102.4.51` |
+| 状态查询 | ✅ 返回 `result: 1`，账号 `13800000000`，IP `10.0.0.100` |
 | **正确账号密码** | ✅ 返回**认证成功页** `Dr.COMWebLoginID_3.htm` |
 | **错误密码** | ✅ 返回**认证失败页** `Dr.COMWebLoginID_2.htm`（`userid error2`） |
 | **不存在的账号** | ✅ 返回**认证失败页** `Dr.COMWebLoginID_2.htm`（`userid error1`） |
