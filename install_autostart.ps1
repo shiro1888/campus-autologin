@@ -11,7 +11,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $target = Join-Path $here "autostart.bat"
 
 function Write-Step($msg) { Write-Host "  $msg" }
@@ -21,6 +21,14 @@ function Write-Warn($msg) { Write-Host "  [!!] $msg" -ForegroundColor Yellow }
 Write-Host ""
 Write-Host "===== 校园网自动登录 · 计划任务安装 =====" -ForegroundColor Cyan
 Write-Host ""
+
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Write-Host "  [错误] 注册或卸载计划任务需要管理员权限。" -ForegroundColor Red
+    Write-Host "         请右键 PowerShell 选择「以管理员身份运行」后再执行本脚本。" -ForegroundColor Yellow
+    Write-Host ""
+    exit 1
+}
 
 if ($Uninstall) {
     $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
@@ -80,6 +88,7 @@ if ($cfgParseError) {
 }
 $cfgUser = if ($cfgObj) { [string]$cfgObj.username } else { "" }
 $cfgPass = if ($cfgObj) { [string]$cfgObj.password } else { "" }
+$portalHost = if ($cfgObj -and $cfgObj.portal_host) { [string]$cfgObj.portal_host } else { "172.30.100.2" }
 if (-not $cfgUser.Trim() -or -not $cfgPass.Trim()) {
     Write-Host ""
     Write-Host "  [错误] 账号或密码未填写，无法安装开机自启。" -ForegroundColor Red
@@ -144,7 +153,7 @@ Register-ScheduledTask `
     -Trigger $trigger `
     -Settings $settings `
     -Principal $principal `
-    -Description "开机自动登录校园网 http://172.30.100.2/ (Dr.COM ePortal)" | Out-Null
+    -Description "开机自动登录校园网 http://$portalHost/ (Dr.COM ePortal)" | Out-Null
 
 Write-Ok "计划任务已创建: $TaskName"
 

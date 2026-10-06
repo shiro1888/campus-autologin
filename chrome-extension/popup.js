@@ -99,8 +99,11 @@ function refresh() {
       // 只接受字符串：account 被手改/来自旧版本时可能不是字符串，
       // 直接放进 textContent 会显示成 "[object Object]"。
       currentAccount = (s && typeof s.account === 'string') ? s.account : '';
-      $('account').textContent = currentAccount || '未设置';
-      $('account').title = currentAccount ? `点击复制账号: ${currentAccount}` : '尚未设置认证账号';
+      const accEl = $('account');
+      if (accEl) {
+        accEl.textContent = currentAccount || '未设置';
+        accEl.title = currentAccount ? `点击复制账号: ${currentAccount}` : '尚未设置认证账号';
+      }
 
       const ispNames = { '1': '校园', '2': '电信', '3': '联通', '4': '其他' };
       const ispFullNames = { '1': '校园用户 (默认)', '2': '校园电信 (@dx)', '3': '校园联通 (@lt)', '4': '校园其他' };

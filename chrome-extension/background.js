@@ -173,13 +173,7 @@ async function fetchText(url) {
       credentials: 'omit',
       signal: ctrl.signal
     });
-    // 取原始字节后自行解码；ArrayBuffer 失败时退回 text()，保证不因解码而中断。
-    let buf;
-    try {
-      buf = await resp.arrayBuffer();
-    } catch (e) {
-      return await resp.text();
-    }
+    const buf = await resp.arrayBuffer();
     const ct = String(resp.headers && resp.headers.get ? (resp.headers.get('content-type') || '') : '');
     const m = /charset\s*=\s*"?([\w-]+)"?/i.exec(ct);
     const charset = m ? m[1].toLowerCase() : '';
@@ -462,13 +456,11 @@ async function doLogout() {
     jsVersion: JS_VERSION
   });
 
-  // 若此刻正好有一次登录在进行中（用户点了「立即登录」后马上又点「注销」），
-  // 必须**先**落盘注销意图：否则那次登录会完成并把人重新认证上网，
-  // 而本次注销的校验又恰好跑在它之后、看到「会话仍在」，最终既没注销成功、
-  // 也没记下用户的注销意图（manualLogout 保持 false），插件还会继续守护重连。
-  // 提前置位后，在途的那次登录会在完成时看到该标志并让位（见 autoLogin 第 4.5 步）。
+  // 用户明确发起注销：必须在向网关发请求前立即落盘 manualLogout=true，
+  // 避免注销过程中（网络请求 + 600ms 延迟）后台定时器触发 autoLogin 看到掉线后把人静默登回。
+  await setState({ manualLogout: true, unreachableStreak: 0 });
+  unreachableStreak = 0;
   if (running) {
-    await setState({ manualLogout: true, unreachableStreak: 0 });
     console.log('[logout] 检测到登录进行中，先记录注销意图');
   }
 
@@ -587,13 +579,22 @@ async function autoLogin(trigger, manual) {
     let paused = settings.manualLogout;
     if (manual && paused) {
       await setState({ manualLogout: false, unreachableStreak: 0 });
+      unreachableStreak = 0;
       paused = false;
       console.log(tag + '用户手动登录，已解除注销暂停');
+    }
+    // 手动登录时（无论是否暂停）：重置退避计数，让本次从 0 开始获得完整的宽限期。
+    // 否则用户从长时间不可达状态手动点登录，仍会卡在 60 秒退避，体验极差。
+    if (manual && !paused && unreachableStreak > 0) {
+      unreachableStreak = 0;
+      await setState({ unreachableStreak: 0 });
+      console.log(tag + '用户手动登录，已重置退避计数');
     }
     // 用户手动点了登录，说明可能刚改过账号密码 —— 清掉凭据类错误标记，
     // 让这一次重新按正常节奏去试（否则会被 authError 降频挡住，白点一下）。
     if (manual && settings.authError) {
       await setState({ authError: false });
+      settings.authError = false;
       console.log(tag + '用户手动登录，已清除凭据错误标记');
     }
 

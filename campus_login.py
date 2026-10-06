@@ -595,11 +595,12 @@ def cmd_status(args, cfg) -> int:
 
     # 包含下行与上行分项的流量字符串
     flow_detail = flow_text
-    if st.get("actdf") and st.get("actuf"):
+    if st.get("actdf") is not None and st.get("actuf") is not None:
         flow_detail += " (↓%s ↑%s)" % (_format_flow(st["actdf"]), _format_flow(st["actuf"]))
 
     info = {
         "action": "status",
+        "success": True,
         "online": online,
         "ip": ip,
         "account": st.get("uid") or st.get("AC") or "",
@@ -755,7 +756,10 @@ def cmd_wait(args, cfg) -> int:
     while True:
         try:
             if int(portal.status().get("result", 0)) == 1:
-                say("● 已在线。")
+                if args.json:
+                    emit_json({"action": "wait", "success": True, "online": True, "message": "已在线"})
+                else:
+                    say("● 已在线。")
                 return EXIT_OK
             # 门户可达但未认证 -> 无需继续等待，直接去登录
             break
@@ -1003,7 +1007,7 @@ def cmd_gui(args, cfg) -> int:
         if key is not None:
             with _busy_lock:
                 if key in _busy:
-                    return
+                    return False
                 _busy.add(key)
             def _wrapped():
                 try:
@@ -1012,8 +1016,9 @@ def cmd_gui(args, cfg) -> int:
                     with _busy_lock:
                         _busy.discard(key)
             threading.Thread(target=_wrapped, daemon=True).start()
-            return
+            return True
         threading.Thread(target=fn, daemon=True).start()
+        return True
 
     def safe_ui(fn):
         """将 UI 更新调度到主线程。线程安全：不直接查询控件状态。"""
@@ -1169,10 +1174,18 @@ def cmd_gui(args, cfg) -> int:
         run_async(_task, 'selftest')
 
     def do_login():
-        cfg["username"] = user_ent.get().strip()
-        cfg["password"] = pass_ent.get().strip()
+        u = user_ent.get().strip()
+        p = pass_ent.get().strip()
+        if not u or not p:
+            messagebox.showwarning("提示", "请先输入上网账号和密码。")
+            if not u:
+                user_ent.focus()
+            else:
+                pass_ent.focus()
+            return
+        cfg["username"] = u
+        cfg["password"] = p
         cfg["isp"] = isp_var.get()
-        st_lbl.config(text="→ 正在登录…", fg="#3b82f6")
         def _task():
             try:
                 portal = Portal(cfg)
@@ -1188,12 +1201,12 @@ def cmd_gui(args, cfg) -> int:
                 # 同上：先取值再交给延迟回调，避免 NameError
                 err_msg = str(e)
                 safe_ui(lambda m=err_msg: messagebox.showerror("错误", m))
-        run_async(_task, 'login')
+        if run_async(_task, 'login'):
+            st_lbl.config(text="→ 正在登录…", fg="#3b82f6")
 
     def do_logout():
         if not messagebox.askyesno("注销确认", "确定要注销下线当前校园网会话吗？\n注销后电脑将断开互联网连接。"):
             return
-        st_lbl.config(text="→ 正在注销…", fg="#f59e0b")
         def _task():
             try:
                 portal = Portal(cfg)
@@ -1209,16 +1222,27 @@ def cmd_gui(args, cfg) -> int:
                 # 同上：先取值再交给延迟回调，避免 NameError
                 err_msg = str(e)
                 safe_ui(lambda m=err_msg: messagebox.showerror("错误", m))
-        run_async(_task, 'logout')
+        if run_async(_task, 'logout'):
+            st_lbl.config(text="→ 正在注销…", fg="#f59e0b")
 
     def do_save():
-        cfg["username"] = user_ent.get().strip()
-        cfg["password"] = pass_ent.get().strip()
-        cfg["isp"] = isp_var.get()
-        target_save_path = CONFIG_PATH
+        # 仅持久化合法配置字段，避免命令行临时参数（如 --user, --timeout）污染配置文件
+        saved_cfg = {}
+        if os.path.exists(CONFIG_PATH):
+            try:
+                with open(CONFIG_PATH, "r", encoding="utf-8") as rf:
+                    saved_cfg = json.load(rf)
+            except Exception:
+                saved_cfg = {}
+        saved_cfg["username"] = user_ent.get().strip()
+        saved_cfg["password"] = pass_ent.get().strip()
+        saved_cfg["isp"] = isp_var.get()
+        for k in ["portal_host", "portal_port", "wait_seconds", "timeout"]:
+            if k in cfg and k not in saved_cfg:
+                saved_cfg[k] = cfg[k]
         try:
-            with open(target_save_path, "w", encoding="utf-8") as fh:
-                json.dump(cfg, fh, indent=2, ensure_ascii=False)
+            with open(CONFIG_PATH, "w", encoding="utf-8") as fh:
+                json.dump(saved_cfg, fh, indent=2, ensure_ascii=False)
             messagebox.showinfo("提示", "配置已成功保存至 config.json")
         except Exception as e:
             messagebox.showerror("保存失败", str(e))

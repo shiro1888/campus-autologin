@@ -199,5 +199,5 @@ Chrome 只在加载扩展时读代码，之后一直用内存里的旧副本。�
 
 ## 卸载
 
-`chrome://extensions/` → 找到「校园网自动登录」→ **移除**。
+`chrome://extensions/` → 找到「Campus AutoLogin」（或「校园网自动登录」）→ **移除**。
 如需同时清除已保存的账号密码，移除插件即可（storage 会一并删除）。

@@ -35,7 +35,8 @@ def main():
     # 输出目录可能被删除（例如手动清理过），缺失时补建，避免保存时抛异常
     os.makedirs(OUT_DIR, exist_ok=True)
 
-    img = Image.open(MASTER_PATH).convert("RGBA")
+    with Image.open(MASTER_PATH) as raw_img:
+        img = raw_img.convert("RGBA")
     w, h = img.size
 
     # 超采样生成抗锯齿圆角蒙版 (iOS Squircle 曲线)
