@@ -85,7 +85,7 @@ function refresh() {
 
   try {
     const ver = chrome.runtime.getManifest().version;
-    $('ver').textContent = 'v' + (ver || '1.0.0');
+    $('ver').textContent = 'v' + (ver || '1.1.0');
   } catch (e) {
     $('ver').textContent = '';
   }
@@ -146,7 +146,7 @@ function refresh() {
         }
       }
       if (rMsg && (!r.ok || rMsg.indexOf('无需登录') === -1)) {
-        setMsg(rMsg, r.ok ? 'ok' : 'err');
+        setMsg(rMsg, r.ok === false ? 'err' : 'ok');
       }
     }
   );

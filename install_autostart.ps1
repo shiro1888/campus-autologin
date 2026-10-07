@@ -160,7 +160,7 @@ Write-Ok "计划任务已创建: $TaskName"
 Write-Host ""
 Write-Host "===== 安装完成 =====" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  以后每次开机 30 秒后会自动检查并登录。" -ForegroundColor White
+Write-Host "  以后每次开机 20 秒后会自动检查并登录。" -ForegroundColor White
 Write-Host ""
 Write-Host "  常用命令:"
 Write-Host "    立即测试:  schtasks /Run /TN $TaskName"

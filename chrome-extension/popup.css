@@ -169,7 +169,7 @@ body {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #94a3b8;
+  background: var(--text-light);
   border: 2px solid var(--bg-page);
   transition: all 0.3s ease;
 }
@@ -440,7 +440,7 @@ body {
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: #94a3b8;
+  background: var(--text-light);
   transition: all 0.3s ease;
   z-index: 2;
 }

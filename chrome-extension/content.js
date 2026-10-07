@@ -342,12 +342,36 @@
       // 用户手动注销后不要自动填单提交
       if (s.paused) return;
 
-      checkStatus().then(function (online) {
-        if (online) {
-          report({ ok: true, online: true, message: '页面加载时已在线，无需登录' });
-          return;
-        }
+      // 协调：若后台已经在处理登录（running=true）或处于已在线/暂停，则不重复提交
+      try {
+        chrome.runtime.sendMessage({ type: 'status' }, function (res) {
+          if (chrome.runtime.lastError || !res) {
+            proceedLocalCheck();
+            return;
+          }
+          if (res.online || res.running || res.manualLogout) {
+            if (res.online) {
+              report({ ok: true, online: true, message: '页面加载时已在线，无需登录' });
+            }
+            return;
+          }
+          proceedWithForm();
+        });
+      } catch (e) {
+        proceedLocalCheck();
+      }
 
+      function proceedLocalCheck() {
+        checkStatus().then(function (online) {
+          if (online) {
+            report({ ok: true, online: true, message: '页面加载时已在线，无需登录' });
+            return;
+          }
+          proceedWithForm();
+        });
+      }
+
+      function proceedWithForm() {
         waitForForm(function (found) {
           if (!found) {
             // 页面上没有表单（可能是成功页 / 公告页），不打扰
@@ -413,7 +437,7 @@
             });
           });
         });
-      });
+      }
     });
   }
 

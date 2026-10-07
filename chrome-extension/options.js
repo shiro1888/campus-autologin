@@ -487,7 +487,7 @@ document.addEventListener('keydown', (e) => {
 function load() {
   try {
     const ver = chrome.runtime.getManifest().version;
-    $('ver').textContent = 'v' + (ver || '1.0.0');
+    $('ver').textContent = 'v' + (ver || '1.1.0');
   } catch (e) {
     $('ver').textContent = '';
   }
@@ -941,7 +941,7 @@ if ($('btnExportConfig')) {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showToast('配置已导出为 JSON 备份文件。', 'ok');
+        showToast('配置已导出为 JSON 备份文件（含明文凭据，请妥善保管）。', 'ok');
       } catch (err) {
         // 导出失败时给明确反馈，避免点了没反应
         showToast('导出失败：' + (err && err.message ? err.message : '未知错误'), 'err');
@@ -1001,8 +1001,14 @@ if ($('btnImportConfig') && $('importFileInput')) {
           }
           toSave.isp = ispVal;
         }
-        if (data.intervalMin !== undefined) toSave.intervalMin = parseFloat(data.intervalMin);
-        if (data.offlineIntervalMin !== undefined) toSave.offlineIntervalMin = parseFloat(data.offlineIntervalMin);
+        if (data.intervalMin !== undefined) {
+          const v = parseFloat(data.intervalMin);
+          if (Number.isFinite(v)) toSave.intervalMin = Math.max(1 / 60, Math.min(60, v));
+        }
+        if (data.offlineIntervalMin !== undefined) {
+          const v = parseFloat(data.offlineIntervalMin);
+          if (Number.isFinite(v)) toSave.offlineIntervalMin = Math.max(1 / 60, Math.min(60, v));
+        }
         if (data.adaptive !== undefined) toSave.adaptive = !!data.adaptive;
         if (data.autoOnStartup !== undefined) toSave.autoOnStartup = !!data.autoOnStartup;
         if (data.contentAutoFill !== undefined) toSave.contentAutoFill = !!data.contentAutoFill;

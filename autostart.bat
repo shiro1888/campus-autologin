@@ -18,6 +18,6 @@ exit /b 2
 :run
 echo. >> "%~dp0logs\autologin.log"
 echo [%date% %time%] ---- START ---- >> "%~dp0logs\autologin.log"
-%PYEXE% "%~dp0campus_login.py" wait -q >> "%~dp0logs\autologin.log" 2>&1
+"%PYEXE%" "%~dp0campus_login.py" wait -q >> "%~dp0logs\autologin.log" 2>&1
 echo [%date% %time%] EXIT: %ERRORLEVEL% >> "%~dp0logs\autologin.log"
 exit /b %ERRORLEVEL%

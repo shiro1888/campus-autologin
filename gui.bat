@@ -16,5 +16,5 @@ pause
 exit /b 2
 
 :run
-start "" %PYEXE% "%~dp0campus_login.py" gui
+start "" "%PYEXE%" "%~dp0campus_login.py" gui
 exit /b 0

@@ -896,10 +896,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 
   if (msg.type === 'status') {
-    // 附带 manualLogout，让 popup 与状态一次拿全，避免两次读取之间的竞态
+    // 附带 manualLogout 与 running 状态，让 popup 与内容脚本一次拿全，避免并发竞态
     Promise.all([checkStatus(), getSettings()])
-      .then(([st, s]) => sendResponse(Object.assign({}, st, { manualLogout: !!s.manualLogout })))
-      .catch(() => sendResponse({ reachable: false, online: false, manualLogout: false, message: '不在校园网内 / 门户不可达' }));
+      .then(([st, s]) => sendResponse(Object.assign({}, st, { manualLogout: !!s.manualLogout, running: !!running })))
+      .catch(() => sendResponse({ reachable: false, online: false, manualLogout: false, running: false, message: '不在校园网内 / 门户不可达' }));
     return true;
   }
 

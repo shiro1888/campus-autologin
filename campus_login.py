@@ -61,7 +61,7 @@ if sys.stderr is not None and hasattr(sys.stderr, "reconfigure"):
     except (OSError, ValueError):
         pass
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
@@ -666,6 +666,19 @@ def cmd_login(args, cfg) -> int:
             last = {"ok": False, "message": str(exc)}
             say_err("✗ %s" % exc)
         else:
+            msg = resp.get("message", "")
+            # 若提示「该 IP 已经在线」或已在线，说明会话已就绪，直接按成功退出，避免无意义重试
+            if "已经在线" in msg or "ip has been online" in msg.lower():
+                if args.json:
+                    emit_json({
+                        "action": "login", "success": True, "already_online": True,
+                        "verified": True, "account": user, "raw": resp.get("raw", {}),
+                    })
+                else:
+                    say("● 该 IP 已经在线，无需重复登录。")
+                    say("  账号: %s" % user)
+                return EXIT_OK
+
             if resp["ok"]:
                 # 复核一次，确认真的上线
                 time.sleep(1)
@@ -687,7 +700,7 @@ def cmd_login(args, cfg) -> int:
             last = resp
             say_err("✗ 登录失败: %s" % resp["message"])
             # 账号/密码类错误重试没有意义
-            if any(k in resp["message"] for k in ("账号", "密码", "锁定", "停机")):
+            if any(k in resp["message"] for k in ("账号", "密码", "锁定", "停机", "已经在线")):
                 break
         if attempt < retry:
             time.sleep(delay)

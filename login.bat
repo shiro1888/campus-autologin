@@ -16,5 +16,5 @@ pause
 exit /b 2
 
 :run
-%PYEXE% "%~dp0campus_login.py" %*
+"%PYEXE%" "%~dp0campus_login.py" %*
 exit /b %ERRORLEVEL%
