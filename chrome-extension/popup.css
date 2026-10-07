@@ -1292,3 +1292,50 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ==========================================================================
+   Native UI & Focus Polish（原生控件主题化 + 键盘焦点环 + 选中色）
+   ========================================================================== */
+
+/* color-scheme：让原生滚动条 / 表单控件 / 自动填充跟随当前主题，
+   否则深色模式下这些原生 UI 仍是 UA 默认的浅色渲染 */
+:root {
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+  }
+}
+
+/* 文本选中色（跟随主题） */
+::selection {
+  background: rgba(37, 99, 235, 0.22);
+}
+
+[data-theme="dark"] ::selection {
+  background: rgba(96, 165, 250, 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) ::selection {
+    background: rgba(96, 165, 250, 0.35);
+  }
+}
+
+/* 键盘焦点环：仅键盘导航时显示（:focus-visible），统一品牌色。
+   深色下对深底 3.46:1，满足非文字组件 3:1 要求；鼠标点击不受影响。 */
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.icon-btn:focus-visible,
+.foot-link:focus-visible,
+.copy-hint:focus-visible,
+.dock-copy-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

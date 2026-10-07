@@ -2121,4 +2121,56 @@ details[open] .faq-arrow {
   }
 }
 
+/* ==========================================================================
+   Native UI & Focus Polish（原生控件主题化 + 键盘焦点环 + 选中色）
+   ========================================================================== */
+
+/* color-scheme：让原生滚动条 / 表单控件 / 自动填充跟随当前主题。
+   本页很长，深色模式下原生滚动条此前一直是浅色渲染，非常突兀 */
+:root {
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+  }
+}
+
+/* 文本选中色（跟随主题） */
+::selection {
+  background: rgba(37, 99, 235, 0.22);
+}
+
+[data-theme="dark"] ::selection {
+  background: rgba(96, 165, 250, 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) ::selection {
+    background: rgba(96, 165, 250, 0.35);
+  }
+}
+
+/* 键盘焦点环：仅键盘导航时显示（:focus-visible），统一品牌色。
+   覆盖此前被 outline:none 清掉可见性的 .btn-action 等交互元素；
+   toggle 开关的环画在 slider 一侧（input 本体视觉隐藏）。 */
+.btn-action:focus-visible,
+.btn-main:focus-visible,
+.btn-aux:focus-visible,
+.btn-ghost-danger:focus-visible,
+.theme-toggle-btn:focus-visible,
+.portal-link-btn:focus-visible,
+.nav-item:focus-visible,
+.back-to-top:focus-visible,
+.faq-summary:focus-visible,
+.toggle-switch input:focus-visible + .slider {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 
