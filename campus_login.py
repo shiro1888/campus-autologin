@@ -1079,10 +1079,14 @@ def cmd_gui(args, cfg) -> int:
                     auto_st_lbl.config(text="● 计划任务生效中", fg=success_color)
                     btn_autostart.config(text="卸载自启", bg="#334155", fg="#f87171",
                                          activebackground="#475569", activeforeground="#fca5a5")
+                    btn_autostart.bind("<Enter>", lambda e: btn_autostart.config(bg="#475569"))
+                    btn_autostart.bind("<Leave>", lambda e: btn_autostart.config(bg="#334155"))
                 else:
                     auto_st_lbl.config(text="○ 未配置自启任务", fg=text_muted)
                     btn_autostart.config(text="一键配置", bg="#2563eb", fg="#ffffff",
                                          activebackground="#1d4ed8", activeforeground="#ffffff")
+                    btn_autostart.bind("<Enter>", lambda e: btn_autostart.config(bg="#1d4ed8"))
+                    btn_autostart.bind("<Leave>", lambda e: btn_autostart.config(bg="#2563eb"))
             safe_ui(_ui)
         run_async(_task, 'autostart')
 
@@ -1119,6 +1123,7 @@ def cmd_gui(args, cfg) -> int:
 
     def do_refresh():
         st_lbl.config(text="● 检测中…", fg="#f59e0b")
+        st_card.config(highlightbackground="#334155")
         update_autostart_ui()
         def _task():
             try:
@@ -1134,8 +1139,10 @@ def cmd_gui(args, cfg) -> int:
                 def _ui():
                     if online:
                         st_lbl.config(text="● 已在线 (认证通过)", fg=success_color)
+                        st_card.config(highlightbackground="#059669")
                     else:
                         st_lbl.config(text="○ 未在线 (需要认证)", fg=danger_color)
+                        st_card.config(highlightbackground="#ef4444")
                     ip_lbl.config(text="本机 IP: %s" % (ip or "—"))
                     dur_text = ("  |  上线: %s" % time_str) if time_str else ""
                     meta_lbl.config(text="流量: %s  |  延迟: %d ms%s" % (flow, ping_ms, dur_text))
@@ -1146,6 +1153,7 @@ def cmd_gui(args, cfg) -> int:
                 err_msg = "%s" % e
                 def _err():
                     st_lbl.config(text="! 网络不可达", fg=danger_color)
+                    st_card.config(highlightbackground="#ef4444")
                     ip_lbl.config(text="错误: %s" % err_msg)
                     meta_lbl.config(text="已用流量: —  |  时长: —")
                 safe_ui(_err)
@@ -1153,6 +1161,7 @@ def cmd_gui(args, cfg) -> int:
 
     def do_test():
         st_lbl.config(text="→ 正在运行网络自检…", fg="#3b82f6")
+        st_card.config(highlightbackground="#2563eb")
         def _task():
             try:
                 portal = Portal(cfg)
@@ -1216,6 +1225,7 @@ def cmd_gui(args, cfg) -> int:
                 safe_ui(lambda m=err_msg: messagebox.showerror("错误", m))
         if run_async(_task, 'login'):
             st_lbl.config(text="→ 正在登录…", fg="#3b82f6")
+            st_card.config(highlightbackground="#2563eb")
 
     def do_logout():
         if not messagebox.askyesno("注销确认", "确定要注销下线当前校园网会话吗？\n注销后电脑将断开互联网连接。"):
@@ -1237,6 +1247,7 @@ def cmd_gui(args, cfg) -> int:
                 safe_ui(lambda m=err_msg: messagebox.showerror("错误", m))
         if run_async(_task, 'logout'):
             st_lbl.config(text="→ 正在注销…", fg="#f59e0b")
+            st_card.config(highlightbackground="#f59e0b")
 
     def do_save():
         # 仅持久化合法配置字段，避免命令行临时参数（如 --user, --timeout）污染配置文件
@@ -1264,20 +1275,40 @@ def cmd_gui(args, cfg) -> int:
     user_ent.bind("<Return>", lambda e: do_login())
     pass_ent.bind("<Return>", lambda e: do_login())
 
-    btn_login = tk.Button(btn_frame, text="立即登录", font=("Microsoft YaHei", 10, "bold"), bg=accent, fg="#fff", activebackground="#1d4ed8", relief="flat", cursor="hand2", command=do_login)
+    btn_login = tk.Button(btn_frame, text="立即登录", font=("Microsoft YaHei", 10, "bold"), bg=accent, fg="#fff", activebackground="#1d4ed8", activeforeground="#ffffff", relief="flat", cursor="hand2", command=do_login)
     btn_login.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
 
-    btn_test = tk.Button(btn_frame, text="自检", font=("Microsoft YaHei", 10), bg="#334155", fg="#f8fafc", activebackground="#475569", relief="flat", cursor="hand2", command=do_test)
+    btn_test = tk.Button(btn_frame, text="自检", font=("Microsoft YaHei", 10), bg="#334155", fg="#f8fafc", activebackground="#475569", activeforeground="#ffffff", relief="flat", cursor="hand2", command=do_test)
     btn_test.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
 
-    btn_refresh = tk.Button(btn_frame, text="刷新", font=("Microsoft YaHei", 10), bg="#1e293b", fg=text_color, relief="flat", cursor="hand2", command=do_refresh)
+    btn_refresh = tk.Button(btn_frame, text="刷新", font=("Microsoft YaHei", 10), bg="#1e293b", fg=text_color, activebackground="#334155", activeforeground=text_color, relief="flat", cursor="hand2", command=do_refresh)
     btn_refresh.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
 
-    btn_save = tk.Button(btn_frame, text="保存账号", font=("Microsoft YaHei", 10), bg="#1e293b", fg=text_muted, relief="flat", cursor="hand2", command=do_save)
+    btn_save = tk.Button(btn_frame, text="保存账号", font=("Microsoft YaHei", 10), bg="#1e293b", fg=text_color, activebackground="#334155", activeforeground=text_color, relief="flat", cursor="hand2", command=do_save)
     btn_save.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
 
-    btn_logout = tk.Button(btn_frame, text="注销", font=("Microsoft YaHei", 10), bg="#1e293b", fg="#f87171", activebackground="#475569", relief="flat", cursor="hand2", command=do_logout)
+    btn_logout = tk.Button(btn_frame, text="注销", font=("Microsoft YaHei", 10), bg="#1e293b", fg="#f87171", activebackground="#475569", activeforeground="#fca5a5", relief="flat", cursor="hand2", command=do_logout)
     btn_logout.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
+
+    def bind_hover(btn, normal_bg, hover_bg, normal_fg=None, hover_fg=None):
+        def on_enter(e):
+            d = {"bg": hover_bg}
+            if hover_fg: d["fg"] = hover_fg
+            btn.config(**d)
+        def on_leave(e):
+            d = {"bg": normal_bg}
+            if normal_fg: d["fg"] = normal_fg
+            btn.config(**d)
+        btn.bind("<Enter>", on_enter)
+        btn.bind("<Leave>", on_leave)
+
+    bind_hover(btn_login, accent, "#1d4ed8")
+    bind_hover(btn_test, "#334155", "#475569")
+    bind_hover(btn_refresh, "#1e293b", "#334155")
+    bind_hover(btn_save, "#1e293b", "#334155")
+    bind_hover(btn_logout, "#1e293b", "#7f1d1d", normal_fg="#f87171", hover_fg="#fca5a5")
+    bind_hover(btn_copy_ip, "#334155", "#475569")
+    bind_hover(btn_pwd_toggle, "#1e293b", "#334155")
 
     do_refresh()
     root.mainloop()

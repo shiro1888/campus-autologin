@@ -579,12 +579,17 @@ function refreshStatus(cb) {
 
     const pill = $('stPill');
     const textEl = $('stOnline');
+    const heroEl = $('statusWidget');
 
     if (chrome.runtime.lastError || !res) {
       // 与 !reachable 分支保持一致：停掉计时器，否则上一轮在线状态启动的
       // 秒表会继续每秒跳动，把这里的占位符覆盖掉，显示一个无人校验的时长
       durationTicker.stop();
       pill.className = 'status-pill off';
+      if (heroEl) {
+        heroEl.classList.remove('hero-on', 'hero-wait');
+        heroEl.classList.add('hero-off');
+      }
       textEl.textContent = '后台未响应';
       $('stIp').textContent = '—';
       $('stTime').textContent = '—';
@@ -663,13 +668,25 @@ function refreshStatus(cb) {
     if (!res.reachable) {
       durationTicker.stop();
       pill.className = 'status-pill off';
+      if (heroEl) {
+        heroEl.classList.remove('hero-on', 'hero-wait');
+        heroEl.classList.add('hero-off');
+      }
       textEl.textContent = res.manualLogout ? '不在校园网内 · 已暂停' : '不在校园网内';
     } else if (res.online) {
       pill.className = 'status-pill on';
+      if (heroEl) {
+        heroEl.classList.remove('hero-off', 'hero-wait');
+        heroEl.classList.add('hero-on');
+      }
       textEl.textContent = '已在线 ✓';
     } else {
       durationTicker.stop();
       pill.className = 'status-pill wait';
+      if (heroEl) {
+        heroEl.classList.remove('hero-on', 'hero-off');
+        heroEl.classList.add('hero-wait');
+      }
       textEl.textContent = res.manualLogout ? '已手动注销 · 自动登录暂停' : '未登录';
     }
 
