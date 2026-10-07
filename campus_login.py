@@ -1243,7 +1243,7 @@ def cmd_gui(args, cfg) -> int:
         saved_cfg = {}
         if os.path.exists(CONFIG_PATH):
             try:
-                with open(CONFIG_PATH, "r", encoding="utf-8") as rf:
+                with open(CONFIG_PATH, "r", encoding="utf-8-sig") as rf:
                     saved_cfg = json.load(rf)
             except Exception:
                 saved_cfg = {}

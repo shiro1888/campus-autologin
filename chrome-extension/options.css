@@ -8,19 +8,19 @@
   --success-glow: rgba(16, 185, 129, 0.25);
   --success-border: rgba(16, 185, 129, 0.4);
   --success-bg: rgba(16, 185, 129, 0.08);
-  --success-text: #059669;
+  --success-text: #047857;
 
   --danger: #ef4444;
   --danger-glow: rgba(239, 68, 68, 0.25);
   --danger-border: rgba(239, 68, 68, 0.4);
   --danger-bg: rgba(239, 68, 68, 0.08);
-  --danger-text: #dc2626;
+  --danger-text: #b91c1c;
 
   --warning: #f59e0b;
   --warning-glow: rgba(245, 158, 11, 0.25);
   --warning-border: rgba(245, 158, 11, 0.4);
   --warning-bg: rgba(245, 158, 11, 0.08);
-  --warning-text: #d97706;
+  --warning-text: #b45309;
 
   --bg-page: #f8fafc;
   --bg-card: rgba(255, 255, 255, 0.9);
@@ -385,7 +385,7 @@ body {
 }
 
 .nav-item.active {
-  color: var(--primary);
+  color: #1d4ed8;
   background: rgba(37, 99, 235, 0.12);
   font-weight: 600;
   box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.22);
@@ -393,7 +393,7 @@ body {
 
 .nav-item.active svg {
   opacity: 1;
-  color: var(--primary);
+  color: #1d4ed8;
 }
 
 [data-theme="dark"] .nav-item.active {
@@ -799,7 +799,11 @@ body {
 }
 
 .stat-val.text-accent {
-  color: var(--primary);
+  color: #1d4ed8;
+}
+
+[data-theme="dark"] .stat-val.text-accent {
+  color: #60a5fa;
 }
 
 .stat-val.note {
@@ -934,6 +938,11 @@ input[type="password"] {
 
 input[type="password"] {
   padding-right: 44px;
+}
+
+input::placeholder {
+  color: var(--text-light);
+  opacity: 1;
 }
 
 #account {
@@ -1312,8 +1321,14 @@ select:focus {
   padding: 10px 14px;
   border-radius: var(--radius-md);
   font-size: 12.5px;
-  color: var(--primary);
+  color: #1d4ed8;
   line-height: 1.45;
+}
+
+[data-theme="dark"] .tip-banner {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
 }
 
 .tip-banner svg {
@@ -1367,7 +1382,7 @@ select:focus {
 .badge-success {
   font-size: 11px;
   font-weight: 600;
-  color: #059669;
+  color: #065f46;
   background: #d1fae5;
   padding: 2px 7px;
   border-radius: var(--radius-pill);
@@ -1376,7 +1391,7 @@ select:focus {
 .badge-primary {
   font-size: 11px;
   font-weight: 600;
-  color: #2563eb;
+  color: #1e40af;
   background: #dbeafe;
   padding: 2px 7px;
   border-radius: var(--radius-pill);

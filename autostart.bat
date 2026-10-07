@@ -3,6 +3,11 @@ chcp 936 >nul
 rem Silent runner for scheduled task, writes logs to logs\autologin.log
 cd /d "%~dp0"
 if not exist "%~dp0logs" mkdir "%~dp0logs"
+set "LOGFILE=%~dp0logs\autologin.log"
+if exist "%LOGFILE%" for %%A in ("%LOGFILE%") do if %%~zA gtr 1048576 (
+    copy /y "%LOGFILE%" "%~dp0logs\autologin.old.log" >nul 2>nul
+    type nul > "%LOGFILE%"
+)
 
 set "PYEXE="
 where py >nul 2>nul
