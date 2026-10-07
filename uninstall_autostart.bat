@@ -8,7 +8,9 @@ net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo.
     echo   Admin privileges required to uninstall...
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process cmd.exe -ArgumentList ('/c \"\"%~f0\"\"') -Verb RunAs"
+    set "THIS_BAT=%~f0"
+    set "SAFE_BAT=%THIS_BAT:'=''%"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process cmd.exe -ArgumentList ('/c \"\"' + '%SAFE_BAT%' + '\"\"') -Verb RunAs"
     exit /b
 )
 

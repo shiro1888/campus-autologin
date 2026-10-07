@@ -14,7 +14,9 @@ if %errorlevel% neq 0 (
     echo   Admin privileges required.
     echo   Requesting UAC elevation...
     echo.
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process cmd.exe -ArgumentList ('/c \"\"%~f0\"\"') -Verb RunAs"
+    set "THIS_BAT=%~f0"
+    set "SAFE_BAT=%THIS_BAT:'=''%"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process cmd.exe -ArgumentList ('/c \"\"' + '%SAFE_BAT%' + '\"\"') -Verb RunAs"
     exit /b
 )
 
