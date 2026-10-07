@@ -133,14 +133,15 @@
   /** 选中运营商（单选按钮或下拉框） */
   function selectIsp(isp) {
     if (!isp) return;
+    const targetIsp = String(isp);
     // 下拉框。isp 来自 storage（可能被手改 / 恶意导入注入任意字符串），
     // 不能拼进 CSS 选择器 —— 非法选择器会抛 SyntaxError 炸穿整条填单流程
     // （HUD 会卡在 loading 态），改为线性匹配 option 的 value。
     const sel = document.querySelector('select[name="ISP_select"]');
     if (sel) {
       for (let i = 0; i < sel.options.length; i++) {
-        if (sel.options[i].value === isp) {
-          sel.value = isp;
+        if (sel.options[i].value === targetIsp) {
+          sel.value = targetIsp;
           fire(sel);
           return;
         }
@@ -151,7 +152,7 @@
     const radios = document.querySelectorAll('div[name="ISP_radio"] input[name="network"], div[name="ISP_radio"] input[type="radio"]');
     if (radios && radios.length) {
       for (let i = 0; i < radios.length; i++) {
-        if (String(radios[i].value) === String(isp)) {
+        if (radios[i].value === targetIsp) {
           radios[i].checked = true;
           fire(radios[i]);
           return;

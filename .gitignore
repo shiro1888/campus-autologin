@@ -17,10 +17,11 @@ _verify/
 config.json
 config.local.json
 
-# 编辑器
+# 编辑器与工具
 .vscode/
 .idea/
 *.swp
+.zcodeignore
 
 # 系统
 Thumbs.db
