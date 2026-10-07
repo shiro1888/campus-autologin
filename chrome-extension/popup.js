@@ -85,7 +85,7 @@ function refresh() {
 
   try {
     const ver = chrome.runtime.getManifest().version;
-    $('ver').textContent = 'v' + (ver || '1.1.0');
+    $('ver').textContent = 'v' + (ver || '1.0.0');
   } catch (e) {
     $('ver').textContent = '';
   }

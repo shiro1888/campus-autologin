@@ -61,7 +61,7 @@ if sys.stderr is not None and hasattr(sys.stderr, "reconfigure"):
     except (OSError, ValueError):
         pass
 
-VERSION = "1.1.0"
+VERSION = "1.0.0"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
