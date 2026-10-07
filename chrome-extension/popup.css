@@ -675,10 +675,24 @@ body {
   padding: 1.5px 6.5px;
   border-radius: var(--radius-pill);
   background: rgba(59, 130, 246, 0.12);
-  color: var(--primary);
+  color: #1d4ed8;
   border: 1px solid rgba(59, 130, 246, 0.25);
   margin-left: auto;
   line-height: 1.25;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .isp-badge {
+    color: #93c5fd;
+    background: rgba(59, 130, 246, 0.16);
+    border-color: rgba(96, 165, 250, 0.3);
+  }
+}
+
+[data-theme="dark"] .isp-badge {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(96, 165, 250, 0.3);
 }
 
 /* Apple-grade Jewel-toned Micro-tray Badges */
