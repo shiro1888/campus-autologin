@@ -13,6 +13,7 @@
   --danger-glow: rgba(239, 68, 68, 0.22);
   --danger-border: rgba(239, 68, 68, 0.35);
   --danger-bg: rgba(239, 68, 68, 0.08);
+  --danger-text: #b91c1c;
 
   --warning: #f59e0b;
   --warning-glow: rgba(245, 158, 11, 0.25);
@@ -56,6 +57,7 @@
     --text-main: #f8fafc;
     --text-muted: #cbd5e1;
     --text-light: #94a3b8;
+    --danger-text: #f87171;
 
     --border-hairline: rgba(255, 255, 255, 0.09);
     --border-subtle: rgba(255, 255, 255, 0.18);
@@ -75,6 +77,7 @@
   --text-main: #f8fafc;
   --text-muted: #cbd5e1;
   --text-light: #94a3b8;
+  --danger-text: #f87171;
 
   --border-hairline: rgba(255, 255, 255, 0.09);
   --border-subtle: rgba(255, 255, 255, 0.18);
@@ -1186,7 +1189,7 @@ body {
 
 .btn-secondary:hover {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-text);
   border-color: var(--danger-border);
   transform: translateY(-1px) scale(1.02);
   box-shadow: 0 4px 14px -2px var(--danger-glow);
@@ -1199,7 +1202,7 @@ body {
 
 .btn-secondary.confirming {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-text);
   border-color: var(--danger-border);
   box-shadow: 0 0 0 2px var(--danger-glow);
   font-weight: 600;
