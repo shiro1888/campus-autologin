@@ -653,8 +653,24 @@ function refreshStatus(cb) {
     }
 
     // Flow & Fee (下行 / 上行 / 总计 / 余额)
+    const optFlowWrap = $('optFlowBarWrap');
+    const optFlowDl = $('optFlowBarDl');
+    const optFlowUl = $('optFlowBarUl');
     if (raw.flow !== undefined) {
       $('stFlow').textContent = fmtFlow(raw.flow);
+      const dl = parseFloat(raw.actdf) || 0;
+      const ul = parseFloat(raw.actuf) || 0;
+      const total = dl + ul;
+      if (total > 0 && optFlowDl && optFlowUl && optFlowWrap) {
+        const dlPct = Math.max(6, Math.min(94, Math.round((dl / total) * 100)));
+        const ulPct = 100 - dlPct;
+        optFlowDl.style.width = dlPct + '%';
+        optFlowUl.style.width = ulPct + '%';
+        optFlowWrap.style.display = 'flex';
+        optFlowWrap.title = `下载 ${dlPct}% (${fmtFlow(dl)}) · 上传 ${ulPct}% (${fmtFlow(ul)})`;
+      } else if (optFlowWrap) {
+        optFlowWrap.style.display = 'none';
+      }
       const sub = [];
       if (raw.actdf !== undefined && raw.actuf !== undefined) {
         sub.push(`↓ ${fmtFlow(raw.actdf)} · ↑ ${fmtFlow(raw.actuf)}`);
@@ -667,6 +683,7 @@ function refreshStatus(cb) {
     } else {
       $('stFlow').textContent = res.online ? '计量中' : '—';
       $('stFee').textContent = '账户余额: —';
+      if (optFlowWrap) optFlowWrap.style.display = 'none';
     }
 
     if (!res.reachable) {
@@ -865,6 +882,32 @@ if (cardStatIp) {
     if (ip && ip !== '—' && ip !== '正在获取…' && ip !== '未获取到') {
       navigator.clipboard.writeText(ip).then(() => {
         showToast('已复制本机 IP: ' + ip, 'ok');
+        const pill = $('ipCopyPill');
+        if (pill) {
+          pill.textContent = '已复制 ✓';
+          pill.classList.add('copied');
+          setTimeout(() => {
+            pill.textContent = '点击复制';
+            pill.classList.remove('copied');
+          }, 1500);
+        }
+      }).catch(() => {
+        showToast('复制失败', 'err');
+      });
+    }
+  });
+}
+
+// --- 点击物理 MAC 快捷复制 ---
+const stMac = $('stMac');
+if (stMac) {
+  stMac.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const txt = stMac.textContent;
+    const match = txt.match(/([0-9a-fA-F:]{12,17})/);
+    if (match && match[1]) {
+      navigator.clipboard.writeText(match[1]).then(() => {
+        showToast('已复制物理 MAC: ' + match[1], 'ok');
       }).catch(() => {
         showToast('复制失败', 'err');
       });

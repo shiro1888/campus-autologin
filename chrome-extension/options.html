@@ -117,9 +117,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
           </div>
           <span>本机局域网 IP</span>
+          <span class="stat-copy-pill" id="ipCopyPill">点击复制</span>
         </div>
         <div class="stat-val mono" id="stIp">正在获取…</div>
-        <div class="stat-sub text-muted" id="stMac">物理 MAC: —</div>
+        <div class="stat-sub text-muted" id="stMac" title="点击复制物理 MAC 地址">物理 MAC: —</div>
       </div>
 
       <div class="stat-card">
@@ -158,6 +159,10 @@
         </div>
         <div class="stat-val" id="stFlow">—</div>
         <div class="stat-sub text-muted" id="stFee">账户计费: —</div>
+        <div class="flow-bar-wrap" id="optFlowBarWrap" style="display: none;" title="上传与下载比例">
+          <div class="flow-bar-dl" id="optFlowBarDl" style="width: 50%;"></div>
+          <div class="flow-bar-ul" id="optFlowBarUl" style="width: 50%;"></div>
+        </div>
       </div>
 
       <div class="stat-card full-span">

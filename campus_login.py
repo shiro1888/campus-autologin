@@ -901,13 +901,30 @@ def cmd_gui(args, cfg) -> int:
         say_err("✗ 当前 Python 环境未安装 tkinter，无法启动图形界面。")
         return EXIT_FAIL
 
+    # 启用 Windows 高 DPI 感知，确保现代高分屏 (125%/150%/200%) 下文字与边框矢量渲染清晰，消除模糊
+    try:
+        import ctypes
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        try:
+            import ctypes
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
     root = tk.Tk()
     root.title("校园网自动登录 · 桌面控制中心")
     root.configure(bg="#0f172a")
 
-    # 窗口尺寸与屏幕居中
-    win_w, win_h = 470, 660
-    root.minsize(440, 580)
+    # 动态根据系统 DPI 缩放基准几何尺寸
+    scale = 1.0
+    try:
+        scale = max(1.0, float(root.tk.call("tk", "scaling")) / 1.333333)
+    except Exception:
+        scale = 1.0
+    win_w, win_h = int(470 * scale), int(660 * scale)
+    min_w, min_h = int(440 * scale), int(580 * scale)
+    root.minsize(min_w, min_h)
     root.update_idletasks()
     sw = root.winfo_screenwidth()
     sh = root.winfo_screenheight()
