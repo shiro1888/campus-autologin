@@ -2397,14 +2397,6 @@ select:focus {
   gap: 20px;
   position: sticky;
   top: 76px;
-  max-height: calc(100vh - 90px);
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: none;
-}
-
-.dashboard-sidebar::-webkit-scrollbar {
-  display: none;
 }
 
 /* ==========================================================================
