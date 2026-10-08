@@ -970,7 +970,7 @@ def cmd_gui(args, cfg) -> int:
     tk.Label(form_card, text="上网账号", font=("Microsoft YaHei", 9, "bold"), fg=text_color, bg=card_bg).pack(anchor="w")
     user_ent = tk.Entry(form_card, font=("Microsoft YaHei", 10), bg="#0b1120", fg=text_color,
                         insertbackground=text_color, relief="flat", highlightthickness=1,
-                        highlightbackground="#334155")
+                        highlightbackground="#334155", highlightcolor="#2563eb")
     user_ent.insert(0, cfg.get("username", ""))
     user_ent.pack(fill="x", pady=(3, 10), ipady=4)
 
@@ -981,6 +981,8 @@ def cmd_gui(args, cfg) -> int:
 
     pass_ent = tk.Entry(pwd_wrap, show="●", font=("Microsoft YaHei", 10), bg="#0b1120", fg=text_color,
                         insertbackground=text_color, relief="flat", bd=0)
+    pass_ent.bind("<FocusIn>", lambda e: pwd_wrap.config(highlightbackground="#2563eb"))
+    pass_ent.bind("<FocusOut>", lambda e: pwd_wrap.config(highlightbackground="#334155"))
     pass_ent.insert(0, cfg.get("password", ""))
     pass_ent.pack(side="left", fill="x", expand=True, padx=6, ipady=4)
 
@@ -1076,12 +1078,14 @@ def cmd_gui(args, cfg) -> int:
             autostart_active[0] = is_active
             def _ui():
                 if is_active:
+                    auto_card.config(highlightbackground="#059669")
                     auto_st_lbl.config(text="● 计划任务生效中", fg=success_color)
                     btn_autostart.config(text="卸载自启", bg="#334155", fg="#f87171",
                                          activebackground="#475569", activeforeground="#fca5a5")
                     btn_autostart.bind("<Enter>", lambda e: btn_autostart.config(bg="#475569"))
                     btn_autostart.bind("<Leave>", lambda e: btn_autostart.config(bg="#334155"))
                 else:
+                    auto_card.config(highlightbackground="#334155")
                     auto_st_lbl.config(text="○ 未配置自启任务", fg=text_muted)
                     btn_autostart.config(text="一键配置", bg="#2563eb", fg="#ffffff",
                                          activebackground="#1d4ed8", activeforeground="#ffffff")

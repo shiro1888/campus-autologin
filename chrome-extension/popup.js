@@ -16,7 +16,7 @@ function setStatus(title, desc, cls) {
 
   const av = $('avatarBeacon');
   if (av) {
-    av.className = 'avatar-beacon ' + (cls === 'on' ? 'on' : 'off');
+    av.className = 'avatar-beacon ' + (cls === 'on' ? 'on' : (cls === 'wait' ? 'wait' : 'off'));
   }
 
   const titleEl = $('statusTitle');

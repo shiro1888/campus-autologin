@@ -191,10 +191,26 @@ body {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--success);
+  background: var(--text-light);
   border: 2px solid var(--bg-page);
+  transition: all 0.3s ease;
+}
+
+.logo-beacon.on {
+  background: var(--success);
   box-shadow: 0 0 10px var(--success);
   animation: beacon-pop 2s ease-in-out infinite;
+}
+
+.logo-beacon.off {
+  background: var(--danger);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
+.logo-beacon.wait {
+  background: var(--warning);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+  animation: beacon-pop 1.5s ease-in-out infinite;
 }
 
 @keyframes beacon-pop {
@@ -302,8 +318,18 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  background: var(--text-light);
+  transition: all 0.3s ease;
+}
+
+.portal-dot.on {
   background: var(--success);
   box-shadow: 0 0 8px var(--success);
+}
+
+.portal-dot.off {
+  background: var(--danger);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
 }
 
 .portal-ip {
@@ -883,6 +909,7 @@ body {
   justify-content: center;
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 0.25s var(--ease-spring), box-shadow 0.25s ease;
 }
 
 .card-icon svg {
@@ -890,9 +917,17 @@ body {
   height: 20px;
 }
 
+.form-card:hover .card-icon {
+  transform: scale(1.08);
+}
+
 .card-icon.blue { background: #dbeafe; color: #2563eb; }
 .card-icon.emerald { background: #d1fae5; color: #059669; }
 .card-icon.amber { background: #fef3c7; color: #d97706; }
+
+.form-card:hover .card-icon.blue { box-shadow: 0 0 16px rgba(59, 130, 246, 0.35); }
+.form-card:hover .card-icon.emerald { box-shadow: 0 0 16px rgba(16, 185, 129, 0.35); }
+.form-card:hover .card-icon.amber { box-shadow: 0 0 16px rgba(245, 158, 11, 0.35); }
 
 [data-theme="dark"] .card-icon.blue { background: rgba(59, 130, 246, 0.18); color: #60a5fa; }
 [data-theme="dark"] .card-icon.emerald { background: rgba(16, 185, 129, 0.18); color: #34d399; }

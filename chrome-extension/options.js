@@ -580,6 +580,8 @@ function refreshStatus(cb) {
     const pill = $('stPill');
     const textEl = $('stOnline');
     const heroEl = $('statusWidget');
+    const logoAv = $('logoBeacon');
+    const portalDot = $('portalDot');
 
     if (chrome.runtime.lastError || !res) {
       // 与 !reachable 分支保持一致：停掉计时器，否则上一轮在线状态启动的
@@ -590,6 +592,8 @@ function refreshStatus(cb) {
         heroEl.classList.remove('hero-on', 'hero-wait');
         heroEl.classList.add('hero-off');
       }
+      if (logoAv) logoAv.className = 'logo-beacon off';
+      if (portalDot) portalDot.className = 'portal-dot off';
       textEl.textContent = '后台未响应';
       $('stIp').textContent = '—';
       $('stTime').textContent = '—';
@@ -672,6 +676,8 @@ function refreshStatus(cb) {
         heroEl.classList.remove('hero-on', 'hero-wait');
         heroEl.classList.add('hero-off');
       }
+      if (logoAv) logoAv.className = 'logo-beacon off';
+      if (portalDot) portalDot.className = 'portal-dot off';
       textEl.textContent = res.manualLogout ? '不在校园网内 · 已暂停' : '不在校园网内';
     } else if (res.online) {
       pill.className = 'status-pill on';
@@ -679,6 +685,8 @@ function refreshStatus(cb) {
         heroEl.classList.remove('hero-off', 'hero-wait');
         heroEl.classList.add('hero-on');
       }
+      if (logoAv) logoAv.className = 'logo-beacon on';
+      if (portalDot) portalDot.className = 'portal-dot on';
       textEl.textContent = '已在线 ✓';
     } else {
       durationTicker.stop();
@@ -687,6 +695,8 @@ function refreshStatus(cb) {
         heroEl.classList.remove('hero-on', 'hero-off');
         heroEl.classList.add('hero-wait');
       }
+      if (logoAv) logoAv.className = 'logo-beacon wait';
+      if (portalDot) portalDot.className = 'portal-dot on';
       textEl.textContent = res.manualLogout ? '已手动注销 · 自动登录暂停' : '未登录';
     }
 
@@ -846,6 +856,21 @@ $('btnCopyReport').addEventListener('click', () => {
     });
   });
 });
+
+// --- 点击本机 IP 卡片快速单项复制 ---
+const cardStatIp = $('cardStatIp');
+if (cardStatIp) {
+  cardStatIp.addEventListener('click', () => {
+    const ip = $('stIp').textContent.trim();
+    if (ip && ip !== '—' && ip !== '正在获取…' && ip !== '未获取到') {
+      navigator.clipboard.writeText(ip).then(() => {
+        showToast('已复制本机 IP: ' + ip, 'ok');
+      }).catch(() => {
+        showToast('复制失败', 'err');
+      });
+    }
+  });
+}
 
 // --- 顶部快捷：注销下线 (防误触二次确认) ---
 let optLogoutTimer = null;
