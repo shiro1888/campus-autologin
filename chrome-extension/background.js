@@ -82,10 +82,17 @@ const ERROR_MAP = {
   'userid error4': '账号已欠费或已停机',
   'userid error5': '账号状态异常，请联系网络中心',
   'userid error6': '该账号已在别处登录',
+  'userid error0': '账号或密码错误',
   'password error': '密码错误，请检查密码',
   'error1': '账号不存在',
   'error2': '密码错误',
-  'error3': '账号或密码错误'
+  'error3': '账号或密码错误',
+  // 以下三条与 campus_login.py 的 ERROR_HINTS 对齐（此前只有 Python 侧识别，
+  // 导致同一错误码在扩展里退化成每秒重试）。
+  'out of service': '账号已停机，请充值后使用',
+  'supplicant version too low': '客户端版本过低',
+  'ip has been online': '该 IP 已经在线，无需重复登录',
+  'auth error': '认证失败'
 };
 
 // 连接状态机的全部取值（用于校验从 storage 恢复的值是否合法）
@@ -371,10 +378,10 @@ function friendlyError(data) {
  */
 function isPermanentAuthError(msg) {
   const m = String(msg || '');
-  // 'password error' 是门户对密码错误返回的原始 ascii 原因（见 ERROR_MAP），
-  // 必须显式列出：它不含中文「密码」，也不含 errorN 形式，漏掉会让
-  // 这类明确的凭据错误退化成每秒重试。
-  return /密码|账号不存在|账号格式|被锁定|锁定|欠费|停机|已在别处|password error|userid error/i.test(m) ||
+  // 'password error' / 'out of service' / 'supplicant version too low' 都是门户的原始
+  // ascii 原因（见 ERROR_MAP），不含中文关键词也不含 errorN 形式，必须显式列出 ——
+  // 漏掉会让这些「重试无用」的错误退化成每秒重试（停机状态下每天上万次无效认证）。
+  return /密码|账号不存在|账号格式|被锁定|锁定|欠费|停机|已在别处|password error|userid error|out of service|supplicant version too low/i.test(m) ||
     /error[1-6]/i.test(m);
 }
 
@@ -432,15 +439,21 @@ async function doLogin(settings) {
   if (code === '1' || code.toLowerCase() === 'ok') {
     return ok('登录成功', true);
   }
+  const portalReason = [data.msga, data.msg]
+    .filter((v) => v != null && String(v).trim() !== '')
+    .join(' ')
+    .trim();
+  // 「该 IP 已经在线」不是错误：门户在说这个 IP 的会话是好的（常见于多设备/重复提交）。
+  // 若当成失败，就会每秒重试一个「本来就成功」的请求。
+  // 更不能计入 authError 降频 —— 用户凭据没问题。
+  if (/ip has been online/i.test(portalReason)) {
+    return ok('该 IP 已经在线，无需重复登录', true);
+  }
   // 判定「凭据类错误」必须只看**门户自己给出的原因**，不能看我们拼出来的提示文案。
   // 原因：friendlyError 在门户没给 msga/msg 时会兜底成「登录失败：账号或密码错误」，
   // 其中的「密码」二字会命中 isPermanentAuthError —— 于是把「门户没说明原因」
   // 误判为「密码错误」，抢修间隔被从 1 秒降到 10 秒，核心的秒级重连承诺失效。
   // 门户沉默时原因未知（可能是 AC 过载等瞬时故障），此时必须保持 1 秒快速重试。
-  const portalReason = [data.msga, data.msg]
-    .filter((v) => v != null && String(v).trim() !== '')
-    .join(' ')
-    .trim();
   const msg = friendlyError(data);
   const r = fail(msg, false);
   r.permanent = !!portalReason && isPermanentAuthError(portalReason);   // 仅门户明说才算凭据类错误

@@ -706,8 +706,10 @@ def cmd_login(args, cfg) -> int:
 
             last = resp
             say_err("✗ 登录失败: %s" % resp["message"])
-            # 账号/密码类错误重试没有意义
-            if any(k in resp["message"] for k in ("账号", "密码", "锁定", "停机", "已经在线")):
+            # 账号/密码类错误重试没有意义。
+            # 「客户端版本过低」是客户端/固件问题，重试同样无用 —— 它与其它
+            # ERROR_HINTS 译名不同，不含上面任何关键词，漏掉会让它按 retry 反复打门户。
+            if any(k in resp["message"] for k in ("账号", "密码", "锁定", "停机", "已经在线", "客户端版本过低")):
                 break
         if attempt < retry:
             time.sleep(delay)
