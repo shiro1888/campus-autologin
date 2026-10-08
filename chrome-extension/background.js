@@ -371,7 +371,11 @@ function friendlyError(data) {
  */
 function isPermanentAuthError(msg) {
   const m = String(msg || '');
-  return /密码|账号不存在|账号格式|被锁定|锁定|欠费|停机|已在别处|error1|error2|error3|error4|error5|error6/i.test(m);
+  // 'password error' 是门户对密码错误返回的原始 ascii 原因（见 ERROR_MAP），
+  // 必须显式列出：它不含中文「密码」，也不含 errorN 形式，漏掉会让
+  // 这类明确的凭据错误退化成每秒重试。
+  return /密码|账号不存在|账号格式|被锁定|锁定|欠费|停机|已在别处|password error|userid error/i.test(m) ||
+    /error[1-6]/i.test(m);
 }
 
 /** 执行登录，返回统一结果对象。返回值的 permanent=true 表示凭据类错误、不应再高频重试。 */
@@ -428,9 +432,18 @@ async function doLogin(settings) {
   if (code === '1' || code.toLowerCase() === 'ok') {
     return ok('登录成功', true);
   }
+  // 判定「凭据类错误」必须只看**门户自己给出的原因**，不能看我们拼出来的提示文案。
+  // 原因：friendlyError 在门户没给 msga/msg 时会兜底成「登录失败：账号或密码错误」，
+  // 其中的「密码」二字会命中 isPermanentAuthError —— 于是把「门户没说明原因」
+  // 误判为「密码错误」，抢修间隔被从 1 秒降到 10 秒，核心的秒级重连承诺失效。
+  // 门户沉默时原因未知（可能是 AC 过载等瞬时故障），此时必须保持 1 秒快速重试。
+  const portalReason = [data.msga, data.msg]
+    .filter((v) => v != null && String(v).trim() !== '')
+    .join(' ')
+    .trim();
   const msg = friendlyError(data);
   const r = fail(msg, false);
-  r.permanent = isPermanentAuthError(msg);   // 凭据类错误 -> 调度层改走退避
+  r.permanent = !!portalReason && isPermanentAuthError(portalReason);   // 仅门户明说才算凭据类错误
   return r;
 }
 
@@ -639,6 +652,16 @@ async function autoLogin(trigger, manual) {
     }
 
     await updateConnState(st);
+
+    // 3.5) 已在线说明凭据是可用的（或用户自行登录了）-> 清掉陈旧的「凭据类错误」标记。
+    //   不清的后果：标记会一直留到下一次真掉线，把那次抢修从 1 秒拖到 10 秒
+    //   （之后由 doLogin 结果自愈，所以只是**一次性**延迟，但白等 10 秒没必要）。
+    //   与上面第 3 步「陈旧 manualLogout 自愈」是同一思路。
+    if (st.reachable && st.online && settings.authError) {
+      await setState({ authError: false });
+      settings.authError = false;
+      console.log(tag + '已在线，清除陈旧的凭据错误标记');
+    }
 
     // 不可登录的三种情况（互斥）：已在线 / 拿不到门户数据 / 门户连不上
     if (st.online || st.unparseable || !st.reachable) {
