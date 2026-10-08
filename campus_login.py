@@ -501,6 +501,9 @@ ERROR_HINTS = {
     "supplicant version too low": "客户端版本过低",
     "auth error": "认证失败",
     "out of service": "账号已停机，请充值后使用",
+    "本时段禁止使用": "当前时段禁止使用校园网（夜间断网/宵禁时段）",
+    "禁止使用": "当前时段禁止使用校园网（夜间断网/宵禁时段）",
+    "禁止上网": "当前时段禁止上网",
 }
 
 
@@ -709,7 +712,8 @@ def cmd_login(args, cfg) -> int:
             # 账号/密码类错误重试没有意义。
             # 「客户端版本过低」是客户端/固件问题，重试同样无用 —— 它与其它
             # ERROR_HINTS 译名不同，不含上面任何关键词，漏掉会让它按 retry 反复打门户。
-            if any(k in resp["message"] for k in ("账号", "密码", "锁定", "停机", "已经在线", "客户端版本过低")):
+            # 「禁止使用」/「时段」代表夜间断网宵禁，重试无用。
+            if any(k in resp["message"] for k in ("账号", "密码", "锁定", "停机", "已经在线", "客户端版本过低", "禁止使用", "时段", "禁止上网")):
                 break
         if attempt < retry:
             time.sleep(delay)

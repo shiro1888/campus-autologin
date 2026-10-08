@@ -92,7 +92,10 @@ const ERROR_MAP = {
   'out of service': '账号已停机，请充值后使用',
   'supplicant version too low': '客户端版本过低',
   'ip has been online': '该 IP 已经在线，无需重复登录',
-  'auth error': '认证失败'
+  'auth error': '认证失败',
+  '本时段禁止使用': '当前时段禁止使用校园网（夜间断网/宵禁时段）',
+  '禁止使用': '当前时段禁止使用校园网（夜间断网/宵禁时段）',
+  '禁止上网': '当前时段禁止上网'
 };
 
 // 连接状态机的全部取值（用于校验从 storage 恢复的值是否合法）
@@ -381,7 +384,8 @@ function isPermanentAuthError(msg) {
   // 'password error' / 'out of service' / 'supplicant version too low' 都是门户的原始
   // ascii 原因（见 ERROR_MAP），不含中文关键词也不含 errorN 形式，必须显式列出 ——
   // 漏掉会让这些「重试无用」的错误退化成每秒重试（停机状态下每天上万次无效认证）。
-  return /密码|账号不存在|账号格式|被锁定|锁定|欠费|停机|已在别处|password error|userid error|out of service|supplicant version too low/i.test(m) ||
+  // 「禁止使用」/「时段」代表校园网夜间断网/宵禁策略，重试无用，必须降频。
+  return /密码|账号不存在|账号格式|被锁定|锁定|欠费|停机|已在别处|禁止使用|禁止上网|时段|password error|userid error|out of service|supplicant version too low/i.test(m) ||
     /error[1-6]/i.test(m);
 }
 

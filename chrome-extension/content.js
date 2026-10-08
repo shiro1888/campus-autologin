@@ -73,13 +73,58 @@
     }
   }
 
+  /**
+   * 带编码自适应的文本拉取。
+   * Dr.COM 门户返回 GBK 编码的中文字符串（如「本时段禁止使用 1」），
+   * 若直接用 resp.text() 会按 UTF-8 解码成乱码（U+FFFD）。
+   */
+  function fetchPortalText(url) {
+    return fetch(url, { cache: 'no-store', credentials: 'include' })
+      .then(function (resp) {
+        return resp.arrayBuffer().then(function (buf) {
+          const ct = String(resp.headers && resp.headers.get ? (resp.headers.get('content-type') || '') : '');
+          const m = /charset\s*=\s*"?([\w-]+)"?/i.exec(ct);
+          const charset = m ? m[1].toLowerCase() : '';
+          const candidates = charset ? [charset, 'gbk', 'gb18030', 'utf-8'] : ['gbk', 'gb18030', 'utf-8'];
+          const bytes = new Uint8Array(buf);
+          for (let i = 0; i < candidates.length; i++) {
+            try {
+              return new TextDecoder(candidates[i], { fatal: true }).decode(bytes);
+            } catch (e) {
+              /* 编码不匹配，换下一个 */
+            }
+          }
+          return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+        });
+      });
+  }
+
+  /** 将原生错误原因转换为友好可读文案 */
+  function formatErrMsg(rawMsg) {
+    const s = String(rawMsg || '').trim();
+    if (!s) return '';
+    const low = s.toLowerCase();
+    if (low.indexOf('本时段禁止使用') !== -1 || low.indexOf('禁止使用') !== -1 || low.indexOf('时段') !== -1) {
+      return '当前时段禁止使用校园网（夜间断网/宵禁时段）';
+    }
+    if (low.indexOf('userid error2') !== -1 || low.indexOf('password error') !== -1 || low.indexOf('error2') !== -1) {
+      return '密码错误，请检查密码';
+    }
+    if (low.indexOf('userid error1') !== -1 || low.indexOf('error1') !== -1) {
+      return '账号不存在，请检查账号';
+    }
+    if (low.indexOf('userid error3') !== -1) {
+      return '账号已被锁定，请联系网络中心';
+    }
+    if (low.indexOf('userid error4') !== -1 || low.indexOf('out of service') !== -1) {
+      return '账号已欠费或已停机';
+    }
+    return s;
+  }
+
   /** 同源查询在线状态 */
   function checkStatus() {
-    return fetch('/drcom/chkstatus?callback=dr1001&v=' + Date.now() + '&lang=zh&jsVersion=' + JS_VERSION, {
-      cache: 'no-store',
-      credentials: 'include'
-    })
-      .then(function (r) { return r.text(); })
+    return fetchPortalText('/drcom/chkstatus?callback=dr1001&v=' + Date.now() + '&lang=zh&jsVersion=' + JS_VERSION)
       .then(function (t) {
         const d = parseJsonp(t);
         return d ? Number(d.result) === 1 : false;
@@ -94,13 +139,13 @@
       '&upass=' + encodeURIComponent(password) +
       '&0MKKey=123456&R1=0&R2=&R3=' + encodeURIComponent(isp || '1') +
       '&R6=0&para=00&v6ip=&terminal_type=1&lang=zh-cn&jsVersion=' + JS_VERSION;
-    return fetch(url, { cache: 'no-store', credentials: 'include' })
-      .then(function (r) { return r.text(); })
+    return fetchPortalText(url)
       .then(function (t) {
         const d = parseJsonp(t);
         if (d) {
           const code = String(d.result);
-          return { ok: code === '1' || code.toLowerCase() === 'ok', msg: d.msga || d.msg || '' };
+          const rawMsg = d.msga || d.msg || '';
+          return { ok: code === '1' || code.toLowerCase() === 'ok', msg: formatErrMsg(rawMsg) };
         }
         if (/Dr\.COMWebLoginID_3/.test(t)) return { ok: true, msg: '' };
         return { ok: false, msg: '' };
