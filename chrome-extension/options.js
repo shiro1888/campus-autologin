@@ -896,6 +896,12 @@ if (cardStatIp) {
       });
     }
   });
+  cardStatIp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      cardStatIp.click();
+    }
+  });
 }
 
 // --- 点击物理 MAC 快捷复制 ---
@@ -904,13 +910,19 @@ if (stMac) {
   stMac.addEventListener('click', (e) => {
     e.stopPropagation();
     const txt = stMac.textContent;
-    const match = txt.match(/([0-9a-fA-F:]{12,17})/);
+    const match = txt.match(/([0-9a-fA-F:-]{12,17})/);
     if (match && match[1]) {
       navigator.clipboard.writeText(match[1]).then(() => {
         showToast('已复制物理 MAC: ' + match[1], 'ok');
       }).catch(() => {
         showToast('复制失败', 'err');
       });
+    }
+  });
+  stMac.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      stMac.click();
     }
   });
 }

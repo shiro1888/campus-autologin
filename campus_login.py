@@ -922,12 +922,15 @@ def cmd_gui(args, cfg) -> int:
         scale = max(1.0, float(root.tk.call("tk", "scaling")) / 1.333333)
     except Exception:
         scale = 1.0
-    win_w, win_h = int(470 * scale), int(660 * scale)
-    min_w, min_h = int(440 * scale), int(580 * scale)
-    root.minsize(min_w, min_h)
     root.update_idletasks()
     sw = root.winfo_screenwidth()
     sh = root.winfo_screenheight()
+    # 窗口宽高自适应 DPI，并限制不超过屏幕安全尺寸（预留系统任务栏），防止小屏笔记本溢出
+    win_w = min(max(380, sw - 40), int(470 * scale))
+    win_h = min(max(500, sh - 80), int(660 * scale))
+    min_w = min(win_w, int(440 * scale))
+    min_h = min(win_h, int(560 * scale))
+    root.minsize(min_w, min_h)
     pos_x = max(0, (sw - win_w) // 2)
     pos_y = max(0, (sh - win_h) // 2)
     root.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
