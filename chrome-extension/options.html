@@ -50,7 +50,7 @@
     <div class="nav-track">
       <a href="#statusWidget" class="nav-item active" data-target="statusWidget">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        <span>监控中心</span>
+        <span>全链路遥测</span>
       </a>
       <a href="#cardCredentials" class="nav-item" data-target="cardCredentials">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -66,7 +66,7 @@
       </a>
       <a href="#cardFaq" class="nav-item" data-target="cardFaq">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <span>常见问题</span>
+        <span>排障指南</span>
       </a>
     </div>
   </nav>
@@ -258,7 +258,7 @@
             <div class="card-title-box">
               <div class="card-title-row">
                 <h2>认证凭据与网络</h2>
-                <span class="step-badge blue">STEP 01</span>
+                <span class="step-badge blue">01 · 凭据鉴权</span>
               </div>
               <p>用于校园网门户登录认证的账号信息，仅安全保存在本机浏览器沙盒中</p>
             </div>
@@ -325,8 +325,12 @@
               </div>
 
               <div class="tip-banner">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                <span>排错提示：若登录返回「密码错误」，多半是运营商后缀未选对。尝试点击上方电信或联通快捷微标签即可。</span>
+                <div class="tip-banner-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                </div>
+                <div class="tip-banner-text">
+                  <b>运营商后缀排错</b>：若登录返回「密码错误」，多半是运营商后缀未匹配。点击上方电信(@dx)或联通(@lt)快捷微标签即可。
+                </div>
               </div>
             </div>
           </div>
@@ -341,7 +345,7 @@
             <div class="card-title-box">
               <div class="card-title-row">
                 <h2>智能保活与轮询策略</h2>
-                <span class="step-badge emerald">STEP 02</span>
+                <span class="step-badge emerald">02 · 自适应保活</span>
               </div>
               <p>控制后台心跳探测周期与网络掉线后的自适应抢险提速机制</p>
             </div>
@@ -411,7 +415,7 @@
             <div class="card-title-box">
               <div class="card-title-row">
                 <h2>自动化触发与页面增强</h2>
-                <span class="step-badge amber">STEP 03</span>
+                <span class="step-badge amber">03 · 自动化增强</span>
               </div>
               <p>更聪明的网络事件监听机制，多重保障不断网</p>
             </div>
@@ -478,6 +482,7 @@
             <svg class="btn-spinner" id="saveSpinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
             <svg class="btn-icon" id="saveIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             <span id="btnSaveText">保存配置并立即测试</span>
+            <span class="kbd-pill" title="快捷键 Ctrl+S 保存">Ctrl+S</span>
             <span class="unsaved-dot" id="unsavedDot" title="有尚未保存的更改"></span>
           </button>
 
@@ -554,16 +559,22 @@
         <div class="side-card-body">
           <ul class="tips-list">
             <li>
-              <div class="tip-icon-bullet">💡</div>
-              <div class="tip-text"><b>点击 IP / MAC</b>：触感微气泡复制，快速填入选课、报修系统。</div>
+              <div class="tip-icon-bullet blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </div>
+              <div class="tip-text"><b>触感快捷复制</b>：单击 IP 或 MAC 指标卡，气泡震颤并复制，快速填入选课、报修系统。</div>
             </li>
             <li>
-              <div class="tip-icon-bullet">⚡</div>
-              <div class="tip-text"><b>密码错误排查</b>：多数因未选对运营商，点击上方电信(@dx)或联通(@lt)即可。</div>
+              <div class="tip-icon-bullet emerald">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </div>
+              <div class="tip-text"><b>宽带后缀排错</b>：多数认证拒绝源于运营商未选对，点击上方电信(@dx)或联通(@lt)即可。</div>
             </li>
             <li>
-              <div class="tip-icon-bullet">📦</div>
-              <div class="tip-text"><b>一键备份迁移</b>：通过下方「导出配置」生成 JSON 备份，新设备 1 秒恢复。</div>
+              <div class="tip-icon-bullet purple">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </div>
+              <div class="tip-text"><b>配置一键迁移</b>：通过下方「导出配置」生成 JSON 备份，重装或换设备 1 秒恢复。</div>
             </li>
           </ul>
       </div>

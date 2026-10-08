@@ -931,6 +931,17 @@ $('form').addEventListener('submit', (e) => {
   });
 });
 
+// 全局快捷键 Ctrl+S / Cmd+S 快速保存
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    const btn = $('btnSave');
+    if (btn && !btn.disabled) {
+      $('form').dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+  }
+});
+
 // --- 顶部快捷：测试连接/检测状态 ---
 $('btnCheckStatus').addEventListener('click', () => {
   refreshStatus(() => {
