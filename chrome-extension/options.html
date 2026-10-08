@@ -134,7 +134,7 @@
         <div class="stat-sub text-muted" id="stStime">上线时间: —</div>
       </div>
 
-      <div class="stat-card">
+      <div class="stat-card" id="cardStatPing">
         <div class="stat-label">
           <div class="stat-badge emerald">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
@@ -142,7 +142,16 @@
           <span>网关延迟 (Ping)</span>
           <span class="latency-badge" id="pingBadge">良好</span>
         </div>
-        <div class="stat-val text-accent" id="stPing">—</div>
+        <div class="stat-ping-row">
+          <div class="stat-val text-accent" id="stPing">—</div>
+          <div class="ping-sparkline" id="optPingSparkline" title="心跳延迟波动走势">
+            <span class="spark-bar"></span>
+            <span class="spark-bar"></span>
+            <span class="spark-bar"></span>
+            <span class="spark-bar"></span>
+            <span class="spark-bar"></span>
+          </div>
+        </div>
         <div class="stat-sub text-muted">172.30.100.2 响应耗时</div>
       </div>
 

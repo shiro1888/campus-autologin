@@ -67,6 +67,46 @@ function setLocalIp(ip) {
   $('localIp').textContent = currentIp || '未检测到';
 }
 
+const pingHistory = [];
+function renderPingSparkline(pingMs) {
+  const container = $('popPingSparkline');
+  if (!container) return;
+  if (pingMs !== undefined && pingMs >= 0) {
+    pingHistory.push(pingMs);
+    if (pingHistory.length > 4) pingHistory.shift();
+  }
+  const bars = container.querySelectorAll('.spark-bar');
+  if (!bars.length) return;
+  const maxPing = Math.max(60, ...pingHistory, 1);
+  bars.forEach((bar, idx) => {
+    const val = pingHistory[idx];
+    if (val !== undefined) {
+      const pct = Math.max(25, Math.min(100, Math.round((val / maxPing) * 100)));
+      bar.style.height = `${pct}%`;
+      bar.className = 'spark-bar ' + (val <= 50 ? 'fast' : (val <= 150 ? 'normal' : 'slow'));
+      bar.title = `${val} ms`;
+    } else {
+      bar.style.height = '25%';
+      bar.className = 'spark-bar';
+      bar.title = '';
+    }
+  });
+}
+
+function showFloatingBubble(e, text = '已复制 ✓') {
+  try {
+    const bubble = document.createElement('div');
+    bubble.className = 'floating-copy-bubble';
+    bubble.textContent = text;
+    const x = e && e.clientX ? e.clientX : (window.innerWidth / 2);
+    const y = e && e.clientY ? e.clientY : (window.innerHeight / 2);
+    bubble.style.left = `${x}px`;
+    bubble.style.top = `${y}px`;
+    document.body.appendChild(bubble);
+    setTimeout(() => bubble.remove(), 900);
+  } catch (err) {}
+}
+
 /** 刷新面板状态 */
 function refresh() {
   const refreshBtn = $('btnRefresh');
@@ -181,10 +221,12 @@ function refresh() {
         pingEl.className = 'dock-value mono ping-slow';
         pingEl.title = `较高延迟 (${res.pingMs} ms)`;
       }
+      renderPingSparkline(res.pingMs);
     } else {
       pingEl.textContent = res.reachable ? '< 10 ms' : '超时';
       pingEl.className = 'dock-value mono';
       pingEl.title = res.reachable ? '网关连通正常' : '网关不可达';
+      renderPingSparkline(res.reachable ? 8 : -1);
     }
 
     const rawData = res.raw || {};
@@ -319,7 +361,7 @@ $('btnLogout').addEventListener('click', () => {
 });
 
 // --- 一键复制 IP ---
-$('ipChip').addEventListener('click', () => {
+$('ipChip').addEventListener('click', (e) => {
   if (!currentIp || currentIp === '未检测到') return;
 
   navigator.clipboard.writeText(currentIp).then(() => {
@@ -329,6 +371,7 @@ $('ipChip').addEventListener('click', () => {
     chip.classList.add('copied');
     copyIcon.innerHTML = '<polyline points="20 6 9 17 4 12" stroke="#10b981" stroke-width="2.5" fill="none"/>';
     setMsg(`已复制 IP: ${currentIp}`, 'ok', 1800);
+    showFloatingBubble(e, '已复制 IP ✓');
 
     setTimeout(() => {
       copyIcon.innerHTML = oldHtml;
@@ -340,7 +383,7 @@ $('ipChip').addEventListener('click', () => {
 });
 
 // --- 一键复制账号 ---
-function copyAccount() {
+function copyAccount(e) {
   if (!currentAccount || currentAccount === '未设置') {
     setMsg('当前未设置认证账号', 'info', 2000);
     return;
@@ -364,6 +407,7 @@ function copyAccount() {
       }, 1500);
     }
     setMsg(`已复制账号: ${currentAccount}`, 'ok', 1800);
+    showFloatingBubble(e, '已复制账号 ✓');
   }).catch(() => {
     setMsg(`账号: ${currentAccount}`, 'info', 2500);
   });
@@ -373,7 +417,7 @@ const btnCopyAcc = $('btnCopyAccount');
 if (btnCopyAcc) {
   btnCopyAcc.addEventListener('click', (e) => {
     e.stopPropagation();
-    copyAccount();
+    copyAccount(e);
   });
 }
 
@@ -381,7 +425,7 @@ const accEl = $('account');
 if (accEl) {
   accEl.addEventListener('click', (e) => {
     e.stopPropagation();
-    copyAccount();
+    copyAccount(e);
   });
 }
 
@@ -449,3 +493,14 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 refresh();
+
+// --- Linear/Raycast 级卡片鼠标光斑跟随 ---
+if (window.matchMedia('(hover: hover)').matches) {
+  document.querySelectorAll('.card, .dock-item').forEach((card) => {
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+      card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+    });
+  });
+}

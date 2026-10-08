@@ -860,6 +860,116 @@ body {
   color: #ef4444;
 }
 
+/* Apple/Cloudflare Radar 迷你心跳信号柱 */
+.dock-sparkline {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+  margin-left: auto;
+  padding: 0 2px;
+}
+
+.dock-sparkline .spark-bar {
+  width: 2.5px;
+  height: 3px;
+  border-radius: 1px;
+  background: var(--border-hairline);
+  transition: height 0.35s var(--ease-spring), background 0.3s ease;
+}
+
+.dock-sparkline .spark-bar.fast {
+  background: #10b981;
+  box-shadow: 0 0 5px rgba(16, 185, 129, 0.4);
+}
+
+.dock-sparkline .spark-bar.normal {
+  background: #f59e0b;
+  box-shadow: 0 0 5px rgba(245, 158, 11, 0.4);
+}
+
+.dock-sparkline .spark-bar.slow {
+  background: #ef4444;
+  box-shadow: 0 0 5px rgba(239, 68, 68, 0.4);
+}
+
+/* Linear/Raycast 级鼠标光斑跟随 (Spotlight Glow) */
+.card,
+.dock-item {
+  --mouse-x: -999px;
+  --mouse-y: -999px;
+}
+
+.card::after,
+.dock-item::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: radial-gradient(
+    140px circle at var(--mouse-x) var(--mouse-y),
+    rgba(37, 99, 235, 0.32),
+    transparent 70%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 3;
+}
+
+[data-theme="dark"] .card::after,
+[data-theme="dark"] .dock-item::after {
+  background: radial-gradient(
+    150px circle at var(--mouse-x) var(--mouse-y),
+    rgba(96, 165, 250, 0.38),
+    transparent 70%
+  );
+}
+
+.card:hover::after,
+.dock-item:hover::after {
+  opacity: 1;
+}
+
+/* 就地触感复制浮动微气泡 */
+.floating-copy-bubble {
+  position: fixed;
+  z-index: 99999;
+  pointer-events: none;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8.5px;
+  border-radius: var(--radius-pill);
+  color: #ffffff;
+  background: #059669;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.45);
+  transform: translate(-50%, -100%);
+  animation: float-bubble 0.85s var(--ease-spring) forwards;
+}
+
+@keyframes float-bubble {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 2px) scale(0.85);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -6px) scale(1.05);
+  }
+  75% {
+    opacity: 1;
+    transform: translate(-50%, -12px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -18px) scale(0.95);
+  }
+}
+
 .dock-value.mono,
 .mono,
 .meta-value,

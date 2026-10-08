@@ -47,6 +47,46 @@ const durationTicker = createTicker((text) => {
   $('stTime').textContent = text;
 });
 
+const optPingHistory = [];
+function renderOptPingSparkline(pingMs) {
+  const container = $('optPingSparkline');
+  if (!container) return;
+  if (pingMs !== undefined && pingMs >= 0) {
+    optPingHistory.push(pingMs);
+    if (optPingHistory.length > 5) optPingHistory.shift();
+  }
+  const bars = container.querySelectorAll('.spark-bar');
+  if (!bars.length) return;
+  const maxPing = Math.max(60, ...optPingHistory, 1);
+  bars.forEach((bar, idx) => {
+    const val = optPingHistory[idx];
+    if (val !== undefined) {
+      const pct = Math.max(25, Math.min(100, Math.round((val / maxPing) * 100)));
+      bar.style.height = `${pct}%`;
+      bar.className = 'spark-bar ' + (val <= 50 ? 'fast' : (val <= 150 ? 'normal' : 'slow'));
+      bar.title = `${val} ms`;
+    } else {
+      bar.style.height = '25%';
+      bar.className = 'spark-bar';
+      bar.title = '';
+    }
+  });
+}
+
+function showFloatingBubble(e, text = '已复制 ✓') {
+  try {
+    const bubble = document.createElement('div');
+    bubble.className = 'floating-copy-bubble';
+    bubble.textContent = text;
+    const x = e && e.clientX ? e.clientX : (window.innerWidth / 2);
+    const y = e && e.clientY ? e.clientY : (window.innerHeight / 2);
+    bubble.style.left = `${x}px`;
+    bubble.style.top = `${y}px`;
+    document.body.appendChild(bubble);
+    setTimeout(() => bubble.remove(), 900);
+  } catch (err) {}
+}
+
 /** 主题切换管理 */
 function initTheme() {
   chrome.storage.local.get({ theme: 'auto' }, (s) => {
@@ -599,6 +639,7 @@ function refreshStatus(cb) {
       $('stTime').textContent = '—';
       $('stMac').textContent = '物理 MAC: —';
       $('stPing').textContent = '—';
+      renderOptPingSparkline(-1);
       $('stFlow').textContent = '—';
       $('stFee').textContent = '账户计费: —';
       $('stStime').textContent = '上线时间: —';
@@ -644,12 +685,14 @@ function refreshStatus(cb) {
           badgeEl.textContent = '较高';
         }
       }
+      renderOptPingSparkline(res.pingMs);
     } else {
       pingEl.textContent = res.reachable ? '< 10 ms' : '超时';
       if (badgeEl) {
         badgeEl.className = res.reachable ? 'latency-badge fast' : 'latency-badge slow';
         badgeEl.textContent = res.reachable ? '连通' : '超时';
       }
+      renderOptPingSparkline(res.reachable ? 8 : -1);
     }
 
     // Flow & Fee (下行 / 上行 / 总计 / 余额)
@@ -832,7 +875,7 @@ $('btnLoginNow').addEventListener('click', () => {
 });
 
 // --- 顶部快捷：一键复制完整诊断报告 ---
-$('btnCopyReport').addEventListener('click', () => {
+$('btnCopyReport').addEventListener('click', (e) => {
   const btn = $('btnCopyReport');
   const span = $('btnCopyReportText');
   const originalText = span.textContent;
@@ -864,6 +907,7 @@ $('btnCopyReport').addEventListener('click', () => {
 
     navigator.clipboard.writeText(report).then(() => {
       span.textContent = '已复制 ✓';
+      showFloatingBubble(e, '诊断报告已复制 ✓');
       showToast('诊断报告已成功复制到剪贴板', 'ok');
       setTimeout(() => {
         span.textContent = originalText;
@@ -877,10 +921,11 @@ $('btnCopyReport').addEventListener('click', () => {
 // --- 点击本机 IP 卡片快速单项复制 ---
 const cardStatIp = $('cardStatIp');
 if (cardStatIp) {
-  cardStatIp.addEventListener('click', () => {
+  cardStatIp.addEventListener('click', (e) => {
     const ip = $('stIp').textContent.trim();
     if (ip && ip !== '—' && ip !== '正在获取…' && ip !== '未获取到') {
       navigator.clipboard.writeText(ip).then(() => {
+        showFloatingBubble(e, '已复制 IP ✓');
         showToast('已复制本机 IP: ' + ip, 'ok');
         const pill = $('ipCopyPill');
         if (pill) {
@@ -913,6 +958,7 @@ if (stMac) {
     const match = txt.match(/([0-9a-fA-F:-]{12,17})/);
     if (match && match[1]) {
       navigator.clipboard.writeText(match[1]).then(() => {
+        showFloatingBubble(e, '已复制 MAC ✓');
         showToast('已复制物理 MAC: ' + match[1], 'ok');
       }).catch(() => {
         showToast('复制失败', 'err');
@@ -1196,4 +1242,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
     applyTheme(changes.theme.newValue || 'auto');
   }
 });
+
+// --- Linear/Raycast 级卡片鼠标光斑跟随 ---
+if (window.matchMedia('(hover: hover)').matches) {
+  document.querySelectorAll('.stat-card, .form-card, .card').forEach((card) => {
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+      card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+    });
+  });
+}
 

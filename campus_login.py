@@ -935,6 +935,17 @@ def cmd_gui(args, cfg) -> int:
     pos_y = max(0, (sh - win_h) // 2)
     root.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
 
+    # 启用 Windows 10/11 原生沉浸式深色标题栏 (DWM Immersive Dark Titlebar)
+    try:
+        from ctypes import byref, c_int, sizeof
+        DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+        hwnd = ctypes.windll.user32.GetParent(root.winfo_id()) or root.winfo_id()
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, byref(c_int(1)), sizeof(c_int)
+        )
+    except Exception:
+        pass
+
     # 尝试加载高质感专属应用图标
     icon_path = os.path.join(BASE_DIR, "chrome-extension", "icons", "icon48.png")
     if os.path.isfile(icon_path):
