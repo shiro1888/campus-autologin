@@ -87,6 +87,84 @@ function showFloatingBubble(e, text = '已复制 ✓') {
   } catch (err) {}
 }
 
+/** 动态更新网络全链路拓扑指示器 */
+function updateTopology(res) {
+  const clientIp = $('topoClientIp');
+  if (!clientIp) return;
+  const pingVal = $('topoPingVal');
+  const pingChip = $('topoPingChip');
+  const authVal = $('topoAuthVal');
+  const authChip = $('topoAuthChip');
+  const internetVal = $('topoInternetVal');
+  const linkPing = $('topoLinkPing');
+  const linkAuth = $('topoLinkAuth');
+
+  if (!res) {
+    clientIp.textContent = '未获取到';
+    if (pingVal) pingVal.textContent = '离线';
+    if (pingChip) pingChip.className = 'topo-chip-badge off';
+    if (authVal) authVal.textContent = '未连接';
+    if (authChip) authChip.className = 'topo-chip-badge off';
+    if (internetVal) internetVal.textContent = '无网络';
+    if (linkPing) linkPing.className = 'topo-link off';
+    if (linkAuth) linkAuth.className = 'topo-link off';
+    return;
+  }
+
+  const raw = res.raw || {};
+  const ip = raw.v4ip || raw.ss5 || '';
+  clientIp.textContent = ip || (res.reachable ? '已连接网关' : '未连接');
+
+  if (res.pingMs !== undefined && res.pingMs >= 0) {
+    if (pingVal) pingVal.textContent = res.pingMs + ' ms';
+    if (pingChip) pingChip.className = 'topo-chip-badge ' + (res.pingMs <= 50 ? 'fast' : (res.pingMs <= 150 ? 'normal' : 'slow'));
+  } else {
+    if (pingVal) pingVal.textContent = res.reachable ? '< 10 ms' : '超时';
+    if (pingChip) pingChip.className = 'topo-chip-badge ' + (res.reachable ? 'fast' : 'off');
+  }
+
+  if (linkPing) {
+    linkPing.className = 'topo-link ' + (res.reachable ? 'on' : 'off');
+  }
+
+  if (!res.reachable) {
+    if (authVal) authVal.textContent = '不可达';
+    if (authChip) authChip.className = 'topo-chip-badge off';
+    if (internetVal) internetVal.textContent = '未通畅';
+    if (linkAuth) linkAuth.className = 'topo-link off';
+  } else if (res.online) {
+    if (authVal) authVal.textContent = '已认证 ✓';
+    if (authChip) authChip.className = 'topo-chip-badge on';
+    if (internetVal) internetVal.textContent = '全网通畅 ✓';
+    if (linkAuth) linkAuth.className = 'topo-link on';
+  } else {
+    if (authVal) authVal.textContent = res.manualLogout ? '已暂停' : '待认证';
+    if (authChip) authChip.className = 'topo-chip-badge wait';
+    if (internetVal) internetVal.textContent = '局域网受限';
+    if (linkAuth) linkAuth.className = 'topo-link wait';
+  }
+}
+
+/** 运营商快速切换微标签 */
+function initIspChips() {
+  document.querySelectorAll('.isp-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const val = chip.getAttribute('data-isp');
+      if (!val) return;
+      $('isp').value = val;
+      syncCustomSelect('isp');
+      syncIspChips(val);
+      save(() => showToast('已切换运营商: ' + chip.textContent.trim(), 'ok'));
+    });
+  });
+}
+
+function syncIspChips(val) {
+  document.querySelectorAll('.isp-chip').forEach((chip) => {
+    chip.classList.toggle('active', chip.getAttribute('data-isp') === String(val));
+  });
+}
+
 /** 主题切换管理 */
 function initTheme() {
   chrome.storage.local.get({ theme: 'auto' }, (s) => {
@@ -544,6 +622,7 @@ function load() {
     const storedIsp = typeof s.isp === 'string' ? s.isp : String(s.isp || '1');
     $('isp').value = ['1', '2', '3', '4'].indexOf(storedIsp) !== -1 ? storedIsp : '1';
     syncCustomSelect('isp');
+    syncIspChips($('isp').value);
 
     pickClosest('intervalMin', s.intervalMin === undefined ? DEFAULTS.intervalMin : s.intervalMin);
     pickClosest('offlineIntervalMin', s.offlineIntervalMin === undefined ? DEFAULTS.offlineIntervalMin : s.offlineIntervalMin);
@@ -643,6 +722,7 @@ function refreshStatus(cb) {
       $('stFlow').textContent = '—';
       $('stFee').textContent = '账户计费: —';
       $('stStime').textContent = '上线时间: —';
+      updateTopology(null);
       if (cb) cb();
       return;
     }
@@ -760,6 +840,7 @@ function refreshStatus(cb) {
       textEl.textContent = res.manualLogout ? '已手动注销 · 自动登录暂停' : '未登录';
     }
 
+    updateTopology(res);
     if (cb) cb();
   });
 }
@@ -1212,6 +1293,7 @@ $('adaptive').addEventListener('change', () => {
 // --- 下拉框改动即时保存 ---
 ['intervalMin', 'offlineIntervalMin', 'isp'].forEach((id) => {
   $(id).addEventListener('change', () => {
+    if (id === 'isp') syncIspChips($(id).value);
     save(() => showToast('参数已自动保存并生效。', 'ok'));
   });
 });
@@ -1220,6 +1302,7 @@ $('adaptive').addEventListener('change', () => {
 initTheme();
 initNavigation();
 initCustomSelects();
+initIspChips();
 load();
 
 // 当偏好设置页面在前台激活时，每 15 秒自动向后台刷新一次网关状态（流量与Ping）
@@ -1245,7 +1328,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // --- Linear/Raycast 级卡片鼠标光斑跟随 ---
 if (window.matchMedia('(hover: hover)').matches) {
-  document.querySelectorAll('.stat-card, .form-card, .card').forEach((card) => {
+  document.querySelectorAll('.stat-card, .form-card, .side-card, .card').forEach((card) => {
     card.addEventListener('mousemove', (e) => {
       const rect = card.getBoundingClientRect();
       card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);

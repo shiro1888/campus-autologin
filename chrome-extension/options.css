@@ -101,15 +101,27 @@
 
 body {
   background-color: var(--bg-page);
+  background-image: radial-gradient(rgba(148, 163, 184, 0.16) 1px, transparent 1px);
+  background-size: 28px 28px;
   color: var(--text-main);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", sans-serif;
   font-size: 14px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
-  padding: 40px 24px 110px;
+  padding: 36px 24px 110px;
   position: relative;
   overflow-x: hidden;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+[data-theme="dark"] body {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] body {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  }
 }
 
 /* Ambient Top Light Mesh */
@@ -118,10 +130,10 @@ body {
   top: -160px;
   left: 50%;
   transform: translateX(-50%);
-  width: 960px;
-  height: 380px;
-  background: radial-gradient(circle at 30% 40%, rgba(37, 99, 235, 0.12) 0%, transparent 60%),
-              radial-gradient(circle at 70% 30%, rgba(16, 185, 129, 0.1) 0%, transparent 60%);
+  width: 1100px;
+  height: 420px;
+  background: radial-gradient(circle at 30% 40%, rgba(37, 99, 235, 0.14) 0%, transparent 60%),
+              radial-gradient(circle at 70% 30%, rgba(16, 185, 129, 0.12) 0%, transparent 60%);
   filter: blur(80px);
   pointer-events: none;
   z-index: 0;
@@ -129,11 +141,11 @@ body {
 
 /* --- Container --- */
 .page-container {
-  max-width: 900px;
+  max-width: 1180px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 24px;
   position: relative;
   z-index: 1;
 }
@@ -245,6 +257,22 @@ body {
   border: 1px solid var(--border-color);
   padding: 2.5px 8px;
   border-radius: var(--radius-pill);
+}
+
+.header-status-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--primary);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="dark"] .header-status-chip {
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.3);
 }
 
 .subtitle {
@@ -765,6 +793,186 @@ body {
 }
 
 /* ==========================================================================
+   Network Topology Hop Pipeline (全链路拓扑指示器)
+   ========================================================================== */
+.network-topology-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--stat-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  gap: 10px;
+}
+
+.topo-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.topo-badge-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.25s var(--ease-spring);
+}
+
+.topo-badge-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.topo-badge-icon.blue {
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+}
+[data-theme="dark"] .topo-badge-icon.blue { color: #60a5fa; }
+
+.topo-badge-icon.emerald {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+[data-theme="dark"] .topo-badge-icon.emerald { color: #34d399; }
+
+.topo-badge-icon.purple {
+  background: rgba(147, 51, 234, 0.12);
+  color: #9333ea;
+  border: 1px solid rgba(147, 51, 234, 0.25);
+}
+[data-theme="dark"] .topo-badge-icon.purple { color: #c084fc; }
+
+.topo-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5px;
+}
+
+.topo-tag {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-light);
+  letter-spacing: 0.02em;
+}
+
+.topo-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.25;
+}
+
+/* Connecting links */
+.topo-link {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  position: relative;
+  min-width: 60px;
+  padding: 0 6px;
+}
+
+.topo-line-track {
+  width: 100%;
+  height: 2px;
+  background: var(--border-color);
+  position: relative;
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.topo-line-glow {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  transform: translateX(-100%);
+  animation: topo-beam 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes topo-beam {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.topo-link.on .topo-line-glow {
+  background: linear-gradient(90deg, transparent, #10b981, transparent);
+}
+
+.topo-link.wait .topo-line-glow {
+  background: linear-gradient(90deg, transparent, #f59e0b, transparent);
+}
+
+.topo-link.off .topo-line-glow {
+  display: none;
+}
+
+.topo-chip-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7.5px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  white-space: nowrap;
+  transition: all 0.25s ease;
+}
+
+.topo-chip-badge svg {
+  width: 11px;
+  height: 11px;
+}
+
+.topo-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.topo-chip-badge.fast,
+.topo-chip-badge.on {
+  color: var(--success);
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.topo-chip-badge.normal,
+.topo-chip-badge.wait {
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+[data-theme="dark"] .topo-chip-badge.normal,
+[data-theme="dark"] .topo-chip-badge.wait {
+  color: #fbbf24;
+}
+
+.topo-chip-badge.slow,
+.topo-chip-badge.off {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+/* ==========================================================================
    Stat Grid Inside Hero (Bento Cards + Log Strip)
    ========================================================================== */
 .hero-stat-grid {
@@ -823,13 +1031,15 @@ body {
 
 /* Linear/Raycast 级鼠标光斑跟随 (Spotlight Glow) */
 .stat-card,
-.form-card {
+.form-card,
+.side-card {
   --mouse-x: -999px;
   --mouse-y: -999px;
 }
 
 .stat-card::after,
-.form-card::after {
+.form-card::after,
+.side-card::after {
   content: "";
   position: absolute;
   inset: -1px;
@@ -850,7 +1060,8 @@ body {
 }
 
 [data-theme="dark"] .stat-card::after,
-[data-theme="dark"] .form-card::after {
+[data-theme="dark"] .form-card::after,
+[data-theme="dark"] .side-card::after {
   background: radial-gradient(
     220px circle at var(--mouse-x) var(--mouse-y),
     rgba(96, 165, 250, 0.4),
@@ -859,7 +1070,8 @@ body {
 }
 
 .stat-card:hover::after,
-.form-card:hover::after {
+.form-card:hover::after,
+.side-card:hover::after {
   opacity: 1;
 }
 
@@ -1148,6 +1360,116 @@ body {
 [data-theme="dark"] .card-icon.blue { background: rgba(59, 130, 246, 0.18); color: #60a5fa; }
 [data-theme="dark"] .card-icon.emerald { background: rgba(16, 185, 129, 0.18); color: #34d399; }
 [data-theme="dark"] .card-icon.amber { background: rgba(245, 158, 11, 0.18); color: #fbbf24; }
+
+.card-title-box {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.step-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 7.5px;
+  border-radius: var(--radius-pill);
+  text-transform: uppercase;
+}
+
+.step-badge.blue {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+}
+[data-theme="dark"] .step-badge.blue { color: #60a5fa; }
+
+.step-badge.emerald {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+[data-theme="dark"] .step-badge.emerald { color: #34d399; }
+
+.step-badge.amber {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+[data-theme="dark"] .step-badge.amber { color: #fbbf24; }
+
+.field-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.field-sub-label {
+  font-size: 11.5px;
+  color: var(--text-light);
+}
+
+.isp-quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 4px;
+}
+
+.isp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6.5px;
+  padding: 5.5px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-spring);
+  outline: none;
+}
+
+.isp-chip:hover {
+  border-color: var(--primary);
+  color: var(--text-main);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.isp-chip.active {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--primary), 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+
+[data-theme="dark"] .isp-chip.active {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: #60a5fa;
+  color: #93c5fd;
+  box-shadow: 0 0 0 1px #60a5fa, 0 2px 8px rgba(59, 130, 246, 0.25);
+}
+
+.chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chip-dot.default { background: #10b981; }
+.chip-dot.dx { background: #0284c7; }
+.chip-dot.lt { background: #ea580c; }
+.chip-dot.other { background: #8b5cf6; }
 
 .card-title-box h2 {
   font-size: 16px;
@@ -1631,7 +1953,7 @@ select:focus {
 }
 
 /* ==========================================================================
-   Switch Rows (iOS Style Toggle Switches)
+   Switch Rows & Feature Tiles (iOS Style Toggle Switches)
    ========================================================================== */
 .switch-row {
   display: flex;
@@ -1644,10 +1966,75 @@ select:focus {
   transition: all 0.2s var(--ease-smooth);
 }
 
-.switch-row:hover {
-  background: rgba(37, 99, 235, 0.035);
-  border-color: rgba(37, 99, 235, 0.12);
+.switch-row.feature-tile {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
+
+.switch-row.feature-tile:hover {
+  background: var(--bg-card);
+  border-color: rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+.switch-row.feature-tile:has(input:checked) {
+  border-color: rgba(37, 99, 235, 0.45);
+  background: rgba(37, 99, 235, 0.025);
+}
+
+[data-theme="dark"] .switch-row.feature-tile:has(input:checked) {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(96, 165, 250, 0.35);
+}
+
+.switch-icon-box {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.25s var(--ease-spring);
+}
+
+.switch-row.feature-tile:hover .switch-icon-box {
+  transform: scale(1.08);
+}
+
+.switch-icon-box svg {
+  width: 18px;
+  height: 18px;
+}
+
+.switch-icon-box.emerald {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+[data-theme="dark"] .switch-icon-box.emerald { color: #34d399; }
+
+.switch-icon-box.blue {
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+}
+[data-theme="dark"] .switch-icon-box.blue { color: #60a5fa; }
+
+.switch-icon-box.purple {
+  background: rgba(147, 51, 234, 0.12);
+  color: #9333ea;
+}
+[data-theme="dark"] .switch-icon-box.purple { color: #c084fc; }
+
+.switch-icon-box.amber {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+[data-theme="dark"] .switch-icon-box.amber { color: #fbbf24; }
 
 .switch-info {
   display: flex;
@@ -1683,8 +2070,19 @@ select:focus {
   border-radius: var(--radius-pill);
 }
 
+.badge-neutral {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--stat-bg);
+  border: 1px solid var(--border-color);
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+}
+
 [data-theme="dark"] .badge-success { background: rgba(16, 185, 129, 0.2); color: #34d399; }
 [data-theme="dark"] .badge-primary { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+[data-theme="dark"] .badge-neutral { background: rgba(255, 255, 255, 0.08); color: #cbd5e1; border-color: rgba(255, 255, 255, 0.12); }
 
 .switch-desc {
   font-size: 12.5px;
@@ -1976,6 +2374,217 @@ select:focus {
 }
 
 /* ==========================================================================
+   Dashboard Dual-Column Layout (主控区 + 辅助侧边栏)
+   ========================================================================== */
+.dashboard-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 350px;
+  gap: 24px;
+  align-items: start;
+}
+
+.dashboard-primary {
+  min-width: 0;
+}
+
+.dashboard-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: sticky;
+  top: 76px;
+}
+
+/* ==========================================================================
+   Side Cards (网关画像与快捷智囊)
+   ========================================================================== */
+.side-card {
+  padding: 20px 22px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.25s var(--ease-spring);
+}
+
+.side-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme="dark"] .side-card:hover {
+  box-shadow: 0 14px 36px -4px rgba(0, 0, 0, 0.55);
+}
+
+.side-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.side-card-title h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.015em;
+}
+
+.side-card-title p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.side-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 12.5px;
+  border-bottom: 1px dashed var(--border-subtle);
+}
+
+.info-row:last-of-type {
+  border-bottom: none;
+}
+
+.info-label {
+  color: var(--text-light);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.info-val {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.badge-tag-safe {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1.5px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.badge-tag-turbo {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1.5px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--primary);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="dark"] .badge-tag-turbo { color: #60a5fa; }
+
+.side-portal-link {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-radius: var(--radius-md);
+  background: var(--stat-bg);
+  border: 1px solid var(--border-color);
+  color: var(--primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s var(--ease-spring);
+}
+
+.side-portal-link:hover {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+}
+
+.side-portal-link svg {
+  width: 13.5px;
+  height: 13.5px;
+}
+
+.tips-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.tips-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.tip-icon-bullet {
+  font-size: 14px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+/* FAQ Summary Badge and Title enhancement */
+.faq-summary-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.faq-summary-badge svg {
+  width: 17px;
+  height: 17px;
+}
+
+.faq-summary-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.faq-main-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.faq-sub-title {
+  font-size: 11.5px;
+  color: var(--text-light);
+  font-weight: 400;
+}
+
+/* ==========================================================================
    FAQ / Accordion Card
    ========================================================================== */
 .faq-card {
@@ -2176,8 +2785,45 @@ details[open] .faq-content {
 }
 
 /* ==========================================================================
-   Mobile & Tablet Responsive Adaptations (移动端与手机屏幕自适应适配)
+   Mobile & Tablet Responsive Adaptations (移动端与屏幕自适应适配)
    ========================================================================== */
+@media (max-width: 1024px) {
+  .dashboard-body {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-sidebar {
+    position: static;
+  }
+
+  .network-topology-strip {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .topo-link {
+    min-width: 50px;
+  }
+}
+
+@media (max-width: 640px) {
+  .network-topology-strip {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .topo-link {
+    flex-direction: row;
+    width: 100%;
+    padding: 2px 0;
+  }
+
+  .topo-line-track {
+    height: 1px;
+  }
+}
+
 @media (max-width: 768px) {
   body {
     padding: 24px 16px 100px;

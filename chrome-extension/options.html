@@ -9,7 +9,7 @@
 <body>
 <div class="page-container">
 
-  <!-- Ambient Background Aura -->
+  <!-- Ambient Background Aura & Tech Dot Pattern -->
   <div class="page-ambient-mesh"></div>
 
   <!-- Header -->
@@ -23,6 +23,7 @@
         <div class="title-row">
           <h1>校园网自动登录 · 控制中心</h1>
           <span class="version-badge" id="ver">v1.0.0</span>
+          <span class="header-status-chip">实时监控</span>
         </div>
         <p class="subtitle">Dr.COM / 哆点 ePortal 智能认证 · 断线自适应秒级重连引擎</p>
       </div>
@@ -70,7 +71,7 @@
     </div>
   </nav>
 
-  <!-- Live Telemetry & Diagnostic Dashboard (Hero Radar) -->
+  <!-- Live Telemetry & Diagnostic Dashboard (Hero Cockpit) -->
   <section class="card status-hero" id="statusWidget">
     <div class="hero-ambient-glow"></div>
 
@@ -106,6 +107,55 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           <span>注销下线</span>
         </button>
+      </div>
+    </div>
+
+    <!-- Live Network Route Topology Pipeline (动态全链路拓扑指示器) -->
+    <div class="network-topology-strip" id="networkTopology">
+      <div class="topo-step topo-client">
+        <div class="topo-badge-icon blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div class="topo-meta">
+          <span class="topo-tag">本机设备</span>
+          <span class="topo-val mono" id="topoClientIp">获取中…</span>
+        </div>
+      </div>
+
+      <div class="topo-link" id="topoLinkPing">
+        <div class="topo-line-track"><div class="topo-line-glow"></div></div>
+        <div class="topo-chip-badge" id="topoPingChip" title="网关响应延迟">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span id="topoPingVal">探测中</span>
+        </div>
+      </div>
+
+      <div class="topo-step topo-gateway">
+        <div class="topo-badge-icon emerald">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        </div>
+        <div class="topo-meta">
+          <span class="topo-tag">校园网关 (ePortal)</span>
+          <span class="topo-val mono">172.30.100.2:80</span>
+        </div>
+      </div>
+
+      <div class="topo-link" id="topoLinkAuth">
+        <div class="topo-line-track"><div class="topo-line-glow"></div></div>
+        <div class="topo-chip-badge" id="topoAuthChip" title="认证状态">
+          <span class="topo-chip-dot"></span>
+          <span id="topoAuthVal">认证状态</span>
+        </div>
+      </div>
+
+      <div class="topo-step topo-internet">
+        <div class="topo-badge-icon purple">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </div>
+        <div class="topo-meta">
+          <span class="topo-tag">广域互联网</span>
+          <span class="topo-val" id="topoInternetVal">检测中</span>
+        </div>
       </div>
     </div>
 
@@ -192,243 +242,369 @@
     <span class="toast-msg" id="toastMsg"></span>
   </div>
 
-  <!-- Settings Form -->
-  <form id="form" autocomplete="off">
+  <!-- Dashboard Body: Modern Dual-Column Layout (主控区 + 辅助智能区) -->
+  <div class="dashboard-body">
 
-    <!-- Card 1: 认证信息 -->
-    <div class="card form-card" id="cardCredentials">
-      <div class="card-header">
-        <div class="card-icon blue">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        </div>
-        <div class="card-title-box">
-          <h2>认证凭据与网络</h2>
-          <p>用于校园网门户登录认证的账号信息，仅安全保存在本机浏览器沙盒中</p>
-        </div>
-      </div>
+    <!-- Primary Form Column (左侧核心配置) -->
+    <div class="dashboard-primary">
+      <form id="form" autocomplete="off">
 
-      <div class="card-body">
-        <div class="grid-2-col">
-          <div class="field">
-            <label for="account">上网账号</label>
-            <div class="input-wrap">
-              <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              <input type="text" id="account" placeholder="手机号 / 学号 / 认证账号" spellcheck="false" required>
-              <button type="button" id="clearAccount" class="field-clear-btn" title="清空账号" aria-label="清空账号">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
+        <!-- Card 1: 认证信息 -->
+        <div class="card form-card" id="cardCredentials">
+          <div class="card-header">
+            <div class="card-icon blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div class="card-title-box">
+              <div class="card-title-row">
+                <h2>认证凭据与网络</h2>
+                <span class="step-badge blue">STEP 01</span>
+              </div>
+              <p>用于校园网门户登录认证的账号信息，仅安全保存在本机浏览器沙盒中</p>
             </div>
           </div>
 
-          <div class="field">
-            <label for="password">认证密码</label>
-            <div class="input-wrap">
-              <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              <input type="password" id="password" placeholder="校园网登录密码" spellcheck="false" required>
-              <button type="button" id="togglePwd" class="pwd-toggle-btn" title="显示/隐藏密码">
-                <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </button>
+          <div class="card-body">
+            <div class="grid-2-col">
+              <div class="field">
+                <label for="account">上网账号</label>
+                <div class="input-wrap">
+                  <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  <input type="text" id="account" placeholder="手机号 / 学号 / 认证账号" spellcheck="false" required>
+                  <button type="button" id="clearAccount" class="field-clear-btn" title="清空账号" aria-label="清空账号">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="password">认证密码</label>
+                <div class="input-wrap">
+                  <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <input type="password" id="password" placeholder="校园网登录密码" spellcheck="false" required>
+                  <button type="button" id="togglePwd" class="pwd-toggle-btn" title="显示/隐藏密码">
+                    <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="field-label-row">
+                <label for="isp">运营商选择 (R3 认证参数)</label>
+                <span class="field-sub-label">选择对应宽带运营商</span>
+              </div>
+              <div class="select-wrap">
+                <select id="isp">
+                  <option value="1">校园用户（默认，无后缀）</option>
+                  <option value="2">校园电信（@dx）</option>
+                  <option value="3">校园联通（@lt）</option>
+                  <option value="4">校园其他（无后缀）</option>
+                </select>
+                <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+
+              <!-- Quick ISP Selector Chips (运营商快速切换微标签) -->
+              <div class="isp-quick-chips" id="ispChips">
+                <button type="button" class="isp-chip active" data-isp="1">
+                  <span class="chip-dot default"></span>
+                  <span>校园用户</span>
+                </button>
+                <button type="button" class="isp-chip" data-isp="2">
+                  <span class="chip-dot dx"></span>
+                  <span>校园电信 (@dx)</span>
+                </button>
+                <button type="button" class="isp-chip" data-isp="3">
+                  <span class="chip-dot lt"></span>
+                  <span>校园联通 (@lt)</span>
+                </button>
+                <button type="button" class="isp-chip" data-isp="4">
+                  <span class="chip-dot other"></span>
+                  <span>校园其他</span>
+                </button>
+              </div>
+
+              <div class="tip-banner">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <span>排错提示：若登录返回「密码错误」，多半是运营商后缀未选对。尝试点击上方电信或联通快捷微标签即可。</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="field">
-          <label for="isp">运营商选择 (R3 认证参数)</label>
-          <div class="select-wrap">
-            <select id="isp">
-              <option value="1">校园用户（默认，无后缀）</option>
-              <option value="2">校园电信（@dx）</option>
-              <option value="3">校园联通（@lt）</option>
-              <option value="4">校园其他（无后缀）</option>
-            </select>
-            <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <!-- Card 2: 智能保活策略 -->
+        <div class="card form-card" id="cardPolicy">
+          <div class="card-header">
+            <div class="card-icon emerald">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <div class="card-title-box">
+              <div class="card-title-row">
+                <h2>智能保活与轮询策略</h2>
+                <span class="step-badge emerald">STEP 02</span>
+              </div>
+              <p>控制后台心跳探测周期与网络掉线后的自适应抢险提速机制</p>
+            </div>
           </div>
-          <div class="tip-banner">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-            <span>排错提示：若登录返回「密码错误」，多半是运营商后缀未选对。尝试切换为电信或联通即可。</span>
+
+          <div class="card-body">
+            <div class="switch-row feature-tile">
+              <div class="switch-icon-box emerald">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </div>
+              <div class="switch-info">
+                <div class="switch-title">
+                  <span>自适应加速 (Adaptive Turbo)</span>
+                  <span class="badge-success">极速秒级恢复</span>
+                </div>
+                <div class="switch-desc">平时以低频节能巡检；一旦检测到网络掉线，秒速切入高频抢险模式，重连成功后自动切回常规频率。</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="adaptive">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="grid-2-col" id="intervalGrid">
+              <div class="field">
+                <label for="intervalMin">正常在线时的检查间隔</label>
+                <div class="select-wrap">
+                  <select id="intervalMin">
+                    <option value="0.016666666666666666">1 秒（最灵敏）</option>
+                    <option value="0.08333333333333333">5 秒</option>
+                    <option value="0.16666666666666666">10 秒（推荐 · 节能自适应）</option>
+                    <option value="0.5">30 秒</option>
+                    <option value="1">1 分钟</option>
+                    <option value="5">5 分钟（省电推荐）</option>
+                    <option value="10">10 分钟</option>
+                    <option value="30">30 分钟</option>
+                  </select>
+                  <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <p class="field-tip">已在线时的心跳频率。Dr.COM 查状态单次开销极小（~300 字节）。</p>
+              </div>
+
+              <div class="field" id="offlineRow">
+                <label for="offlineIntervalMin">掉线抢修时的重试间隔</label>
+                <div class="select-wrap">
+                  <select id="offlineIntervalMin">
+                    <option value="0.016666666666666666">1 秒（最快 · 推荐）</option>
+                    <option value="0.08333333333333333">5 秒</option>
+                    <option value="0.16666666666666666">10 秒</option>
+                    <option value="0.5">30 秒</option>
+                    <option value="1">1 分钟</option>
+                  </select>
+                  <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <p class="field-tip">掉线后多久重试一次。设为 1 秒即可在断网后 1 秒内瞬间恢复连接。</p>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+
+        <!-- Card 3: 自动化触发场景 -->
+        <div class="card form-card" id="cardTriggers">
+          <div class="card-header">
+            <div class="card-icon amber">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+            </div>
+            <div class="card-title-box">
+              <div class="card-title-row">
+                <h2>自动化触发与页面增强</h2>
+                <span class="step-badge amber">STEP 03</span>
+              </div>
+              <p>更聪明的网络事件监听机制，多重保障不断网</p>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <div class="switch-row feature-tile">
+              <div class="switch-icon-box blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </div>
+              <div class="switch-info">
+                <div class="switch-title">
+                  <span>断网跳转瞬间重连 (Instant Trigger)</span>
+                  <span class="badge-primary">0秒响应 · 推荐</span>
+                </div>
+                <div class="switch-desc">监听浏览器页面打不开或被重定向至 172.30.100.2 登录页时，0 秒立即发起重连，无需等待定时器。</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="instantTrigger">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="switch-row feature-tile">
+              <div class="switch-icon-box purple">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              </div>
+              <div class="switch-info">
+                <div class="switch-title">
+                  <span>浏览器启动时自动登录</span>
+                  <span class="badge-neutral">静默自启</span>
+                </div>
+                <div class="switch-desc">每次打开 Chrome 浏览器时，自动检测校园网状态并在未登录时静默认证。</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="autoOnStartup">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="switch-row feature-tile">
+              <div class="switch-icon-box amber">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </div>
+              <div class="switch-info">
+                <div class="switch-title">
+                  <span>校园网门户页面自动填单并提交</span>
+                  <span class="badge-neutral">内容脚本</span>
+                </div>
+                <div class="switch-desc">当手动在标签页打开 172.30.100.2 登录页时，内容脚本自动填入账号密码并模拟点击登录按钮。</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="contentAutoFill">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Actions (表单提交与导入导出) -->
+        <div class="form-actions">
+          <button type="submit" class="btn-main" id="btnSave">
+            <span class="btn-shimmer"></span>
+            <svg class="btn-spinner" id="saveSpinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+            <svg class="btn-icon" id="saveIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            <span id="btnSaveText">保存配置并立即测试</span>
+            <span class="unsaved-dot" id="unsavedDot" title="有尚未保存的更改"></span>
+          </button>
+
+          <div class="aux-actions">
+            <button type="button" class="btn-aux" id="btnExportConfig" title="导出当前所有配置为 JSON 备份文件">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>导出配置</span>
+            </button>
+
+            <button type="button" class="btn-aux" id="btnImportConfig" title="从 JSON 备份文件恢复配置">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span>导入配置</span>
+            </button>
+            <input type="file" id="importFileInput" accept=".json,application/json" style="display:none">
+
+            <button type="button" class="btn-ghost-danger" id="btnResetDefaults" title="将所有设置恢复为出厂默认">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+              <span>恢复默认</span>
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
 
-    <!-- Card 2: 智能保活策略 -->
-    <div class="card form-card" id="cardPolicy">
-      <div class="card-header">
-        <div class="card-icon emerald">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        </div>
-        <div class="card-title-box">
-          <h2>智能保活与轮询策略</h2>
-          <p>控制后台心跳探测周期与网络掉线后的自适应抢险提速机制</p>
-        </div>
-      </div>
+    <!-- Auxiliary Sidebar Column (右侧画像与排障枢纽) -->
+    <aside class="dashboard-sidebar">
 
-      <div class="card-body">
-        <div class="switch-row">
-          <div class="switch-info">
-            <div class="switch-title">
-              <span>自适应加速 (Adaptive Turbo)</span>
-              <span class="badge-success">极速秒级恢复</span>
-            </div>
-            <div class="switch-desc">平时以低频节能巡检；一旦检测到网络掉线，秒速切入高频抢险模式，重连成功后自动切回常规频率。</div>
+      <!-- Gateway & Network Profile (网关与网络画像卡片) -->
+      <div class="card side-card" id="cardGatewayInfo">
+        <div class="side-card-header">
+          <div class="card-icon blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="adaptive">
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <div class="grid-2-col" id="intervalGrid">
-          <div class="field">
-            <label for="intervalMin">正常在线时的检查间隔</label>
-            <div class="select-wrap">
-              <select id="intervalMin">
-                <option value="0.016666666666666666">1 秒（最灵敏）</option>
-                <option value="0.08333333333333333">5 秒</option>
-                <option value="0.16666666666666666">10 秒（推荐 · 节能自适应）</option>
-                <option value="0.5">30 秒</option>
-                <option value="1">1 分钟</option>
-                <option value="5">5 分钟（省电推荐）</option>
-                <option value="10">10 分钟</option>
-                <option value="30">30 分钟</option>
-              </select>
-              <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
-            <p class="field-tip">已在线时的心跳频率。Dr.COM 查状态单次开销极小（~300 字节）。</p>
-          </div>
-
-          <div class="field" id="offlineRow">
-            <label for="offlineIntervalMin">掉线抢修时的重试间隔</label>
-            <div class="select-wrap">
-              <select id="offlineIntervalMin">
-                <option value="0.016666666666666666">1 秒（最快 · 推荐）</option>
-                <option value="0.08333333333333333">5 秒</option>
-                <option value="0.16666666666666666">10 秒</option>
-                <option value="0.5">30 秒</option>
-                <option value="1">1 分钟</option>
-              </select>
-              <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
-            <p class="field-tip">掉线后多久重试一次。设为 1 秒即可在断网后 1 秒内瞬间恢复连接。</p>
+          <div class="side-card-title">
+            <h3>网关与网络画像</h3>
+            <p>Dr.COM ePortal 节点画像</p>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- Card 3: 自动化触发场景 -->
-    <div class="card form-card" id="cardTriggers">
-      <div class="card-header">
-        <div class="card-icon amber">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
-        </div>
-        <div class="card-title-box">
-          <h2>自动化触发与页面增强</h2>
-          <p>更聪明的网络事件监听机制，多重保障不断网</p>
-        </div>
-      </div>
-
-      <div class="card-body">
-        <div class="switch-row">
-          <div class="switch-info">
-            <div class="switch-title">
-              <span>断网跳转瞬间重连 (Instant Trigger)</span>
-              <span class="badge-primary">0秒响应 · 推荐</span>
-            </div>
-            <div class="switch-desc">监听浏览器页面打不开或被重定向至 172.30.100.2 登录页时，0 秒立即发起重连，无需等待定时器。</div>
+        <div class="side-card-body">
+          <div class="info-row">
+            <span class="info-label">网关主机</span>
+            <span class="info-val mono text-accent">172.30.100.2:80</span>
           </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="instantTrigger">
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <div class="switch-row">
-          <div class="switch-info">
-            <div class="switch-title">
-              <span>浏览器启动时自动登录</span>
-            </div>
-            <div class="switch-desc">每次打开 Chrome 浏览器时，自动检测校园网状态并在未登录时静默认证。</div>
+          <div class="info-row">
+            <span class="info-label">认证架构</span>
+            <span class="info-val mono">ePortal Web R3</span>
           </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="autoOnStartup">
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <div class="switch-row">
-          <div class="switch-info">
-            <div class="switch-title">
-              <span>校园网门户页面自动填单并提交</span>
-            </div>
-            <div class="switch-desc">当手动在标签页打开 172.30.100.2 登录页时，内容脚本自动填入账号密码并模拟点击登录按钮。</div>
+          <div class="info-row">
+            <span class="info-label">存储安全</span>
+            <span class="info-val"><span class="badge-tag-safe">本地独立沙盒</span></span>
           </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="contentAutoFill">
-            <span class="slider"></span>
-          </label>
+          <div class="info-row">
+            <span class="info-label">重连机制</span>
+            <span class="info-val"><span class="badge-tag-turbo">0秒感知 · 自适应抢修</span></span>
+          </div>
+          <a href="http://172.30.100.2/" target="_blank" class="side-portal-link" title="访问校园网门户页面">
+            <span>访问校园网原生门户</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
         </div>
       </div>
-    </div>
 
-    <!-- Bottom Actions -->
-    <div class="form-actions">
-      <button type="submit" class="btn-main" id="btnSave">
-        <span class="btn-shimmer"></span>
-        <svg class="btn-spinner" id="saveSpinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
-        <svg class="btn-icon" id="saveIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        <span id="btnSaveText">保存配置并立即测试</span>
-        <span class="unsaved-dot" id="unsavedDot" title="有尚未保存的更改"></span>
-      </button>
+      <!-- Quick Tips (使用技巧与快捷方式) -->
+      <div class="card side-card" id="cardQuickTips">
+        <div class="side-card-header">
+          <div class="card-icon amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <div class="side-card-title">
+            <h3>使用技巧与快捷方式</h3>
+            <p>高频使用小贴士</p>
+          </div>
+        </div>
+        <div class="side-card-body">
+          <ul class="tips-list">
+            <li>
+              <div class="tip-icon-bullet">💡</div>
+              <div class="tip-text"><b>点击 IP / MAC</b>：触感微气泡复制，快速填入选课、报修系统。</div>
+            </li>
+            <li>
+              <div class="tip-icon-bullet">⚡</div>
+              <div class="tip-text"><b>密码错误排查</b>：多数因未选对运营商，点击上方电信(@dx)或联通(@lt)即可。</div>
+            </li>
+            <li>
+              <div class="tip-icon-bullet">📦</div>
+              <div class="tip-text"><b>一键备份迁移</b>：通过下方「导出配置」生成 JSON 备份，新设备 1 秒恢复。</div>
+            </li>
+          </ul>
+        </div>
+      </div>
 
-      <div class="aux-actions">
-        <button type="button" class="btn-aux" id="btnExportConfig" title="导出当前所有配置为 JSON 备份文件">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span>导出配置</span>
-        </button>
+      <!-- FAQ / Help Accordion -->
+      <details class="card faq-card" id="cardFaq">
+        <summary class="faq-summary">
+          <div class="faq-header-content">
+            <div class="faq-summary-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div class="faq-summary-titles">
+              <span class="faq-main-title">排障指南与常见问题</span>
+              <span class="faq-sub-title">4 组常见问题解答</span>
+            </div>
+          </div>
+          <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </summary>
 
-        <button type="button" class="btn-aux" id="btnImportConfig" title="从 JSON 备份文件恢复配置">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span>导入配置</span>
-        </button>
-        <input type="file" id="importFileInput" accept=".json,application/json" style="display:none">
-
-        <button type="button" class="btn-ghost-danger" id="btnResetDefaults" title="将所有设置恢复为出厂默认">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-          <span>恢复默认</span>
-        </button>
-      </div>
-    </div>
-  </form>
-
-  <!-- FAQ / Help Accordion -->
-  <details class="card faq-card" id="cardFaq">
-    <summary class="faq-summary">
-      <div class="faq-header-content">
-        <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <span>使用说明与常见问题排查（点击展开）</span>
-      </div>
-      <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-    </summary>
-
-    <div class="faq-content">
-      <div class="faq-item">
-        <div class="faq-q">❓ 提示「不在校园网内 / 门户不可达」？</div>
-        <div class="faq-a">表示当前电脑未连接到校园网络（Wi-Fi 或网线接口），或者网卡正在获取 IP 地址。请确认电脑已连接校园网 Wi-Fi。</div>
-      </div>
-      <div class="faq-item">
-        <div class="faq-q">❓ 提示「密码错误」？</div>
-        <div class="faq-a">首先核对密码是否正确；其次，如果办理了电信/联通融合宽带，需在上方「运营商选择」切换为对应的运营商后缀。</div>
-      </div>
-      <div class="faq-item">
-        <div class="faq-q">❓ 账号密码安全吗？</div>
-        <div class="faq-a">绝对安全。所有凭据均保存在 Chrome 本地沙盒（<code>chrome.storage.local</code>），代码纯本地运行，不含任何外部上报与第三方请求。</div>
-      </div>
-      <div class="faq-item">
-        <div class="faq-q">❓ 修改代码后如何确认生效？</div>
-        <div class="faq-a">运行项目根目录下的 <code>reload_extension.bat</code>，在扩展管理页点击刷新。顶部右上角版本号显示为 <b>v1.0.0</b> 即代表最新版本生效。</div>
-      </div>
-    </div>
-  </details>
+        <div class="faq-content">
+          <div class="faq-item">
+            <div class="faq-q">❓ 提示「不在校园网内 / 门户不可达」？</div>
+            <div class="faq-a">表示当前电脑未连接到校园网络（Wi-Fi 或网线接口），或者网卡正在获取 IP 地址。请确认电脑已连接校园网 Wi-Fi。</div>
+          </div>
+          <div class="faq-item">
+            <div class="faq-q">❓ 提示「密码错误」？</div>
+            <div class="faq-a">首先核对密码是否正确；其次，如果办理了电信/联通融合宽带，需在上方「运营商选择」切换为对应的运营商后缀。</div>
+          </div>
+          <div class="faq-item">
+            <div class="faq-q">❓ 账号密码安全吗？</div>
+            <div class="faq-a">绝对安全。所有凭据均保存在 Chrome 本地沙盒（<code>chrome.storage.local</code>），代码纯本地运行，不含任何外部上报与第三方请求。</div>
+          </div>
+          <div class="faq-item">
+            <div class="faq-q">❓ 修改代码后如何确认生效？</div>
+            <div class="faq-a">运行项目根目录下的 <code>reload_extension.bat</code>，在扩展管理页点击刷新。顶部右上角版本号显示为 <b>v1.0.0</b> 即代表最新版本生效。</div>
+          </div>
+        </div>
+      </details>
+    </aside>
+  </div>
 
   <!-- Security Footer -->
   <footer class="page-footer">
