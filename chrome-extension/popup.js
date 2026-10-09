@@ -308,18 +308,14 @@ function refresh() {
           const n = parseInt(v, 10);
           return (Number.isFinite(n) && n > 0 && n < MAX_SESSION_SEC) ? n : 0;
         };
-        const validActt = parseSec(rawData.actt);
-        const validOltime = parseSec(rawData.oltime);
+        const validSec = parseSec(rawData.actt) || parseSec(rawData.oltime);
 
-        if (isSameDay) {
-          durationInput = validActt || rawData.stime;
+        if (validSec) {
+          durationInput = validSec;
+          titleText = `活跃在线: ${fmtDuration(validSec)} (网关计费起始: ${rawData.stime || '—'})`;
+        } else if (isSameDay) {
+          durationInput = rawData.stime;
           titleText = '上线时间: ' + rawData.stime;
-        } else if (validActt) {
-          durationInput = validActt;
-          titleText = `活跃在线: ${fmtDuration(validActt)} (网关计费起始: ${rawData.stime})`;
-        } else if (validOltime) {
-          durationInput = validOltime;
-          titleText = `网关会话计费: ${rawData.stime}`;
         } else if (isStimeValid && (now - stimeMs) > 16 * 3600 * 1000) {
           // 典型的 Dr.COM 跨夜未注销会话（如昨晨建立、夜间断网、今晨复活）
           durationInput = Date.now();

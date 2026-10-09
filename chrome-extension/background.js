@@ -138,6 +138,16 @@ function nowText() {
   );
 }
 
+/** 从网关原始响应中提取有效在线秒数 (优先 actt，回退 oltime；过滤 4294967295 哨兵值) */
+function parseGatewayDurationSec(raw) {
+  if (!raw) return 0;
+  for (const k of ['actt', 'oltime']) {
+    const n = parseInt(raw[k], 10);
+    if (Number.isFinite(n) && n > 0 && n < 90 * 86400) return n;
+  }
+  return 0;
+}
+
 /** 从 JSONP 文本中提取 JSON 对象并解析；失败返回 null */
 function parseJsonp(text) {
   if (!text) return null;
@@ -624,24 +634,17 @@ async function updateConnState(st) {
     }
   } else if (st.online) {
     if (!onlineSince) {
-      const rawStime = st.raw && st.raw.stime;
-      const acttSec = parseInt(st.raw && st.raw.actt, 10);
-      const hasValidActt = Number.isFinite(acttSec) && acttSec > 0 && acttSec < 90 * 86400;
-
-      if (rawStime) {
-        const d = new Date(String(rawStime).replace(/-/g, '/'));
+      const gwSec = parseGatewayDurationSec(st.raw);
+      if (gwSec > 0) {
+        onlineSince = Date.now() - gwSec * 1000;
+      } else if (st.raw && st.raw.stime) {
+        const d = new Date(String(st.raw.stime).replace(/-/g, '/'));
         const ms = d.getTime();
-        // 若 stime 是今天的合法时间戳且早于当前时间，复用网关起始时间；
-        // 若跨天（如网关跨夜保留的昨天会话），优先由网关真实活跃秒数 actt 倒推，否则以当前时间为起点
         if (Number.isFinite(ms) && !isNaN(ms) && d.toDateString() === new Date().toDateString() && ms <= Date.now()) {
           onlineSince = ms;
-        } else if (hasValidActt) {
-          onlineSince = Date.now() - acttSec * 1000;
         } else {
           onlineSince = Date.now();
         }
-      } else if (hasValidActt) {
-        onlineSince = Date.now() - acttSec * 1000;
       } else {
         onlineSince = Date.now();
       }
@@ -1001,22 +1004,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .then(async ([st, s]) => {
         let curOnlineSince = onlineSince || s.onlineSince || null;
         if (st.online && !curOnlineSince) {
-          const rawStime = st.raw && st.raw.stime;
-          const acttSec = parseInt(st.raw && st.raw.actt, 10);
-          const hasValidActt = Number.isFinite(acttSec) && acttSec > 0 && acttSec < 90 * 86400;
-
-          if (rawStime) {
-            const d = new Date(String(rawStime).replace(/-/g, '/'));
+          const gwSec = parseGatewayDurationSec(st.raw);
+          if (gwSec > 0) {
+            curOnlineSince = Date.now() - gwSec * 1000;
+          } else if (st.raw && st.raw.stime) {
+            const d = new Date(String(st.raw.stime).replace(/-/g, '/'));
             const ms = d.getTime();
             if (Number.isFinite(ms) && !isNaN(ms) && d.toDateString() === new Date().toDateString() && ms <= Date.now()) {
               curOnlineSince = ms;
-            } else if (hasValidActt) {
-              curOnlineSince = Date.now() - acttSec * 1000;
             } else {
               curOnlineSince = Date.now();
             }
-          } else if (hasValidActt) {
-            curOnlineSince = Date.now() - acttSec * 1000;
           } else {
             curOnlineSince = Date.now();
           }

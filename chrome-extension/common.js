@@ -43,9 +43,10 @@ function fmtMac(hex) {
  */
 function fmtDuration(totalSec) {
   if (!Number.isFinite(totalSec) || totalSec < 0) return '00分 00秒';
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
+  const sec = Math.floor(totalSec);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
   const p = (n) => String(n).padStart(2, '0');
   if (h > 0) {
     return `${h}小时 ${p(m)}分 ${p(s)}秒`;

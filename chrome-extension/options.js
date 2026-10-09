@@ -756,18 +756,14 @@ function refreshStatus(cb) {
           const n = parseInt(v, 10);
           return (Number.isFinite(n) && n > 0 && n < MAX_SESSION_SEC) ? n : 0;
         };
-        const validActt = parseSec(raw.actt);
-        const validOltime = parseSec(raw.oltime);
+        const validSec = parseSec(raw.actt) || parseSec(raw.oltime);
 
-        if (isSameDay) {
-          durationInput = validActt || raw.stime;
+        if (validSec) {
+          durationInput = validSec;
+          stimeDisplay = `活跃在线: ${fmtDuration(validSec)} (网关计费: ${raw.stime || '—'})`;
+        } else if (isSameDay) {
+          durationInput = raw.stime;
           stimeDisplay = '上线时间: ' + raw.stime;
-        } else if (validActt) {
-          durationInput = validActt;
-          stimeDisplay = `活跃在线: ${fmtDuration(validActt)} (网关计费: ${raw.stime})`;
-        } else if (validOltime) {
-          durationInput = validOltime;
-          stimeDisplay = '网关会话计费: ' + raw.stime;
         } else if (isStimeValid && (now - stimeMs) > 16 * 3600 * 1000) {
           durationInput = Date.now();
           stimeDisplay = `本次在线中 (网关计费: ${raw.stime}，跨夜未释放)`;
