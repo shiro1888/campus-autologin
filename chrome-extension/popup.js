@@ -303,14 +303,22 @@ function refresh() {
         const isSameDay = isStimeValid &&
           new Date().toDateString() === stimeDate.toDateString();
 
+        const MAX_SESSION_SEC = 90 * 86400; // 90 天合理上限（过滤 4294967295 / 0xFFFFFFFF 网关未设置哨兵值）
+        const parseSec = (v) => {
+          const n = parseInt(v, 10);
+          return (Number.isFinite(n) && n > 0 && n < MAX_SESSION_SEC) ? n : 0;
+        };
+        const validOltime = parseSec(rawData.oltime);
+        const validTime = parseSec(rawData.time);
+
         if (isSameDay) {
           durationInput = rawData.stime;
           titleText = '上线时间: ' + rawData.stime;
-        } else if (rawData.oltime && parseInt(rawData.oltime, 10) > 0) {
-          durationInput = parseInt(rawData.oltime, 10);
+        } else if (validOltime) {
+          durationInput = validOltime;
           titleText = `网关会话计费: ${rawData.stime}`;
-        } else if (rawData.time && parseInt(rawData.time, 10) > 0) {
-          durationInput = parseInt(rawData.time, 10);
+        } else if (validTime) {
+          durationInput = validTime;
           titleText = `网关会话计费: ${rawData.stime}`;
         } else if (isStimeValid && (now - stimeMs) > 16 * 3600 * 1000) {
           // 典型的 Dr.COM 跨夜未注销会话（如昨晨建立、夜间断网、今晨复活）
@@ -321,10 +329,10 @@ function refresh() {
           durationInput = rawData.stime;
           titleText = '上线时间: ' + rawData.stime;
         }
-      } else if (rawData.oltime) {
+      } else if (rawData.oltime && parseInt(rawData.oltime, 10) > 0 && parseInt(rawData.oltime, 10) < 90 * 86400) {
         durationInput = parseInt(rawData.oltime, 10);
         titleText = '网关在线计时';
-      } else if (rawData.actt) {
+      } else if (rawData.actt && parseInt(rawData.actt, 10) > 0 && parseInt(rawData.actt, 10) < 90 * 86400) {
         durationInput = parseInt(rawData.actt, 10);
         titleText = '网关计费计时';
       }

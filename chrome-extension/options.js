@@ -751,14 +751,22 @@ function refreshStatus(cb) {
         const isStimeValid = Number.isFinite(stimeMs) && !isNaN(stimeMs);
         const isSameDay = isStimeValid && new Date().toDateString() === stimeDate.toDateString();
 
+        const MAX_SESSION_SEC = 90 * 86400; // 90 天合理上限（过滤 4294967295 / 0xFFFFFFFF 哨兵值）
+        const parseSec = (v) => {
+          const n = parseInt(v, 10);
+          return (Number.isFinite(n) && n > 0 && n < MAX_SESSION_SEC) ? n : 0;
+        };
+        const validOltime = parseSec(raw.oltime);
+        const validTime = parseSec(raw.time);
+
         if (isSameDay) {
           durationInput = raw.stime;
           stimeDisplay = '上线时间: ' + raw.stime;
-        } else if (raw.oltime && parseInt(raw.oltime, 10) > 0) {
-          durationInput = parseInt(raw.oltime, 10);
+        } else if (validOltime) {
+          durationInput = validOltime;
           stimeDisplay = '网关会话计费: ' + raw.stime;
-        } else if (raw.time && parseInt(raw.time, 10) > 0) {
-          durationInput = parseInt(raw.time, 10);
+        } else if (validTime) {
+          durationInput = validTime;
           stimeDisplay = '网关会话计费: ' + raw.stime;
         } else if (isStimeValid && (now - stimeMs) > 16 * 3600 * 1000) {
           durationInput = Date.now();
@@ -767,10 +775,10 @@ function refreshStatus(cb) {
           durationInput = raw.stime;
           stimeDisplay = '上线时间: ' + raw.stime;
         }
-      } else if (raw.oltime) {
+      } else if (raw.oltime && parseInt(raw.oltime, 10) > 0 && parseInt(raw.oltime, 10) < 90 * 86400) {
         durationInput = parseInt(raw.oltime, 10);
         stimeDisplay = '网关在线计时';
-      } else if (raw.actt) {
+      } else if (raw.actt && parseInt(raw.actt, 10) > 0 && parseInt(raw.actt, 10) < 90 * 86400) {
         durationInput = parseInt(raw.actt, 10);
         stimeDisplay = '网关计费计时';
       }

@@ -586,15 +586,20 @@ def cmd_status(args, cfg) -> int:
 
     # 计算在线会话时长
     dur_text = ""
+    MAX_VALID_SESSION_SEC = 90 * 86400  # 90 天合理上限（过滤 4294967295 / 0xFFFFFFFF 网关未设置哨兵值）
+    oltime_val = -1
     if st.get("oltime") and str(st["oltime"]).isdigit():
         try:
-            sec = max(0, int(st["oltime"]))
-            h = sec // 3600
-            m = (sec % 3600) // 60
-            s = sec % 60
-            dur_text = ("%d小时 %02d分 %02d秒" % (h, m, s)) if h > 0 else ("%02d分 %02d秒" % (m, s))
+            oltime_val = int(st["oltime"])
         except (ValueError, TypeError):
-            pass
+            oltime_val = -1
+
+    if 0 < oltime_val < MAX_VALID_SESSION_SEC:
+        sec = oltime_val
+        h = sec // 3600
+        m = (sec % 3600) // 60
+        s = sec % 60
+        dur_text = ("%d小时 %02d分 %02d秒" % (h, m, s)) if h > 0 else ("%02d分 %02d秒" % (m, s))
     elif st.get("stime"):
         try:
             t_struct = time.strptime(str(st["stime"]), "%Y-%m-%d %H:%M:%S")
@@ -608,10 +613,11 @@ def cmd_status(args, cfg) -> int:
     elif st.get("actt"):
         try:
             sec = int(st["actt"])
-            h = sec // 3600
-            m = (sec % 3600) // 60
-            s = sec % 60
-            dur_text = ("%d小时 %02d分 %02d秒" % (h, m, s)) if h > 0 else ("%02d分 %02d秒" % (m, s))
+            if 0 < sec < MAX_VALID_SESSION_SEC:
+                h = sec // 3600
+                m = (sec % 3600) // 60
+                s = sec % 60
+                dur_text = ("%d小时 %02d分 %02d秒" % (h, m, s)) if h > 0 else ("%02d分 %02d秒" % (m, s))
         except (ValueError, TypeError):
             pass
 

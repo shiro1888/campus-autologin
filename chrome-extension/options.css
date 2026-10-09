@@ -269,7 +269,7 @@ body {
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   background: rgba(37, 99, 235, 0.1);
-  color: var(--primary);
+  color: #1d4ed8;
   border: 1px solid rgba(37, 99, 235, 0.25);
 }
 
@@ -1390,21 +1390,21 @@ body {
 
 .step-badge.blue {
   background: rgba(37, 99, 235, 0.1);
-  color: #2563eb;
+  color: #1d4ed8;
   border: 1px solid rgba(37, 99, 235, 0.25);
 }
 [data-theme="dark"] .step-badge.blue { color: #60a5fa; }
 
 .step-badge.emerald {
   background: rgba(16, 185, 129, 0.1);
-  color: #059669;
+  color: #065f46;
   border: 1px solid rgba(16, 185, 129, 0.25);
 }
 [data-theme="dark"] .step-badge.emerald { color: #34d399; }
 
 .step-badge.amber {
   background: rgba(245, 158, 11, 0.1);
-  color: #d97706;
+  color: #92400e;
   border: 1px solid rgba(245, 158, 11, 0.25);
 }
 [data-theme="dark"] .step-badge.amber { color: #fbbf24; }
@@ -2531,9 +2531,10 @@ select:focus {
   padding: 1.5px 8px;
   border-radius: var(--radius-pill);
   background: rgba(16, 185, 129, 0.12);
-  color: var(--success);
+  color: #065f46;
   border: 1px solid rgba(16, 185, 129, 0.25);
 }
+[data-theme="dark"] .badge-tag-safe { color: #34d399; }
 
 .badge-tag-turbo {
   font-size: 11px;
@@ -2541,7 +2542,7 @@ select:focus {
   padding: 1.5px 8px;
   border-radius: var(--radius-pill);
   background: rgba(37, 99, 235, 0.12);
-  color: var(--primary);
+  color: #1d4ed8;
   border: 1px solid rgba(37, 99, 235, 0.25);
 }
 
