@@ -166,9 +166,36 @@ function syncIspChips(val) {
 }
 
 /** 主题切换管理 */
+let currentThemePref = 'auto';
+
+function applyTheme(theme) {
+  currentThemePref = theme || 'auto';
+  const sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const effectiveTheme = currentThemePref === 'auto' ? (sysDark ? 'dark' : 'light') : currentThemePref;
+  document.documentElement.setAttribute('data-theme', effectiveTheme);
+  const label = $('themeLabel');
+  if (label) {
+    label.textContent = currentThemePref === 'dark' ? '深色' : (currentThemePref === 'light' ? '浅色' : '自动');
+  }
+}
+
 function initTheme() {
   chrome.storage.local.get({ theme: 'auto' }, (s) => {
     applyTheme(s.theme || 'auto');
+  });
+
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (currentThemePref === 'auto') {
+        applyTheme('auto');
+      }
+    });
+  }
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.theme) {
+      applyTheme(changes.theme.newValue);
+    }
   });
 
   const btn = $('btnThemeToggle');
@@ -184,14 +211,6 @@ function initTheme() {
         });
       });
     });
-  }
-}
-
-function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  const label = $('themeLabel');
-  if (label) {
-    label.textContent = theme === 'dark' ? '深色' : (theme === 'light' ? '浅色' : '自动');
   }
 }
 
