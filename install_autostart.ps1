@@ -119,11 +119,11 @@ Write-Step "创建计划任务..."
 
 $action = New-ScheduledTaskAction -Execute "`"$target`"" -WorkingDirectory $here
 
-# 双触发器：开机启动（延迟 20 秒） + 用户登录（延迟 10 秒），兼顾台式机与笔记本合盖休眠唤醒
+# 双触发器：开机启动（延迟 2 秒） + 用户登录（即时触发），兼顾开机无需登录桌面即连网与合盖休眠唤醒
+# campus_login.py wait 自身内置自适应轮询，无需设置冗余的长延时死等
 $triggerStartup = New-ScheduledTaskTrigger -AtStartup
-$triggerStartup.Delay = "PT20S"
+$triggerStartup.Delay = "PT2S"
 $triggerLogon = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERNAME"
-$triggerLogon.Delay = "PT10S"
 $trigger = @($triggerStartup, $triggerLogon)
 
 $settings = New-ScheduledTaskSettingsSet `
@@ -135,10 +135,10 @@ $settings = New-ScheduledTaskSettingsSet `
     -RestartCount 3 `
     -RestartInterval (New-TimeSpan -Minutes 1)
 
-# 以当前用户身份、最高权限运行(交互式登录，保证用户桌面、Path 环境变量与 Wi-Fi 完全就绪)
+# 以当前用户身份、最高权限运行(S4U 允许开机无需登录 Windows 桌面即可在后台自动连网，免输 Windows 密码)
 $principal = New-ScheduledTaskPrincipal `
     -UserId "$env:USERDOMAIN\$env:USERNAME" `
-    -LogonType Interactive `
+    -LogonType S4U `
     -RunLevel Highest
 
 $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
@@ -160,7 +160,7 @@ Write-Ok "计划任务已创建: $TaskName"
 Write-Host ""
 Write-Host "===== 安装完成 =====" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  以后每次开机 20 秒后会自动检查并登录。" -ForegroundColor White
+Write-Host "  以后每次开机 2 秒后或用户登录后均会立即自动检查并登录。" -ForegroundColor White
 Write-Host ""
 Write-Host "  常用命令:"
 Write-Host "    立即测试:  schtasks /Run /TN $TaskName"

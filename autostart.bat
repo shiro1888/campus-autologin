@@ -16,6 +16,14 @@ if defined PYEXE goto :run
 where python >nul 2>nul
 if not errorlevel 1 set "PYEXE=python"
 if defined PYEXE goto :run
+for /d %%D in ("%LOCALAPPDATA%\Programs\Python\Python3*") do if exist "%%D\python.exe" (
+    set "PYEXE=%%D\python.exe"
+    goto :run
+)
+for /d %%D in ("%ProgramFiles%\Python3*") do if exist "%%D\python.exe" (
+    set "PYEXE=%%D\python.exe"
+    goto :run
+)
 
 echo [%date% %time%] [ERROR] Python environment not found (neither py nor python in PATH) >> "%LOGFILE%"
 exit /b 2
