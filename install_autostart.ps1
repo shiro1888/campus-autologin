@@ -135,10 +135,10 @@ $settings = New-ScheduledTaskSettingsSet `
     -RestartCount 3 `
     -RestartInterval (New-TimeSpan -Minutes 1)
 
-# 以当前用户身份、最高权限运行(需要管理员授权创建)
+# 以当前用户身份、最高权限运行(交互式登录，保证用户桌面、Path 环境变量与 Wi-Fi 完全就绪)
 $principal = New-ScheduledTaskPrincipal `
     -UserId "$env:USERDOMAIN\$env:USERNAME" `
-    -LogonType S4U `
+    -LogonType Interactive `
     -RunLevel Highest
 
 $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
