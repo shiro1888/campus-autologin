@@ -625,16 +625,23 @@ async function updateConnState(st) {
   } else if (st.online) {
     if (!onlineSince) {
       const rawStime = st.raw && st.raw.stime;
+      const acttSec = parseInt(st.raw && st.raw.actt, 10);
+      const hasValidActt = Number.isFinite(acttSec) && acttSec > 0 && acttSec < 90 * 86400;
+
       if (rawStime) {
         const d = new Date(String(rawStime).replace(/-/g, '/'));
         const ms = d.getTime();
         // 若 stime 是今天的合法时间戳且早于当前时间，复用网关起始时间；
-        // 若跨天（如网关跨夜保留的昨天会话），以当前连通时间为起点
+        // 若跨天（如网关跨夜保留的昨天会话），优先由网关真实活跃秒数 actt 倒推，否则以当前时间为起点
         if (Number.isFinite(ms) && !isNaN(ms) && d.toDateString() === new Date().toDateString() && ms <= Date.now()) {
           onlineSince = ms;
+        } else if (hasValidActt) {
+          onlineSince = Date.now() - acttSec * 1000;
         } else {
           onlineSince = Date.now();
         }
+      } else if (hasValidActt) {
+        onlineSince = Date.now() - acttSec * 1000;
       } else {
         onlineSince = Date.now();
       }
@@ -995,14 +1002,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         let curOnlineSince = onlineSince || s.onlineSince || null;
         if (st.online && !curOnlineSince) {
           const rawStime = st.raw && st.raw.stime;
+          const acttSec = parseInt(st.raw && st.raw.actt, 10);
+          const hasValidActt = Number.isFinite(acttSec) && acttSec > 0 && acttSec < 90 * 86400;
+
           if (rawStime) {
             const d = new Date(String(rawStime).replace(/-/g, '/'));
             const ms = d.getTime();
             if (Number.isFinite(ms) && !isNaN(ms) && d.toDateString() === new Date().toDateString() && ms <= Date.now()) {
               curOnlineSince = ms;
+            } else if (hasValidActt) {
+              curOnlineSince = Date.now() - acttSec * 1000;
             } else {
               curOnlineSince = Date.now();
             }
+          } else if (hasValidActt) {
+            curOnlineSince = Date.now() - acttSec * 1000;
           } else {
             curOnlineSince = Date.now();
           }

@@ -4,6 +4,12 @@ title Campus Network Auto Login - Control Center
 cd /d "%~dp0"
 
 set "PYEXE="
+where pythonw >nul 2>nul
+if not errorlevel 1 set "PYEXE=pythonw"
+if defined PYEXE goto :run
+where pyw >nul 2>nul
+if not errorlevel 1 set "PYEXE=pyw"
+if defined PYEXE goto :run
 where py >nul 2>nul
 if not errorlevel 1 set "PYEXE=py"
 if defined PYEXE goto :run

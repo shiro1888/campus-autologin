@@ -484,7 +484,7 @@
                     if (r.ok) {
                       showHud('校园网认证成功！已在线', 'success');
                     } else {
-                      const displayMsg = !r.msg ? '登录失败：请检查密码' : (
+                      const displayMsg = !r.msg ? '登录失败：认证被拒绝' : (
                         r.msg.indexOf('登录失败') === 0 || r.msg.indexOf('当前时段') === 0 || r.msg.indexOf('认证失败') === 0
                           ? r.msg
                           : ('登录失败：' + r.msg)
@@ -494,7 +494,7 @@
                     report({
                       ok: r.ok,
                       online: r.ok,
-                      message: r.ok ? '登录成功（兜底请求）' : ('登录失败：' + (r.msg || '账号或密码可能不正确'))
+                      message: r.ok ? '登录成功（兜底请求）' : ('登录失败：' + (r.msg || '认证被拒绝'))
                     });
                     resolveFlow();
                   }).catch(function () {

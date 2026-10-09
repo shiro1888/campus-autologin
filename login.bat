@@ -17,4 +17,9 @@ exit /b 2
 
 :run
 "%PYEXE%" "%~dp0campus_login.py" %*
-exit /b %ERRORLEVEL%
+set "EXIT_CODE=%ERRORLEVEL%"
+if "%~1"=="" (
+    echo.
+    pause
+)
+exit /b %EXIT_CODE%

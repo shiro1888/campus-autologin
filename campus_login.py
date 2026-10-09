@@ -560,6 +560,45 @@ def _format_flow(kb) -> str:
         return "—"
 
 
+def _calculate_duration(st: dict) -> str:
+    """计算在线会话时长。
+    优先采用网关返回的有效秒数 actt (实际活跃时长) 或 oltime (过滤 4294967295 / 0xFFFFFFFF 哨兵值)。
+    若网关未返回有效秒数，再由上线时间 stime 计算。
+    """
+    MAX_VALID_SESSION_SEC = 90 * 86400  # 90 天合理上限
+    sec = -1
+
+    # 1. 优先采用网关实时秒数 actt / oltime
+    for key in ("actt", "oltime"):
+        val = st.get(key)
+        if val is not None and str(val).isdigit():
+            try:
+                n = int(val)
+                if 0 < n < MAX_VALID_SESSION_SEC:
+                    sec = n
+                    break
+            except (ValueError, TypeError):
+                pass
+
+    # 2. 回退到网关上线时间 stime
+    if sec < 0 and st.get("stime"):
+        try:
+            t_struct = time.strptime(str(st["stime"]), "%Y-%m-%d %H:%M:%S")
+            diff = max(0, int(time.time() - time.mktime(t_struct)))
+            if 0 <= diff < MAX_VALID_SESSION_SEC:
+                sec = diff
+        except (ValueError, TypeError, OverflowError):
+            pass
+
+    if sec < 0:
+        return ""
+
+    h = sec // 3600
+    m = (sec % 3600) // 60
+    s = sec % 60
+    return ("%d小时 %02d分 %02d秒" % (h, m, s)) if h > 0 else ("%02d分 %02d秒" % (m, s))
+
+
 def _card_line(text: str, width: int = 51) -> str:
     """计算 CJK 全角与半角字符在控制台中的视觉显示宽度，保证卡片右边框 100% 垂直对齐。"""
     dw = sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in text)
@@ -585,41 +624,7 @@ def cmd_status(args, cfg) -> int:
         fee_text = "—"
 
     # 计算在线会话时长
-    dur_text = ""
-    MAX_VALID_SESSION_SEC = 90 * 86400  # 90 天合理上限（过滤 4294967295 / 0xFFFFFFFF 网关未设置哨兵值）
-    oltime_val = -1
-    if st.get("oltime") and str(st["oltime"]).isdigit():
-        try:
-            oltime_val = int(st["oltime"])
-        except (ValueError, TypeError):
-            oltime_val = -1
-
-    if 0 < oltime_val < MAX_VALID_SESSION_SEC:
-        sec = oltime_val
-        h = sec // 3600
-        m = (sec % 3600) // 60
-        s = sec % 60
-        dur_text = ("%d小时 %02d分 %02d秒" % (h, m, s)) if h > 0 else ("%02d分 %02d秒" % (m, s))
-    elif st.get("stime"):
-        try:
-            t_struct = time.strptime(str(st["stime"]), "%Y-%m-%d %H:%M:%S")
-            sec = max(0, int(time.time() - time.mktime(t_struct)))
-            h = sec // 3600
-            m = (sec % 3600) // 60
-            s = sec % 60
-            dur_text = ("%d小时 %02d分 %02d秒" % (h, m, s)) if h > 0 else ("%02d分 %02d秒" % (m, s))
-        except (ValueError, TypeError, OverflowError):
-            pass
-    elif st.get("actt"):
-        try:
-            sec = int(st["actt"])
-            if 0 < sec < MAX_VALID_SESSION_SEC:
-                h = sec // 3600
-                m = (sec % 3600) // 60
-                s = sec % 60
-                dur_text = ("%d小时 %02d分 %02d秒" % (h, m, s)) if h > 0 else ("%02d分 %02d秒" % (m, s))
-        except (ValueError, TypeError):
-            pass
+    dur_text = _calculate_duration(st)
 
     # 包含下行与上行分项的流量字符串
     flow_detail = flow_text
@@ -730,8 +735,8 @@ def cmd_login(args, cfg) -> int:
             # 账号/密码类错误重试没有意义。
             # 「客户端版本过低」是客户端/固件问题，重试同样无用 —— 它与其它
             # ERROR_HINTS 译名不同，不含上面任何关键词，漏掉会让它按 retry 反复打门户。
-            # 「禁止使用」/「时段」代表夜间断网宵禁，重试无用。
-            if any(k in resp["message"] for k in ("账号", "密码", "锁定", "停机", "已经在线", "客户端版本过低", "禁止使用", "时段", "禁止上网")):
+            low_msg = resp["message"].lower()
+            if any(k in resp["message"] or k in low_msg for k in ("账号", "密码", "锁定", "停机", "已经在线", "客户端版本过低", "禁止使用", "时段", "禁止上网", "password error", "userid error", "out of service")):
                 break
         if attempt < retry:
             time.sleep(delay)
@@ -1210,8 +1215,9 @@ def cmd_gui(args, cfg) -> int:
                         st_lbl.config(text="○ 未在线 (需要认证)", fg=danger_color)
                         st_card.config(highlightbackground="#ef4444")
                     ip_lbl.config(text="本机 IP: %s" % (ip or "—"))
-                    dur_text = ("  |  上线: %s" % time_str) if time_str else ""
-                    meta_lbl.config(text="流量: %s  |  延迟: %d ms%s" % (flow, ping_ms, dur_text))
+                    dur_text = _calculate_duration(st)
+                    dur_display = ("时长: %s" % dur_text) if dur_text else ("上线: %s" % time_str if time_str else "时长: —")
+                    meta_lbl.config(text="流量: %s  |  %s  |  延迟: %d ms" % (flow, dur_display, ping_ms))
                 safe_ui(_ui)
             except Exception as e:
                 # 同样必须在 except 块内先取出消息：Python 会在块结束时删除 e，
@@ -1327,8 +1333,8 @@ def cmd_gui(args, cfg) -> int:
         saved_cfg["username"] = user_ent.get().strip()
         saved_cfg["password"] = pass_ent.get().strip()
         saved_cfg["isp"] = isp_var.get()
-        for k in ["portal_host", "portal_port", "wait_seconds", "timeout"]:
-            if k in cfg and k not in saved_cfg:
+        for k in DEFAULT_CONFIG:
+            if k not in saved_cfg and k in cfg:
                 saved_cfg[k] = cfg[k]
         try:
             with open(CONFIG_PATH, "w", encoding="utf-8") as fh:

@@ -308,33 +308,32 @@ function refresh() {
           const n = parseInt(v, 10);
           return (Number.isFinite(n) && n > 0 && n < MAX_SESSION_SEC) ? n : 0;
         };
+        const validActt = parseSec(rawData.actt);
         const validOltime = parseSec(rawData.oltime);
-        const validTime = parseSec(rawData.time);
 
         if (isSameDay) {
-          durationInput = rawData.stime;
+          durationInput = validActt || rawData.stime;
           titleText = '上线时间: ' + rawData.stime;
+        } else if (validActt) {
+          durationInput = validActt;
+          titleText = `活跃在线: ${fmtDuration(validActt)} (网关计费起始: ${rawData.stime})`;
         } else if (validOltime) {
           durationInput = validOltime;
           titleText = `网关会话计费: ${rawData.stime}`;
-        } else if (validTime) {
-          durationInput = validTime;
-          titleText = `网关会话计费: ${rawData.stime}`;
         } else if (isStimeValid && (now - stimeMs) > 16 * 3600 * 1000) {
           // 典型的 Dr.COM 跨夜未注销会话（如昨晨建立、夜间断网、今晨复活）
-          // 网关计费起始是昨天，但设备今日刚重连，以当前时间为计时起点
           durationInput = Date.now();
           titleText = `本次在线中 (网关计费起始: ${rawData.stime}，跨夜未释放)`;
         } else if (isStimeValid) {
           durationInput = rawData.stime;
           titleText = '上线时间: ' + rawData.stime;
         }
+      } else if (rawData.actt && parseInt(rawData.actt, 10) > 0 && parseInt(rawData.actt, 10) < 90 * 86400) {
+        durationInput = parseInt(rawData.actt, 10);
+        titleText = '网关活跃在线计时';
       } else if (rawData.oltime && parseInt(rawData.oltime, 10) > 0 && parseInt(rawData.oltime, 10) < 90 * 86400) {
         durationInput = parseInt(rawData.oltime, 10);
         titleText = '网关在线计时';
-      } else if (rawData.actt && parseInt(rawData.actt, 10) > 0 && parseInt(rawData.actt, 10) < 90 * 86400) {
-        durationInput = parseInt(rawData.actt, 10);
-        titleText = '网关计费计时';
       }
 
       if (durationInput != null) {

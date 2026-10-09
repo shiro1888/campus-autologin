@@ -756,17 +756,17 @@ function refreshStatus(cb) {
           const n = parseInt(v, 10);
           return (Number.isFinite(n) && n > 0 && n < MAX_SESSION_SEC) ? n : 0;
         };
+        const validActt = parseSec(raw.actt);
         const validOltime = parseSec(raw.oltime);
-        const validTime = parseSec(raw.time);
 
         if (isSameDay) {
-          durationInput = raw.stime;
+          durationInput = validActt || raw.stime;
           stimeDisplay = '上线时间: ' + raw.stime;
+        } else if (validActt) {
+          durationInput = validActt;
+          stimeDisplay = `活跃在线: ${fmtDuration(validActt)} (网关计费: ${raw.stime})`;
         } else if (validOltime) {
           durationInput = validOltime;
-          stimeDisplay = '网关会话计费: ' + raw.stime;
-        } else if (validTime) {
-          durationInput = validTime;
           stimeDisplay = '网关会话计费: ' + raw.stime;
         } else if (isStimeValid && (now - stimeMs) > 16 * 3600 * 1000) {
           durationInput = Date.now();
@@ -775,12 +775,12 @@ function refreshStatus(cb) {
           durationInput = raw.stime;
           stimeDisplay = '上线时间: ' + raw.stime;
         }
+      } else if (raw.actt && parseInt(raw.actt, 10) > 0 && parseInt(raw.actt, 10) < 90 * 86400) {
+        durationInput = parseInt(raw.actt, 10);
+        stimeDisplay = '网关活跃在线计时';
       } else if (raw.oltime && parseInt(raw.oltime, 10) > 0 && parseInt(raw.oltime, 10) < 90 * 86400) {
         durationInput = parseInt(raw.oltime, 10);
         stimeDisplay = '网关在线计时';
-      } else if (raw.actt && parseInt(raw.actt, 10) > 0 && parseInt(raw.actt, 10) < 90 * 86400) {
-        durationInput = parseInt(raw.actt, 10);
-        stimeDisplay = '网关计费计时';
       }
 
       if (durationInput != null) {

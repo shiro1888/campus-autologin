@@ -17,12 +17,12 @@ where python >nul 2>nul
 if not errorlevel 1 set "PYEXE=python"
 if defined PYEXE goto :run
 
-echo [%date% %time%] [ERROR] Python environment not found (neither py nor python in PATH) >> "%~dp0logs\autologin.log"
+echo [%date% %time%] [ERROR] Python environment not found (neither py nor python in PATH) >> "%LOGFILE%"
 exit /b 2
 
 :run
-echo. >> "%~dp0logs\autologin.log"
-echo [%date% %time%] ---- START ---- >> "%~dp0logs\autologin.log"
-"%PYEXE%" "%~dp0campus_login.py" wait -q >> "%~dp0logs\autologin.log" 2>&1
-echo [%date% %time%] EXIT: %ERRORLEVEL% >> "%~dp0logs\autologin.log"
+echo. >> "%LOGFILE%"
+echo [%date% %time%] ---- START ---- >> "%LOGFILE%"
+"%PYEXE%" "%~dp0campus_login.py" wait -q >> "%LOGFILE%" 2>&1
+echo [%date% %time%] EXIT: %ERRORLEVEL% >> "%LOGFILE%"
 exit /b %ERRORLEVEL%
