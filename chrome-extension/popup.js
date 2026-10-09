@@ -275,14 +275,66 @@ function refresh() {
       const ip = rawData.v4ip || rawData.ss5 || '';
       setLocalIp(ip);
 
-      if (rawData.stime) {
-        durationTicker.start(rawData.stime);
-        $('onlineDuration').title = '上线时间: ' + rawData.stime;
+      // 智能计算在线时长：
+      // 1. 若后台记录了本次实际连通/登录时间 (res.onlineSince)，以本地连通时间为准，
+      //    避免校园网网关跨夜未释放 RADIUS 会话导致显示荒谬的「23小时+」。
+      // 2. 若无本地记录，但网关返回了 stime：
+      //    - 若 stime 为今天的时间，正常计时；
+      //    - 若 stime 跨天 (昨天或更早)，注明「网关长会话（跨夜保留）」，
+      //      并优先使用网关 oltime/time（若有较小值）。
+      let durationInput = null;
+      let titleText = '';
+
+      const now = Date.now();
+      const localSince = res.onlineSince ? Number(res.onlineSince) : null;
+
+      if (localSince && Number.isFinite(localSince) && localSince <= now) {
+        durationInput = localSince;
+        titleText = '本次在线始于: ' + new Date(localSince).toLocaleTimeString();
+        if (rawData.stime) {
+          titleText += ` (网关计费起始: ${rawData.stime})`;
+        }
+      } else if (rawData.stime) {
+        const stimeDate = new Date(String(rawData.stime).replace(/-/g, '/'));
+        const stimeMs = stimeDate.getTime();
+        const isStimeValid = Number.isFinite(stimeMs) && !isNaN(stimeMs);
+
+        // 检查 stime 是否为跨天旧会话（如昨天的会话）
+        const isSameDay = isStimeValid &&
+          new Date().toDateString() === stimeDate.toDateString();
+
+        if (isSameDay) {
+          durationInput = rawData.stime;
+          titleText = '上线时间: ' + rawData.stime;
+        } else if (rawData.oltime && parseInt(rawData.oltime, 10) > 0) {
+          durationInput = parseInt(rawData.oltime, 10);
+          titleText = `网关会话计费: ${rawData.stime}`;
+        } else if (rawData.time && parseInt(rawData.time, 10) > 0) {
+          durationInput = parseInt(rawData.time, 10);
+          titleText = `网关会话计费: ${rawData.stime}`;
+        } else if (isStimeValid && (now - stimeMs) > 16 * 3600 * 1000) {
+          // 典型的 Dr.COM 跨夜未注销会话（如昨晨建立、夜间断网、今晨复活）
+          durationInput = rawData.stime;
+          titleText = `网关保留长会话 (始于 ${rawData.stime}，跨夜未释放)`;
+        } else if (isStimeValid) {
+          durationInput = rawData.stime;
+          titleText = '上线时间: ' + rawData.stime;
+        }
+      } else if (rawData.oltime) {
+        durationInput = parseInt(rawData.oltime, 10);
+        titleText = '网关在线计时';
       } else if (rawData.actt) {
-        durationTicker.start(parseInt(rawData.actt, 10));
+        durationInput = parseInt(rawData.actt, 10);
+        titleText = '网关计费计时';
+      }
+
+      if (durationInput != null) {
+        durationTicker.start(durationInput);
+        $('onlineDuration').title = titleText;
       } else {
         durationTicker.stop();
         $('onlineDuration').textContent = '在线中';
+        $('onlineDuration').title = '已在线';
       }
     } else {
       durationTicker.stop();

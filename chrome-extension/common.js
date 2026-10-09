@@ -73,8 +73,13 @@ function createTicker(onTick) {
       }
 
       if (typeof timeInput === 'number') {
-        // 如果传入的是已过去的秒数，倒推起始毫秒
-        startMs = Date.now() - timeInput * 1000;
+        // 若传入的是时间戳毫秒 (>= 1e11，如 Date.now() / 1791504448000)，直接作为 startMs；
+        // 若是已过去的秒数 (如 120 或 3600)，倒推起始毫秒
+        if (timeInput > 1e11) {
+          startMs = timeInput;
+        } else {
+          startMs = Date.now() - timeInput * 1000;
+        }
       } else {
         // 传入的是时间戳字符串，形如 "2026-09-30 10:08:56"
         const d = new Date(String(timeInput).replace(/-/g, '/'));

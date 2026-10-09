@@ -512,6 +512,9 @@ def _explain_error(msg: str) -> str:
     if not msg:
         return ""
     low = msg.lower()
+    # 宵禁 / 乱码模式匹配（兼容 GBK 误按 UTF-8 解码的 \u02b1(ʱ) 与 \u03bd(ν)）
+    if re.search(r"[\u02b1].{0,3}[\u03bd]|ʱ.{0,3}ν|本时段|禁止使用|禁止上网", msg):
+        return "%s (%s)" % ("当前时段禁止使用校园网（夜间断网/宵禁时段）", msg)
     for key, hint in ERROR_HINTS.items():
         if key.lower() in low:
             return "%s (%s)" % (hint, msg)
@@ -583,7 +586,16 @@ def cmd_status(args, cfg) -> int:
 
     # 计算在线会话时长
     dur_text = ""
-    if st.get("stime"):
+    if st.get("oltime") and str(st["oltime"]).isdigit():
+        try:
+            sec = max(0, int(st["oltime"]))
+            h = sec // 3600
+            m = (sec % 3600) // 60
+            s = sec % 60
+            dur_text = ("%d小时 %02d分 %02d秒" % (h, m, s)) if h > 0 else ("%02d分 %02d秒" % (m, s))
+        except (ValueError, TypeError):
+            pass
+    elif st.get("stime"):
         try:
             t_struct = time.strptime(str(st["stime"]), "%Y-%m-%d %H:%M:%S")
             sec = max(0, int(time.time() - time.mktime(t_struct)))

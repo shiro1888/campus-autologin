@@ -107,6 +107,8 @@ let running = false;
 // 连接状态机与退避计数（详见 updateConnState 注释）
 let connState = 'unknown';
 let unreachableStreak = 0;
+// 本地记录的本次会话连通起始毫秒时间戳（自愈与准确统计当前在线时长）
+let onlineSince = null;
 
 // 已落盘的 streak 值，用于避免重复写入 storage
 let lastPersistedStreak = -1;
@@ -187,7 +189,11 @@ async function fetchText(url) {
     const ct = String(resp.headers && resp.headers.get ? (resp.headers.get('content-type') || '') : '');
     const m = /charset\s*=\s*"?([\w-]+)"?/i.exec(ct);
     const charset = m ? m[1].toLowerCase() : '';
-    const candidates = charset ? [charset, 'utf-8', 'gbk', 'gb18030'] : ['utf-8', 'gbk', 'gb18030'];
+    const candidates = [];
+    if (charset && charset !== 'utf-8' && charset !== 'utf8') {
+      candidates.push(charset);
+    }
+    candidates.push('gbk', 'gb18030', 'utf-8');
     const bytes = new Uint8Array(buf);
     for (const enc of candidates) {
       try {
@@ -234,12 +240,13 @@ async function getSettings() {
     unreachableStreak: Math.max(0, parseInt(stored.unreachableStreak, 10) || 0),
     // 上次的连接状态，便于 SW 重启后退避不归零
     connState: CONN_STATES.indexOf(stored.connState) !== -1 ? stored.connState : 'unknown',
-    initialized: !!stored.initialized
+    initialized: !!stored.initialized,
+    onlineSince: stored.onlineSince ? Number(stored.onlineSince) : null
   };
   return s;
 }
 
-/** 写入运行态字段（manualLogout / unreachableStreak / connState） */
+/** 写入运行态字段（manualLogout / unreachableStreak / connState / onlineSince） */
 async function setState(patch) {
   try {
     await chrome.storage.local.set(patch);
@@ -250,7 +257,7 @@ async function setState(patch) {
 
 /**
  * 从 storage 恢复运行态。MV3 的 Service Worker 随时会被回收，模块级变量
- * （connState / unreachableStreak）每次唤醒都归零；不恢复的话退避计数会被不断
+ * （connState / unreachableStreak / onlineSince）每次唤醒都归零；不恢复的话退避计数会被不断
  * 清零、闹钟退回基础间隔，指数退避就形同虚设。只在首次唤醒时恢复一次。
  */
 async function hydrateState() {
@@ -261,6 +268,7 @@ async function hydrateState() {
     if (connState === 'unknown') connState = s.connState;
     unreachableStreak = Math.max(unreachableStreak, s.unreachableStreak);
     lastPersistedStreak = s.unreachableStreak;
+    if (s.onlineSince) onlineSince = s.onlineSince;
   } catch (e) {
     // 忽略，按默认值继续
   }
@@ -366,8 +374,23 @@ function friendlyError(data) {
   const joined = raw.join(' ').trim();
   const key = joined.toLowerCase();
   if (key) {
+    // 宵禁 / 夜间断网判断（含误按 UTF-8 解码形成的乱码签名，如 \u02b1(ʱ) 与 \u03bd(ν)）
+    if (
+      key.indexOf('本时段禁止使用') !== -1 ||
+      key.indexOf('禁止使用') !== -1 ||
+      key.indexOf('时段') !== -1 ||
+      key.indexOf('禁止上网') !== -1 ||
+      /[\u02b1][\s\S]{0,3}[\u03bd]/.test(joined) ||
+      /ʱ[\s\S]{0,3}ν/.test(joined) ||
+      /[\ufffd].*ʱ/.test(joined)
+    ) {
+      return '当前时段禁止使用校园网（夜间断网/宵禁时段）';
+    }
     for (const k of Object.keys(ERROR_MAP)) {
       if (key.indexOf(k) !== -1) return ERROR_MAP[k];
+    }
+    if (/[\ufffd]/.test(joined)) {
+      return '登录失败：当前时段受限或账号密码错误';
     }
   }
   return joined ? '登录失败：' + joined : '登录失败：账号或密码错误';
@@ -385,7 +408,7 @@ function isPermanentAuthError(msg) {
   // ascii 原因（见 ERROR_MAP），不含中文关键词也不含 errorN 形式，必须显式列出 ——
   // 漏掉会让这些「重试无用」的错误退化成每秒重试（停机状态下每天上万次无效认证）。
   // 「禁止使用」/「时段」代表校园网夜间断网/宵禁策略，重试无用，必须降频。
-  return /密码|账号不存在|账号格式|被锁定|锁定|欠费|停机|已在别处|禁止使用|禁止上网|时段|password error|userid error|out of service|supplicant version too low/i.test(m) ||
+  return /密码|账号不存在|账号格式|被锁定|锁定|欠费|停机|已在别处|禁止使用|禁止上网|时段|[\u02b1].*[\u03bd]|password error|userid error|out of service|supplicant version too low/i.test(m) ||
     /error[1-6]/i.test(m);
 }
 
@@ -519,9 +542,9 @@ async function doLogout() {
   const stAfter = await checkStatus();
 
   if (!stAfter.online) {
-    // 注销成功 -> 置上抑制标志，暂停自动登录。
-    // 否则下一轮后台巡检（掉线间隔默认 1 秒）会立刻把用户重新认证上网。
-    await setState({ manualLogout: true, unreachableStreak: 0 });
+    // 注销成功 -> 置上抑制标志，暂停自动登录，并清空本地在线会话计时
+    onlineSince = null;
+    await setState({ manualLogout: true, unreachableStreak: 0, onlineSince: null });
     unreachableStreak = 0;
     connState = stAfter.reachable ? 'offline' : 'unreachable';
     const res = ok('已注销下线（自动登录已暂停，点「立即登录」可恢复）', false);
@@ -591,12 +614,29 @@ async function updateConnState(st) {
     unreachableStreak = 0;   // 能正常拿到门户数据 -> 确认在校园网内
     connState = st.online ? 'online' : 'offline';
   }
+
+  // 会话在线时间管理：掉线/不可达时清零，连通在线时初始化
+  let patchOnlineSince = false;
+  if (!st.reachable || st.unparseable || !st.online) {
+    if (onlineSince !== null) {
+      onlineSince = null;
+      patchOnlineSince = true;
+    }
+  } else if (st.online) {
+    if (!onlineSince) {
+      onlineSince = Date.now();
+      patchOnlineSince = true;
+    }
+  }
+
   // 只要计数变了就要落盘（含 unparseable）。此处若只判断状态是否翻转，
   // 那么一旦进入 unparseable，后续每次 +1 都只留在内存里；
   // SW 被回收后 streak 回退到旧值，退避会重新从低档开始 —— 强制门户下又变回每秒空转。
-  if (before !== connState || unreachableStreak !== lastPersistedStreak) {
+  if (before !== connState || unreachableStreak !== lastPersistedStreak || patchOnlineSince) {
     lastPersistedStreak = unreachableStreak;
-    await setState({ connState: connState, unreachableStreak: unreachableStreak });
+    const patch = { connState: connState, unreachableStreak: unreachableStreak };
+    if (patchOnlineSince) patch.onlineSince = onlineSince;
+    await setState(patch);
   }
   return connState;
 }
@@ -936,10 +976,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 
   if (msg.type === 'status') {
-    // 附带 manualLogout 与 running 状态，让 popup 与内容脚本一次拿全，避免并发竞态
+    // 附带 manualLogout, running 与 onlineSince 状态，让 popup 与内容脚本一次拿全，避免并发竞态
     Promise.all([checkStatus(), getSettings()])
-      .then(([st, s]) => sendResponse(Object.assign({}, st, { manualLogout: !!s.manualLogout, running: !!running })))
-      .catch(() => sendResponse({ reachable: false, online: false, manualLogout: false, running: false, message: '不在校园网内 / 门户不可达' }));
+      .then(([st, s]) => sendResponse(Object.assign({}, st, {
+        manualLogout: !!s.manualLogout,
+        running: !!running,
+        onlineSince: onlineSince || s.onlineSince || null
+      })))
+      .catch(() => sendResponse({
+        reachable: false,
+        online: false,
+        manualLogout: false,
+        running: false,
+        onlineSince: null,
+        message: '不在校园网内 / 门户不可达'
+      }));
     return true;
   }
 

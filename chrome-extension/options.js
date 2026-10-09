@@ -732,16 +732,57 @@ function refreshStatus(cb) {
     $('stIp').textContent = ip || '未获取到';
     $('stMac').textContent = raw.ss1 ? ('物理 MAC: ' + fmtMac(raw.ss1)) : '物理 MAC: —';
 
-    if (res.online && raw.stime) {
-      durationTicker.start(raw.stime);
-      $('stStime').textContent = '上线时间: ' + raw.stime;
-    } else if (res.online && raw.actt) {
-      durationTicker.start(parseInt(raw.actt, 10));
-      $('stStime').textContent = '在线中 (网关计时)';
-    } else if (res.online) {
-      durationTicker.stop();
-      $('stTime').textContent = '在线中';
-      $('stStime').textContent = '上线时间: —';
+    if (res.online) {
+      let durationInput = null;
+      let stimeDisplay = '上线时间: —';
+
+      const now = Date.now();
+      const localSince = res.onlineSince ? Number(res.onlineSince) : null;
+
+      if (localSince && Number.isFinite(localSince) && localSince <= now) {
+        durationInput = localSince;
+        stimeDisplay = '本次连通: ' + new Date(localSince).toLocaleTimeString();
+        if (raw.stime) {
+          stimeDisplay += ` (网关计费: ${raw.stime})`;
+        }
+      } else if (raw.stime) {
+        const stimeDate = new Date(String(raw.stime).replace(/-/g, '/'));
+        const stimeMs = stimeDate.getTime();
+        const isStimeValid = Number.isFinite(stimeMs) && !isNaN(stimeMs);
+        const isSameDay = isStimeValid && new Date().toDateString() === stimeDate.toDateString();
+
+        if (isSameDay) {
+          durationInput = raw.stime;
+          stimeDisplay = '上线时间: ' + raw.stime;
+        } else if (raw.oltime && parseInt(raw.oltime, 10) > 0) {
+          durationInput = parseInt(raw.oltime, 10);
+          stimeDisplay = '网关会话计费: ' + raw.stime;
+        } else if (raw.time && parseInt(raw.time, 10) > 0) {
+          durationInput = parseInt(raw.time, 10);
+          stimeDisplay = '网关会话计费: ' + raw.stime;
+        } else if (isStimeValid && (now - stimeMs) > 16 * 3600 * 1000) {
+          durationInput = raw.stime;
+          stimeDisplay = `网关保留长会话 (始于 ${raw.stime})`;
+        } else if (isStimeValid) {
+          durationInput = raw.stime;
+          stimeDisplay = '上线时间: ' + raw.stime;
+        }
+      } else if (raw.oltime) {
+        durationInput = parseInt(raw.oltime, 10);
+        stimeDisplay = '网关在线计时';
+      } else if (raw.actt) {
+        durationInput = parseInt(raw.actt, 10);
+        stimeDisplay = '网关计费计时';
+      }
+
+      if (durationInput != null) {
+        durationTicker.start(durationInput);
+        $('stStime').textContent = stimeDisplay;
+      } else {
+        durationTicker.stop();
+        $('stTime').textContent = '在线中';
+        $('stStime').textContent = '上线时间: —';
+      }
     } else {
       durationTicker.stop();
       $('stTime').textContent = '未在线';

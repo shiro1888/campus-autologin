@@ -75,8 +75,9 @@
 
   /**
    * 带编码自适应的文本拉取。
-   * Dr.COM 门户返回 GBK 编码的中文字符串（如「本时段禁止使用 1」），
-   * 若直接用 resp.text() 会按 UTF-8 解码成乱码（U+FFFD）。
+   * Dr.COM 门户返回 GBK 编码的中文字符串（如「本时段禁止使用 1」）。
+   * 校园网门户普遍以 GBK 为主，即便网关误标 utf-8 或未标 charset，
+   * 也应优先尝试 GBK/GB18030，避免被浏览器默认 UTF-8 截断成乱码 (U+FFFD)。
    */
   function fetchPortalText(url) {
     return fetch(url, { cache: 'no-store', credentials: 'include' })
@@ -85,7 +86,11 @@
           const ct = String(resp.headers && resp.headers.get ? (resp.headers.get('content-type') || '') : '');
           const m = /charset\s*=\s*"?([\w-]+)"?/i.exec(ct);
           const charset = m ? m[1].toLowerCase() : '';
-          const candidates = charset ? [charset, 'gbk', 'gb18030', 'utf-8'] : ['gbk', 'gb18030', 'utf-8'];
+          const candidates = [];
+          if (charset && charset !== 'utf-8' && charset !== 'utf8') {
+            candidates.push(charset);
+          }
+          candidates.push('gbk', 'gb18030', 'utf-8');
           const bytes = new Uint8Array(buf);
           for (let i = 0; i < candidates.length; i++) {
             try {
@@ -104,7 +109,18 @@
     const s = String(rawMsg || '').trim();
     if (!s) return '';
     const low = s.toLowerCase();
-    if (low.indexOf('本时段禁止使用') !== -1 || low.indexOf('禁止使用') !== -1 || low.indexOf('时段') !== -1) {
+    // 1. 宵禁 / 夜间断网判断：
+    //    支持正常中文关键字，以及 GBK「本时段禁止使用」被旧脚本或错误 UTF-8 解码后
+    //    形成的乱码签名（如 \u02b1(ʱ) 与 \u03bd(ν) 伴随 \ufffd 菱形问号）。
+    if (
+      low.indexOf('本时段禁止使用') !== -1 ||
+      low.indexOf('禁止使用') !== -1 ||
+      low.indexOf('时段') !== -1 ||
+      low.indexOf('禁止上网') !== -1 ||
+      /[\u02b1][\s\S]{0,3}[\u03bd]/.test(s) ||
+      /ʱ[\s\S]{0,3}ν/.test(s) ||
+      /[\ufffd].*ʱ/.test(s)
+    ) {
       return '当前时段禁止使用校园网（夜间断网/宵禁时段）';
     }
     if (low.indexOf('userid error2') !== -1 || low.indexOf('password error') !== -1 || low.indexOf('error2') !== -1) {
@@ -118,6 +134,10 @@
     }
     if (low.indexOf('userid error4') !== -1 || low.indexOf('out of service') !== -1) {
       return '账号已欠费或已停机';
+    }
+    // 2. 若仍残留有  (U+FFFD) 或未识别乱码，不要直接展示给用户造成困惑
+    if (/[\ufffd]/.test(s)) {
+      return '认证失败（可能处于夜间断网时段或账号密码有误）';
     }
     return s;
   }
