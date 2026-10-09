@@ -761,8 +761,8 @@ function refreshStatus(cb) {
           durationInput = parseInt(raw.time, 10);
           stimeDisplay = '网关会话计费: ' + raw.stime;
         } else if (isStimeValid && (now - stimeMs) > 16 * 3600 * 1000) {
-          durationInput = raw.stime;
-          stimeDisplay = `网关保留长会话 (始于 ${raw.stime})`;
+          durationInput = Date.now();
+          stimeDisplay = `本次在线中 (网关计费: ${raw.stime}，跨夜未释放)`;
         } else if (isStimeValid) {
           durationInput = raw.stime;
           stimeDisplay = '上线时间: ' + raw.stime;

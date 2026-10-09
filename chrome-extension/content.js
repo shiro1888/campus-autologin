@@ -484,7 +484,12 @@
                     if (r.ok) {
                       showHud('校园网认证成功！已在线', 'success');
                     } else {
-                      showHud('登录失败：' + (r.msg || '请检查密码'), 'error');
+                      const displayMsg = !r.msg ? '登录失败：请检查密码' : (
+                        r.msg.indexOf('登录失败') === 0 || r.msg.indexOf('当前时段') === 0 || r.msg.indexOf('认证失败') === 0
+                          ? r.msg
+                          : ('登录失败：' + r.msg)
+                      );
+                      showHud(displayMsg, 'error');
                     }
                     report({
                       ok: r.ok,

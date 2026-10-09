@@ -624,7 +624,20 @@ async function updateConnState(st) {
     }
   } else if (st.online) {
     if (!onlineSince) {
-      onlineSince = Date.now();
+      const rawStime = st.raw && st.raw.stime;
+      if (rawStime) {
+        const d = new Date(String(rawStime).replace(/-/g, '/'));
+        const ms = d.getTime();
+        // 若 stime 是今天的合法时间戳且早于当前时间，复用网关起始时间；
+        // 若跨天（如网关跨夜保留的昨天会话），以当前连通时间为起点
+        if (Number.isFinite(ms) && !isNaN(ms) && d.toDateString() === new Date().toDateString() && ms <= Date.now()) {
+          onlineSince = ms;
+        } else {
+          onlineSince = Date.now();
+        }
+      } else {
+        onlineSince = Date.now();
+      }
       patchOnlineSince = true;
     }
   }
@@ -978,11 +991,30 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'status') {
     // 附带 manualLogout, running 与 onlineSince 状态，让 popup 与内容脚本一次拿全，避免并发竞态
     Promise.all([checkStatus(), getSettings()])
-      .then(([st, s]) => sendResponse(Object.assign({}, st, {
-        manualLogout: !!s.manualLogout,
-        running: !!running,
-        onlineSince: onlineSince || s.onlineSince || null
-      })))
+      .then(async ([st, s]) => {
+        let curOnlineSince = onlineSince || s.onlineSince || null;
+        if (st.online && !curOnlineSince) {
+          const rawStime = st.raw && st.raw.stime;
+          if (rawStime) {
+            const d = new Date(String(rawStime).replace(/-/g, '/'));
+            const ms = d.getTime();
+            if (Number.isFinite(ms) && !isNaN(ms) && d.toDateString() === new Date().toDateString() && ms <= Date.now()) {
+              curOnlineSince = ms;
+            } else {
+              curOnlineSince = Date.now();
+            }
+          } else {
+            curOnlineSince = Date.now();
+          }
+          onlineSince = curOnlineSince;
+          await setState({ onlineSince: curOnlineSince });
+        }
+        sendResponse(Object.assign({}, st, {
+          manualLogout: !!s.manualLogout,
+          running: !!running,
+          onlineSince: curOnlineSince
+        }));
+      })
       .catch(() => sendResponse({
         reachable: false,
         online: false,

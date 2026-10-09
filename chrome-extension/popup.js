@@ -314,8 +314,9 @@ function refresh() {
           titleText = `网关会话计费: ${rawData.stime}`;
         } else if (isStimeValid && (now - stimeMs) > 16 * 3600 * 1000) {
           // 典型的 Dr.COM 跨夜未注销会话（如昨晨建立、夜间断网、今晨复活）
-          durationInput = rawData.stime;
-          titleText = `网关保留长会话 (始于 ${rawData.stime}，跨夜未释放)`;
+          // 网关计费起始是昨天，但设备今日刚重连，以当前时间为计时起点
+          durationInput = Date.now();
+          titleText = `本次在线中 (网关计费起始: ${rawData.stime}，跨夜未释放)`;
         } else if (isStimeValid) {
           durationInput = rawData.stime;
           titleText = '上线时间: ' + rawData.stime;
