@@ -693,6 +693,13 @@ body {
   transform: scale(0.96);
 }
 
+.btn-action:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 .btn-action svg {
   width: 14px;
   height: 14px;

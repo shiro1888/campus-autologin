@@ -700,6 +700,8 @@ function refreshStatus(cb) {
       $('stFlow').textContent = '—';
       $('stFee').textContent = '账户计费: —';
       $('stStime').textContent = '上线时间: —';
+      $('btnLogoutNow').disabled = true;
+      $('btnLogoutNow').classList.remove('confirming');
       updateTopology(null);
       if (cb) cb();
       return;
@@ -861,6 +863,12 @@ function refreshStatus(cb) {
       if (logoAv) logoAv.className = 'logo-beacon wait';
       if (portalDot) portalDot.className = 'portal-dot on';
       textEl.textContent = res.manualLogout ? '已手动注销 · 自动登录暂停' : '未登录';
+    }
+
+    const logoutBtn = $('btnLogoutNow');
+    if (logoutBtn) {
+      logoutBtn.disabled = !res.online;
+      if (!res.online) logoutBtn.classList.remove('confirming');
     }
 
     updateTopology(res);
@@ -1089,6 +1097,7 @@ if (stMac) {
 let optLogoutTimer = null;
 $('btnLogoutNow').addEventListener('click', () => {
   const btn = $('btnLogoutNow');
+  if (btn.disabled) return;
   const span = btn.querySelector('span');
 
   if (!btn.classList.contains('confirming')) {
