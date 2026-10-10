@@ -2360,6 +2360,8 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  position: sticky;
+  top: 76px;
 }
 
 /* ==========================================================================
@@ -2417,93 +2419,7 @@ select:focus {
   gap: 10px;
 }
 
-.info-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 0;
-  font-size: 12.5px;
-  border-bottom: 1px dashed var(--border-subtle);
-}
 
-.info-row:last-of-type {
-  border-bottom: none;
-}
-
-.info-label {
-  color: var(--text-muted);
-  font-size: 12.5px;
-  font-weight: 500;
-}
-
-.info-val {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-main);
-  font-variant-numeric: tabular-nums lining-nums;
-}
-
-.badge-tag-safe {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 1.5px 8px;
-  border-radius: var(--radius-pill);
-  background: rgba(16, 185, 129, 0.12);
-  color: #064e3b;
-  border: 1px solid rgba(16, 185, 129, 0.25);
-}
-[data-theme="dark"] .badge-tag-safe { color: #34d399; }
-
-.badge-tag-turbo {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 1.5px 8px;
-  border-radius: var(--radius-pill);
-  background: rgba(37, 99, 235, 0.12);
-  color: #1e40af;
-  border: 1px solid rgba(37, 99, 235, 0.25);
-}
-
-[data-theme="dark"] .badge-tag-turbo { color: #60a5fa; }
-
-.side-portal-link {
-  margin-top: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 9px 14px;
-  border-radius: var(--radius-md);
-  background: var(--stat-bg);
-  border: 1px solid var(--border-color);
-  color: var(--primary);
-  font-size: 12.5px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all 0.2s var(--ease-spring);
-}
-
-.side-portal-link:hover {
-  background: var(--primary);
-  color: #ffffff;
-  border-color: var(--primary);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
-}
-
-[data-theme="dark"] .side-portal-link {
-  color: #60a5fa;
-  background: var(--stat-bg);
-}
-
-[data-theme="dark"] .side-portal-link:hover {
-  color: #ffffff;
-}
-
-.side-portal-link svg {
-  width: 13.5px;
-  height: 13.5px;
-}
 
 
 
