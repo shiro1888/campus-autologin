@@ -1379,7 +1379,8 @@ body {
   height: 20px;
 }
 
-.form-card:hover .card-icon {
+.form-card:hover .card-icon,
+.side-card:hover .card-icon {
   transform: scale(1.08);
 }
 
@@ -1387,9 +1388,12 @@ body {
 .card-icon.emerald { background: #d1fae5; color: #059669; }
 .card-icon.amber { background: #fef3c7; color: #d97706; }
 
-.form-card:hover .card-icon.blue { box-shadow: 0 0 16px rgba(59, 130, 246, 0.35); }
-.form-card:hover .card-icon.emerald { box-shadow: 0 0 16px rgba(16, 185, 129, 0.35); }
-.form-card:hover .card-icon.amber { box-shadow: 0 0 16px rgba(245, 158, 11, 0.35); }
+.form-card:hover .card-icon.blue,
+.side-card:hover .card-icon.blue { box-shadow: 0 0 16px rgba(59, 130, 246, 0.35); }
+.form-card:hover .card-icon.emerald,
+.side-card:hover .card-icon.emerald { box-shadow: 0 0 16px rgba(16, 185, 129, 0.35); }
+.form-card:hover .card-icon.amber,
+.side-card:hover .card-icon.amber { box-shadow: 0 0 16px rgba(245, 158, 11, 0.35); }
 
 [data-theme="dark"] .card-icon.blue { background: rgba(59, 130, 246, 0.18); color: #60a5fa; }
 [data-theme="dark"] .card-icon.emerald { background: rgba(16, 185, 129, 0.18); color: #34d399; }
@@ -2208,7 +2212,13 @@ select:focus {
    Sidebar Actions Card (侧边栏操作与保存面板)
    ========================================================================== */
 .side-actions-card {
-  padding: 16px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.side-actions-body {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -2930,6 +2940,12 @@ details[open] .faq-content {
 
   .dashboard-sidebar {
     position: static;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .side-actions-card {
+    order: -1;
   }
 
   .network-topology-strip {
