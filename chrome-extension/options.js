@@ -1376,6 +1376,15 @@ initCustomSelects();
 initIspChips();
 load();
 
+// 适配 macOS / Windows 键盘快捷键指示徽章
+if (/Mac/i.test(navigator.platform || navigator.userAgent)) {
+  const kbdPill = document.querySelector('.kbd-pill');
+  if (kbdPill) {
+    kbdPill.textContent = '⌘S';
+    kbdPill.title = '快捷键 ⌘S 保存';
+  }
+}
+
 // 当偏好设置页面在前台激活时，每 15 秒自动向后台刷新一次网关状态（流量与Ping）
 setInterval(() => {
   if (document.visibilityState === 'visible') {
