@@ -885,7 +885,7 @@ def cmd_test(args, cfg) -> int:
         # say() 会被静默；但仍不能把结论写在 emit_json 之后的分支外，
         # 否则任何文本都可能混进 stdout，导致 `json.loads(stdout)` 失败。
         if not reachable:
-            say("\n结论: 门户不可达，请确认已连接校园网")
+            say("\n结论: 网络连接失败，请确认已连接校园网 Wi-Fi 或插好网线")
         elif not has_credentials:
             say("\n结论: 门户正常，但账号密码未填写 —— 请先编辑 config.json 再装开机自启")
         else:
@@ -1224,7 +1224,7 @@ def cmd_gui(args, cfg) -> int:
                 # 内层 def 闭包引用 e 时回调会抛 NameError，界面就永远停在「检测中…」。
                 err_msg = "%s" % e
                 def _err():
-                    st_lbl.config(text="! 网络不可达", fg=danger_color)
+                    st_lbl.config(text="! 网络连接失败", fg=danger_color)
                     st_card.config(highlightbackground="#ef4444")
                     ip_lbl.config(text="错误: %s" % err_msg)
                     meta_lbl.config(text="已用流量: —  |  时长: —")

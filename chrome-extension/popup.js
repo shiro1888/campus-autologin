@@ -47,6 +47,11 @@ function setMsg(text, kind, autoDismissMs = 3200) {
     return;
   }
 
+  // 规范化旧版本缓存或离线提示文案，统一口径
+  if (typeof text === 'string' && /门户不可达|不在校园网/.test(text)) {
+    text = '网络连接失败，请检查 Wi-Fi 或插好网线';
+  }
+
   box.className = 'msg-box show ' + (kind || 'info');
   msgEl.textContent = text;
   iconEl.innerHTML = kind === 'ok'
@@ -64,7 +69,7 @@ let currentIp = '';
 let currentAccount = '';
 function setLocalIp(ip) {
   currentIp = ip || '';
-  $('localIp').textContent = currentIp || '未检测到';
+  $('localIp').textContent = currentIp || '未连接';
 }
 
 const pingHistory = [];

@@ -748,7 +748,7 @@ async function autoLogin(trigger, manual) {
       const r = st.online ? ok('已在线，无需登录', true) : fail(st.message, false);
       await saveResult(r);
       console.log(tag + (st.online ? '已在线，跳过登录'
-        : (st.unparseable ? '门户返回非认证数据' : '门户不可达') + '（连续第 ' + unreachableStreak + ' 次）'));
+        : (st.unparseable ? '门户返回非认证数据' : '网络连接失败') + '（连续第 ' + unreachableStreak + ' 次）'));
       await applyCadence();
       return r;
     }
