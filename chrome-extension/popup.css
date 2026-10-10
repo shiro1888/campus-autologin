@@ -227,6 +227,12 @@ body {
   color: var(--text-main);
 }
 
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .brand-name {
+    color: var(--text-main);
+  }
+}
+
 .brand-sub {
   font-size: 10px;
   color: var(--text-light);
