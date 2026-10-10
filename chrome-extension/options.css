@@ -639,10 +639,19 @@ body {
 }
 
 .hero-gw-tag {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--text-light);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hero-gw-tag .gw-host {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 600;
+  color: var(--text-main);
+  letter-spacing: -0.01em;
 }
 
 .hero-action-buttons {
@@ -868,17 +877,18 @@ body {
 }
 
 .topo-tag {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 500;
-  color: var(--text-light);
+  color: var(--text-muted);
   letter-spacing: 0.02em;
 }
 
 .topo-val {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 700;
   color: var(--text-main);
   line-height: 1.25;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 /* Connecting links */
@@ -1285,13 +1295,14 @@ body {
   color: var(--text-main);
   letter-spacing: -0.015em;
   line-height: 1.3;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .stat-val.mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-variant-numeric: tabular-nums lining-nums;
-  letter-spacing: -0.02em;
-  font-size: 15px;
+  letter-spacing: -0.01em;
+  font-size: 16px;
 }
 
 .stat-val.text-accent {
@@ -1309,8 +1320,8 @@ body {
 }
 
 .stat-sub {
-  font-size: 11.5px;
-  color: var(--text-light);
+  font-size: 12px;
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1426,8 +1437,8 @@ body {
 }
 
 .field-sub-label {
-  font-size: 11.5px;
-  color: var(--text-light);
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .isp-quick-chips {
@@ -1994,8 +2005,8 @@ select:focus {
 
 .field-tip {
   font-size: 12px;
-  color: var(--text-light);
-  line-height: 1.4;
+  color: var(--text-muted);
+  line-height: 1.5;
 }
 
 /* ==========================================================================
@@ -2528,14 +2539,16 @@ select:focus {
 }
 
 .info-label {
-  color: var(--text-light);
-  font-size: 12px;
+  color: var(--text-muted);
+  font-size: 12.5px;
   font-weight: 500;
 }
 
 .info-val {
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-main);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .badge-tag-safe {
@@ -2698,9 +2711,9 @@ select:focus {
 }
 
 .faq-sub-title {
-  font-size: 11.5px;
-  color: var(--text-light);
-  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 /* ==========================================================================
@@ -2895,7 +2908,7 @@ details[open] .faq-content {
   background: var(--text-main);
   color: var(--bg-page);
   border-radius: 6px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   pointer-events: none;
