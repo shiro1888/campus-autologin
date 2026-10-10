@@ -2642,67 +2642,7 @@ select:focus {
   height: 13.5px;
 }
 
-.tips-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-}
 
-.tips-list li {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: var(--text-muted);
-}
-
-.tip-icon-bullet {
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.tip-icon-bullet svg {
-  width: 13.5px;
-  height: 13.5px;
-}
-
-.tip-icon-bullet.blue {
-  background: rgba(37, 99, 235, 0.1);
-  color: var(--primary);
-}
-
-.tip-icon-bullet.emerald {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--success);
-}
-
-.tip-icon-bullet.purple {
-  background: rgba(139, 92, 246, 0.1);
-  color: #8b5cf6;
-}
-
-[data-theme="dark"] .tip-icon-bullet.blue {
-  background: rgba(59, 130, 246, 0.18);
-  color: #60a5fa;
-}
-
-[data-theme="dark"] .tip-icon-bullet.emerald {
-  background: rgba(16, 185, 129, 0.18);
-  color: #34d399;
-}
-
-[data-theme="dark"] .tip-icon-bullet.purple {
-  background: rgba(139, 92, 246, 0.18);
-  color: #c084fc;
-}
 
 /* FAQ Summary Badge and Title enhancement */
 .faq-summary-badge {
