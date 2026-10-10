@@ -327,7 +327,7 @@
           'color:#ffffff',
           'padding:9px 18px',
           'border-radius:30px',
-          'font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif',
+          'font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           'font-size:13px',
           'font-weight:600',
           'box-shadow:0 10px 25px -5px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.18)',
