@@ -249,7 +249,7 @@ body {
 }
 
 .version-badge {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
   background: var(--bg-card);
@@ -1854,8 +1854,8 @@ select:focus {
 }
 
 [data-theme="dark"] .opt-badge.primary {
-  background: rgba(59, 130, 246, 0.16);
-  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
   border-color: rgba(59, 130, 246, 0.3);
 }
 
@@ -1865,6 +1865,12 @@ select:focus {
   background: rgba(16, 185, 129, 0.08);
   color: var(--success-text);
   border-color: rgba(16, 185, 129, 0.2);
+}
+
+[data-theme="dark"] .opt-badge.mono {
+  background: rgba(16, 185, 129, 0.16);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.3);
 }
 
 .custom-select-option:hover {
@@ -1921,17 +1927,6 @@ select:focus {
   color: #60a5fa;
 }
 
-[data-theme="dark"] .opt-badge.primary {
-  background: rgba(59, 130, 246, 0.18);
-  color: #60a5fa;
-  border-color: rgba(59, 130, 246, 0.3);
-}
-
-[data-theme="dark"] .opt-badge.mono {
-  background: rgba(16, 185, 129, 0.16);
-  color: #34d399;
-  border-color: rgba(16, 185, 129, 0.3);
-}
 
 /* 兼容未初始化时的原生 select 基础外观 */
 .select-wrap select {

@@ -111,3 +111,91 @@ function createTicker(onTick) {
     }
   };
 }
+
+/**
+ * 弹出触感复制反馈微气泡
+ * @param {MouseEvent} e 点击事件对象
+ * @param {string} text 气泡文案
+ */
+function showFloatingBubble(e, text = '已复制 ✓') {
+  try {
+    const bubble = document.createElement('div');
+    bubble.className = 'floating-copy-bubble';
+    bubble.textContent = text;
+    const x = e && e.clientX ? e.clientX : (window.innerWidth / 2);
+    const y = e && e.clientY ? e.clientY : (window.innerHeight / 2);
+    bubble.style.left = `${x}px`;
+    bubble.style.top = `${y}px`;
+    document.body.appendChild(bubble);
+    setTimeout(() => bubble.remove(), 900);
+  } catch (err) {}
+}
+
+/**
+ * 创建心跳延迟波动小柱图渲染器
+ * @param {string} containerId 容器元素ID
+ * @param {number} maxBars 最多保留的历史条数
+ */
+function createSparkline(containerId, maxBars = 5) {
+  const history = [];
+  return function render(pingMs) {
+    const container = $(containerId);
+    if (!container) return;
+    if (pingMs !== undefined && pingMs >= 0) {
+      history.push(pingMs);
+      if (history.length > maxBars) history.shift();
+    }
+    const bars = container.querySelectorAll('.spark-bar');
+    if (!bars.length) return;
+    const maxPing = Math.max(60, ...history, 1);
+    bars.forEach((bar, idx) => {
+      const val = history[idx];
+      if (val !== undefined) {
+        const pct = Math.max(25, Math.min(100, Math.round((val / maxPing) * 100)));
+        bar.style.height = `${pct}%`;
+        bar.className = 'spark-bar ' + (val <= 50 ? 'fast' : (val <= 150 ? 'normal' : 'slow'));
+        bar.title = `${val} ms`;
+      } else {
+        bar.style.height = '25%';
+        bar.className = 'spark-bar';
+        bar.title = '';
+      }
+    });
+  };
+}
+
+/**
+ * 启用卡片鼠标微光跟随效果 (rAF 帧率节流)
+ * @param {string} selector 元素选择器
+ */
+function initMouseGlow(selector = '.card') {
+  if (window.matchMedia && window.matchMedia('(hover: hover)').matches) {
+    document.querySelectorAll(selector).forEach((card) => {
+      let rect = null;
+      let rafId = null;
+      card.addEventListener('mouseenter', () => {
+        rect = card.getBoundingClientRect();
+      });
+      card.addEventListener('mousemove', (e) => {
+        if (!rect) rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        if (!rafId) {
+          rafId = window.requestAnimationFrame(() => {
+            card.style.setProperty('--mouse-x', `${x}px`);
+            card.style.setProperty('--mouse-y', `${y}px`);
+            rafId = null;
+          });
+        }
+      });
+      card.addEventListener('mouseleave', () => {
+        rect = null;
+        if (rafId) {
+          window.cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+      });
+    });
+  }
+}
+

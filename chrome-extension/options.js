@@ -47,45 +47,8 @@ const durationTicker = createTicker((text) => {
   $('stTime').textContent = text;
 });
 
-const optPingHistory = [];
-function renderOptPingSparkline(pingMs) {
-  const container = $('optPingSparkline');
-  if (!container) return;
-  if (pingMs !== undefined && pingMs >= 0) {
-    optPingHistory.push(pingMs);
-    if (optPingHistory.length > 5) optPingHistory.shift();
-  }
-  const bars = container.querySelectorAll('.spark-bar');
-  if (!bars.length) return;
-  const maxPing = Math.max(60, ...optPingHistory, 1);
-  bars.forEach((bar, idx) => {
-    const val = optPingHistory[idx];
-    if (val !== undefined) {
-      const pct = Math.max(25, Math.min(100, Math.round((val / maxPing) * 100)));
-      bar.style.height = `${pct}%`;
-      bar.className = 'spark-bar ' + (val <= 50 ? 'fast' : (val <= 150 ? 'normal' : 'slow'));
-      bar.title = `${val} ms`;
-    } else {
-      bar.style.height = '25%';
-      bar.className = 'spark-bar';
-      bar.title = '';
-    }
-  });
-}
+const renderOptPingSparkline = createSparkline('optPingSparkline', 5);
 
-function showFloatingBubble(e, text = '已复制 ✓') {
-  try {
-    const bubble = document.createElement('div');
-    bubble.className = 'floating-copy-bubble';
-    bubble.textContent = text;
-    const x = e && e.clientX ? e.clientX : (window.innerWidth / 2);
-    const y = e && e.clientY ? e.clientY : (window.innerHeight / 2);
-    bubble.style.left = `${x}px`;
-    bubble.style.top = `${y}px`;
-    document.body.appendChild(bubble);
-    setTimeout(() => bubble.remove(), 900);
-  } catch (err) {}
-}
 
 /** 动态更新网络全链路拓扑指示器 */
 function updateTopology(res) {
@@ -950,11 +913,8 @@ function hasCredentials() {
 }
 
 // --- 监听表单变更，实时提示未保存状态 ---
-$('form').addEventListener('input', () => {
-  $('btnSave').classList.add('has-changes');
-});
-$('form').addEventListener('change', () => {
-  $('btnSave').classList.add('has-changes');
+['input', 'change'].forEach((evt) => {
+  $('form').addEventListener(evt, () => $('btnSave').classList.add('has-changes'));
 });
 
 // --- 保存并立即测试 ---
@@ -1399,40 +1359,7 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// 监听跨标签页的主题变动
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.theme) {
-    applyTheme(changes.theme.newValue || 'auto');
-  }
-});
 
-// --- Linear/Raycast 级卡片鼠标光斑跟随（rAF 帧率节流与缓存优化） ---
-if (window.matchMedia('(hover: hover)').matches) {
-  document.querySelectorAll('.stat-card, .form-card, .side-card, .card').forEach((card) => {
-    let rect = null;
-    let rafId = null;
-    card.addEventListener('mouseenter', () => {
-      rect = card.getBoundingClientRect();
-    });
-    card.addEventListener('mousemove', (e) => {
-      if (!rect) rect = card.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      if (!rafId) {
-        rafId = window.requestAnimationFrame(() => {
-          card.style.setProperty('--mouse-x', `${x}px`);
-          card.style.setProperty('--mouse-y', `${y}px`);
-          rafId = null;
-        });
-      }
-    });
-    card.addEventListener('mouseleave', () => {
-      rect = null;
-      if (rafId) {
-        window.cancelAnimationFrame(rafId);
-        rafId = null;
-      }
-    });
-  });
-}
+// --- 卡片鼠标微光跟随 ---
+initMouseGlow('.stat-card, .form-card, .side-card, .card');
 
