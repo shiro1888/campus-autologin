@@ -219,8 +219,8 @@
   <!-- Dashboard Body: Balanced 2-Column Dashboard (双列 2:2 黄金对称仪表盘) -->
   <form id="form" class="dashboard-body" autocomplete="off">
 
-    <!-- Left Column: 凭据鉴权 与 触发自动化 -->
-    <div class="dashboard-col">
+    <!-- Top Row: 双列对称设置卡片 (01 凭据鉴权 与 02 智能保活) -->
+    <div class="dashboard-top-grid">
 
       <!-- Card 1: 认证信息 -->
       <div class="card form-card" id="cardCredentials">
@@ -275,76 +275,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Card 3: 自动化触发场景 -->
-      <div class="card form-card" id="cardTriggers">
-        <div class="card-header">
-          <div class="card-icon amber">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
-          </div>
-          <div class="card-title-box">
-            <div class="card-title-row">
-              <h2>自动化触发与页面增强</h2>
-              <span class="step-badge amber">03 · 自动化增强</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="card-body">
-          <div class="switch-row feature-tile">
-            <div class="switch-icon-box blue">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            </div>
-            <div class="switch-info">
-              <div class="switch-title">
-                <span>断网跳转瞬间重连 (Instant Trigger)</span>
-                <span class="badge-primary">0秒响应 · 推荐</span>
-              </div>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="instantTrigger">
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="switch-row feature-tile">
-            <div class="switch-icon-box purple">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-            </div>
-            <div class="switch-info">
-              <div class="switch-title">
-                <span>浏览器启动时自动登录</span>
-                <span class="badge-neutral">静默自启</span>
-              </div>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="autoOnStartup">
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="switch-row feature-tile">
-            <div class="switch-icon-box amber">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </div>
-            <div class="switch-info">
-              <div class="switch-title">
-                <span>校园网门户页面自动填单并提交</span>
-                <span class="badge-neutral">内容脚本</span>
-              </div>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="contentAutoFill">
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Right Column: 智能保活 与 操作配置 -->
-    <div class="dashboard-col">
 
       <!-- Card 2: 智能保活策略 -->
       <div class="card form-card" id="cardPolicy">
@@ -412,50 +342,112 @@
         </div>
       </div>
 
-      <!-- Card 4: 操作与配置管理 -->
-      <div class="card form-card side-actions-card" id="cardActions">
-        <div class="card-header">
-          <div class="card-icon purple">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          </div>
-          <div class="card-title-box">
-            <div class="card-title-row">
-              <h2>操作与配置管理</h2>
-              <span class="step-badge purple">04 · 配置管理</span>
-            </div>
-          </div>
+    </div>
+
+    <!-- Middle: Card 3: 自动化触发与页面增强 (通栏 3 列精致磁贴) -->
+    <div class="card form-card full-width-card" id="cardTriggers">
+      <div class="card-header">
+        <div class="card-icon amber">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
         </div>
-
-        <div class="card-body side-actions-body">
-          <button type="submit" class="btn-main side-btn-main" id="btnSave">
-            <span class="btn-shimmer"></span>
-            <svg class="btn-spinner" id="saveSpinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
-            <svg class="btn-icon" id="saveIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            <span id="btnSaveText">保存配置并立即测试</span>
-            <span class="kbd-pill" title="快捷键 Ctrl+S 保存">Ctrl+S</span>
-            <span class="unsaved-dot" id="unsavedDot" title="有尚未保存的更改"></span>
-          </button>
-
-          <div class="side-aux-grid">
-            <button type="button" class="btn-aux" id="btnExportConfig" title="导出当前所有配置为 JSON 备份文件">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              <span>导出配置</span>
-            </button>
-
-            <button type="button" class="btn-aux" id="btnImportConfig" title="从 JSON 备份文件恢复配置">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              <span>导入配置</span>
-            </button>
-            <input type="file" id="importFileInput" accept=".json,application/json" style="display:none">
-
-            <button type="button" class="btn-ghost-danger side-btn-reset" id="btnResetDefaults" title="将所有设置恢复为出厂默认">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-              <span>恢复默认设置</span>
-            </button>
+        <div class="card-title-box">
+          <div class="card-title-row">
+            <h2>自动化触发与页面增强</h2>
+            <span class="step-badge amber">03 · 自动化增强</span>
           </div>
         </div>
       </div>
 
+      <div class="card-body">
+        <div class="tiles-3-col">
+          <div class="switch-row feature-tile">
+            <div class="switch-icon-box blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <div class="switch-info">
+              <div class="switch-title">
+                <span>断网跳转瞬间重连 (Instant Trigger)</span>
+                <span class="badge-primary">0秒响应 · 推荐</span>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="instantTrigger">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="switch-row feature-tile">
+            <div class="switch-icon-box purple">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+            <div class="switch-info">
+              <div class="switch-title">
+                <span>浏览器启动时自动登录</span>
+                <span class="badge-neutral">静默自启</span>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="autoOnStartup">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="switch-row feature-tile">
+            <div class="switch-icon-box amber">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </div>
+            <div class="switch-info">
+              <div class="switch-title">
+                <span>校园网门户页面自动填单并提交</span>
+                <span class="badge-neutral">内容脚本</span>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="contentAutoFill">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom: 全局操作管理栏 (通栏底栏 Action Dock) -->
+    <div class="card actions-dock-card" id="cardActions">
+      <div class="dock-left">
+        <div class="dock-status-info">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="dock-info-icon"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span class="dock-hint">支持快捷键 <kbd>Ctrl+S</kbd> 随时保存 · 配置仅本地加密存储</span>
+        </div>
+      </div>
+
+      <div class="dock-right">
+        <div class="dock-aux-group">
+          <button type="button" class="btn-aux" id="btnExportConfig" title="导出当前所有配置为 JSON 备份文件">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>导出配置</span>
+          </button>
+
+          <button type="button" class="btn-aux" id="btnImportConfig" title="从 JSON 备份文件恢复配置">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>导入配置</span>
+          </button>
+          <input type="file" id="importFileInput" accept=".json,application/json" style="display:none">
+
+          <button type="button" class="btn-ghost-danger btn-reset-dock" id="btnResetDefaults" title="将所有设置恢复为出厂默认">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            <span>恢复默认设置</span>
+          </button>
+        </div>
+
+        <button type="submit" class="btn-main dock-btn-main" id="btnSave">
+          <span class="btn-shimmer"></span>
+          <svg class="btn-spinner" id="saveSpinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+          <svg class="btn-icon" id="saveIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          <span id="btnSaveText">保存配置并立即测试</span>
+          <span class="kbd-pill" title="快捷键 Ctrl+S 保存">Ctrl+S</span>
+          <span class="unsaved-dot" id="unsavedDot" title="有尚未保存的更改"></span>
+        </button>
+      </div>
     </div>
 
   </form>
