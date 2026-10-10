@@ -159,139 +159,7 @@ function initTheme() {
   }
 }
 
-/** 页面快捷导航与滚动高亮 (Scroll Spy) */
-function initNavigation() {
-  const navItems = document.querySelectorAll('.sticky-nav .nav-item');
-  const btt = $('btnBackToTop');
-  const sectionIds = ['statusWidget', 'cardCredentials', 'cardPolicy', 'cardTriggers'];
 
-  let isClickScrolling = false;
-  let clickTimer = null;
-  let isScrollTicking = false;
-
-  function setActiveNav(targetId) {
-    navItems.forEach((item) => {
-      item.classList.toggle('active', item.getAttribute('data-target') === targetId);
-    });
-  }
-
-  function getTargetScrollTop(targetEl, targetId) {
-    if (targetId === 'statusWidget') return 0;
-    const navBar = document.querySelector('.sticky-nav');
-    const navOffset = (navBar ? navBar.offsetHeight : 44) + 26;
-    const rect = targetEl.getBoundingClientRect();
-    return Math.max(0, Math.round(window.scrollY + rect.top - navOffset));
-  }
-
-  function updateActiveNav() {
-    if (isClickScrolling) return;
-
-    const scrollY = window.scrollY;
-    const viewportHeight = window.innerHeight;
-    const docHeight = document.documentElement.scrollHeight;
-
-    // 页面处于顶部区域时，固定高亮首个模块（监控中心）
-    if (scrollY < 80) {
-      setActiveNav(sectionIds[0]);
-      return;
-    }
-
-    // 页面滚动至接近底部（距底 70px 内）时，锁定高亮末尾模块
-    if (scrollY + viewportHeight >= docHeight - 70) {
-      setActiveNav(sectionIds[sectionIds.length - 1]);
-      return;
-    }
-
-    // 正常区间：从上往下检测，最后一个 top 进入可视区的模块为当前高亮
-    const triggerOffset = 110;
-    let activeId = sectionIds[0];
-
-    for (const id of sectionIds) {
-      const el = $(id);
-      if (!el) continue;
-      const rect = el.getBoundingClientRect();
-      if (rect.top <= triggerOffset) {
-        activeId = id;
-      }
-    }
-
-    setActiveNav(activeId);
-  }
-
-  // 平滑滚动快速跳转
-  navItems.forEach((item) => {
-    item.addEventListener('click', (e) => {
-      e.preventDefault();
-      const targetId = item.getAttribute('data-target');
-      const targetEl = $(targetId);
-      if (!targetEl) return;
-
-      // 锁定滚动监听，防止平滑滚动过程中的中间区域抢占高亮
-      isClickScrolling = true;
-      if (clickTimer) clearTimeout(clickTimer);
-      setActiveNav(targetId);
-
-      const targetTop = getTargetScrollTop(targetEl, targetId);
-      window.scrollTo({
-        top: targetTop,
-        behavior: 'smooth'
-      });
-
-      clickTimer = setTimeout(() => {
-        isClickScrolling = false;
-        updateActiveNav();
-      }, 800);
-    });
-  });
-
-  // 现代浏览器 scrollend 事件即时解除点击锁定
-  if ('onscrollend' in window) {
-    window.addEventListener('scrollend', () => {
-      if (isClickScrolling) {
-        if (clickTimer) clearTimeout(clickTimer);
-        isClickScrolling = false;
-        updateActiveNav();
-      }
-    }, { passive: true });
-  }
-
-  // 滚动与视口尺寸变化监听（基于 requestAnimationFrame 节流杜绝掉帧）
-  const onScroll = () => {
-    if (!isScrollTicking) {
-      window.requestAnimationFrame(() => {
-        const scrollY = window.scrollY;
-        if (btt) {
-          btt.classList.toggle('visible', scrollY > 180);
-        }
-        if (!isClickScrolling) {
-          updateActiveNav();
-        }
-        isScrollTicking = false;
-      });
-      isScrollTicking = true;
-    }
-  };
-
-  window.addEventListener('scroll', onScroll, { passive: true });
-  window.addEventListener('resize', onScroll, { passive: true });
-
-  // 返回顶部按钮逻辑
-  if (btt) {
-    btt.addEventListener('click', () => {
-      isClickScrolling = true;
-      if (clickTimer) clearTimeout(clickTimer);
-      setActiveNav(sectionIds[0]);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      clickTimer = setTimeout(() => {
-        isClickScrolling = false;
-        updateActiveNav();
-      }, 800);
-    });
-  }
-
-  // 页面就绪时初始化一次高亮状态
-  updateActiveNav();
-}
 
 /** HTML 特殊字符转义 */
 function escapeHtml(str) {
@@ -1317,7 +1185,6 @@ $('adaptive').addEventListener('change', () => {
 
 // --- 启动初始化 ---
 initTheme();
-initNavigation();
 initCustomSelects();
 load();
 

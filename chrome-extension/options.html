@@ -43,27 +43,7 @@
     </div>
   </header>
 
-  <!-- Sticky Quick Nav Bar -->
-  <nav class="sticky-nav" id="stickyNav" aria-label="快捷跳转导航">
-    <div class="nav-track">
-      <a href="#statusWidget" class="nav-item active" data-target="statusWidget">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        <span>全链路遥测</span>
-      </a>
-      <a href="#cardCredentials" class="nav-item" data-target="cardCredentials">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span>认证凭据</span>
-      </a>
-      <a href="#cardPolicy" class="nav-item" data-target="cardPolicy">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        <span>保活策略</span>
-      </a>
-      <a href="#cardTriggers" class="nav-item" data-target="cardTriggers">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
-        <span>自动触发</span>
-      </a>
-    </div>
-  </nav>
+
 
   <!-- Live Telemetry & Diagnostic Dashboard (Hero Cockpit) -->
   <section class="card status-hero" id="statusWidget">
@@ -236,219 +216,218 @@
     <span class="toast-msg" id="toastMsg"></span>
   </div>
 
-  <!-- Dashboard Body: Modern Dual-Column Layout (主控区 + 辅助智能区) -->
-  <div class="dashboard-body">
+  <!-- Dashboard Body: Balanced 2-Column Dashboard (双列 2:2 黄金对称仪表盘) -->
+  <form id="form" class="dashboard-body" autocomplete="off">
 
-    <!-- Primary Form Column (左侧核心配置) -->
-    <div class="dashboard-primary">
-      <form id="form" autocomplete="off">
+    <!-- Left Column: 凭据鉴权 与 触发自动化 -->
+    <div class="dashboard-col">
 
-        <!-- Card 1: 认证信息 -->
-        <div class="card form-card" id="cardCredentials">
-          <div class="card-header">
-            <div class="card-icon blue">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            </div>
-            <div class="card-title-box">
-              <div class="card-title-row">
-                <h2>认证凭据与网络</h2>
-                <span class="step-badge blue">01 · 凭据鉴权</span>
-              </div>
+      <!-- Card 1: 认证信息 -->
+      <div class="card form-card" id="cardCredentials">
+        <div class="card-header">
+          <div class="card-icon blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div class="card-title-box">
+            <div class="card-title-row">
+              <h2>认证凭据与网络</h2>
+              <span class="step-badge blue">01 · 凭据鉴权</span>
             </div>
           </div>
+        </div>
 
-          <div class="card-body">
-            <div class="grid-2-col">
-              <div class="field">
-                <label for="account">上网账号</label>
-                <div class="input-wrap">
-                  <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                  <input type="text" id="account" placeholder="手机号 / 学号 / 认证账号" spellcheck="false" required>
-                  <button type="button" id="clearAccount" class="field-clear-btn" title="清空账号" aria-label="清空账号">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                  </button>
-                </div>
-              </div>
-
-              <div class="field">
-                <label for="password">认证密码</label>
-                <div class="input-wrap">
-                  <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                  <input type="password" id="password" placeholder="校园网登录密码" spellcheck="false" required>
-                  <button type="button" id="togglePwd" class="pwd-toggle-btn" title="显示/隐藏密码">
-                    <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  </button>
-                </div>
+        <div class="card-body">
+          <div class="grid-2-col">
+            <div class="field">
+              <label for="account">上网账号</label>
+              <div class="input-wrap">
+                <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <input type="text" id="account" placeholder="手机号 / 学号 / 认证账号" spellcheck="false" required>
+                <button type="button" id="clearAccount" class="field-clear-btn" title="清空账号" aria-label="清空账号">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
               </div>
             </div>
 
             <div class="field">
-              <label for="isp">运营商选择 (R3 认证参数)</label>
+              <label for="password">认证密码</label>
+              <div class="input-wrap">
+                <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input type="password" id="password" placeholder="校园网登录密码" spellcheck="false" required>
+                <button type="button" id="togglePwd" class="pwd-toggle-btn" title="显示/隐藏密码">
+                  <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="isp">运营商选择 (R3 认证参数)</label>
+            <div class="select-wrap">
+              <select id="isp">
+                <option value="1">校园用户（默认，无后缀）</option>
+                <option value="2">校园电信（@dx）</option>
+                <option value="3">校园联通（@lt）</option>
+                <option value="4">校园其他（无后缀）</option>
+              </select>
+              <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: 自动化触发场景 -->
+      <div class="card form-card" id="cardTriggers">
+        <div class="card-header">
+          <div class="card-icon amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+          </div>
+          <div class="card-title-box">
+            <div class="card-title-row">
+              <h2>自动化触发与页面增强</h2>
+              <span class="step-badge amber">03 · 自动化增强</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="switch-row feature-tile">
+            <div class="switch-icon-box blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <div class="switch-info">
+              <div class="switch-title">
+                <span>断网跳转瞬间重连 (Instant Trigger)</span>
+                <span class="badge-primary">0秒响应 · 推荐</span>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="instantTrigger">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="switch-row feature-tile">
+            <div class="switch-icon-box purple">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+            <div class="switch-info">
+              <div class="switch-title">
+                <span>浏览器启动时自动登录</span>
+                <span class="badge-neutral">静默自启</span>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="autoOnStartup">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="switch-row feature-tile">
+            <div class="switch-icon-box amber">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </div>
+            <div class="switch-info">
+              <div class="switch-title">
+                <span>校园网门户页面自动填单并提交</span>
+                <span class="badge-neutral">内容脚本</span>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="contentAutoFill">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: 智能保活 与 操作配置 -->
+    <div class="dashboard-col">
+
+      <!-- Card 2: 智能保活策略 -->
+      <div class="card form-card" id="cardPolicy">
+        <div class="card-header">
+          <div class="card-icon emerald">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <div class="card-title-box">
+            <div class="card-title-row">
+              <h2>智能保活与轮询策略</h2>
+              <span class="step-badge emerald">02 · 自适应保活</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="switch-row feature-tile">
+            <div class="switch-icon-box emerald">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <div class="switch-info">
+              <div class="switch-title">
+                <span>自适应加速 (Adaptive Turbo)</span>
+                <span class="badge-success">极速秒级恢复</span>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="adaptive">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="grid-2-col" id="intervalGrid">
+            <div class="field">
+              <label for="intervalMin">正常在线时的检查间隔</label>
               <div class="select-wrap">
-                <select id="isp">
-                  <option value="1">校园用户（默认，无后缀）</option>
-                  <option value="2">校园电信（@dx）</option>
-                  <option value="3">校园联通（@lt）</option>
-                  <option value="4">校园其他（无后缀）</option>
+                <select id="intervalMin">
+                  <option value="0.016666666666666666">1 秒（最灵敏）</option>
+                  <option value="0.08333333333333333">5 秒</option>
+                  <option value="0.16666666666666666">10 秒（推荐 · 节能自适应）</option>
+                  <option value="0.5">30 秒</option>
+                  <option value="1">1 分钟</option>
+                  <option value="5">5 分钟（省电推荐）</option>
+                  <option value="10">10 分钟</option>
+                  <option value="30">30 分钟</option>
                 </select>
                 <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
-
-
-            </div>
-          </div>
-        </div>
-
-        <!-- Card 2: 智能保活策略 -->
-        <div class="card form-card" id="cardPolicy">
-          <div class="card-header">
-            <div class="card-icon emerald">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            </div>
-            <div class="card-title-box">
-              <div class="card-title-row">
-                <h2>智能保活与轮询策略</h2>
-                <span class="step-badge emerald">02 · 自适应保活</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="card-body">
-            <div class="switch-row feature-tile">
-              <div class="switch-icon-box emerald">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              </div>
-              <div class="switch-info">
-                <div class="switch-title">
-                  <span>自适应加速 (Adaptive Turbo)</span>
-                  <span class="badge-success">极速秒级恢复</span>
-                </div>
-              </div>
-              <label class="toggle-switch">
-                <input type="checkbox" id="adaptive">
-                <span class="slider"></span>
-              </label>
             </div>
 
-            <div class="grid-2-col" id="intervalGrid">
-              <div class="field">
-                <label for="intervalMin">正常在线时的检查间隔</label>
-                <div class="select-wrap">
-                  <select id="intervalMin">
-                    <option value="0.016666666666666666">1 秒（最灵敏）</option>
-                    <option value="0.08333333333333333">5 秒</option>
-                    <option value="0.16666666666666666">10 秒（推荐 · 节能自适应）</option>
-                    <option value="0.5">30 秒</option>
-                    <option value="1">1 分钟</option>
-                    <option value="5">5 分钟（省电推荐）</option>
-                    <option value="10">10 分钟</option>
-                    <option value="30">30 分钟</option>
-                  </select>
-                  <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
-              </div>
-
-              <div class="field" id="offlineRow">
-                <label for="offlineIntervalMin">掉线抢修时的重试间隔</label>
-                <div class="select-wrap">
-                  <select id="offlineIntervalMin">
-                    <option value="0.016666666666666666">1 秒（最快 · 推荐）</option>
-                    <option value="0.08333333333333333">5 秒</option>
-                    <option value="0.16666666666666666">10 秒</option>
-                    <option value="0.5">30 秒</option>
-                    <option value="1">1 分钟</option>
-                  </select>
-                  <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
+            <div class="field" id="offlineRow">
+              <label for="offlineIntervalMin">掉线抢修时的重试间隔</label>
+              <div class="select-wrap">
+                <select id="offlineIntervalMin">
+                  <option value="0.016666666666666666">1 秒（最快 · 推荐）</option>
+                  <option value="0.08333333333333333">5 秒</option>
+                  <option value="0.16666666666666666">10 秒</option>
+                  <option value="0.5">30 秒</option>
+                  <option value="1">1 分钟</option>
+                </select>
+                <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Card 3: 自动化触发场景 -->
-        <div class="card form-card" id="cardTriggers">
-          <div class="card-header">
-            <div class="card-icon amber">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
-            </div>
-            <div class="card-title-box">
-              <div class="card-title-row">
-                <h2>自动化触发与页面增强</h2>
-                <span class="step-badge amber">03 · 自动化增强</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="card-body">
-            <div class="switch-row feature-tile">
-              <div class="switch-icon-box blue">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              </div>
-              <div class="switch-info">
-                <div class="switch-title">
-                  <span>断网跳转瞬间重连 (Instant Trigger)</span>
-                  <span class="badge-primary">0秒响应 · 推荐</span>
-                </div>
-              </div>
-              <label class="toggle-switch">
-                <input type="checkbox" id="instantTrigger">
-                <span class="slider"></span>
-              </label>
-            </div>
-
-            <div class="switch-row feature-tile">
-              <div class="switch-icon-box purple">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-              </div>
-              <div class="switch-info">
-                <div class="switch-title">
-                  <span>浏览器启动时自动登录</span>
-                  <span class="badge-neutral">静默自启</span>
-                </div>
-              </div>
-              <label class="toggle-switch">
-                <input type="checkbox" id="autoOnStartup">
-                <span class="slider"></span>
-              </label>
-            </div>
-
-            <div class="switch-row feature-tile">
-              <div class="switch-icon-box amber">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              </div>
-              <div class="switch-info">
-                <div class="switch-title">
-                  <span>校园网门户页面自动填单并提交</span>
-                  <span class="badge-neutral">内容脚本</span>
-                </div>
-              </div>
-              <label class="toggle-switch">
-                <input type="checkbox" id="contentAutoFill">
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-      </form>
-    </div>
-
-    <!-- Auxiliary Sidebar Column (右侧画像与排障枢纽) -->
-    <aside class="dashboard-sidebar">
-
-      <!-- Configuration Actions Card (右侧操作与配置中心) -->
-      <div class="card side-card side-actions-card" id="cardActions">
-        <div class="side-card-header">
-          <div class="card-icon emerald">
+      <!-- Card 4: 操作与配置管理 -->
+      <div class="card form-card side-actions-card" id="cardActions">
+        <div class="card-header">
+          <div class="card-icon purple">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           </div>
-          <div class="side-card-title">
-            <h3>操作与配置管理</h3>
+          <div class="card-title-box">
+            <div class="card-title-row">
+              <h2>操作与配置管理</h2>
+              <span class="step-badge purple">04 · 配置管理</span>
+            </div>
           </div>
         </div>
 
-        <div class="side-card-body side-actions-body">
-          <button type="submit" form="form" class="btn-main side-btn-main" id="btnSave">
+        <div class="card-body side-actions-body">
+          <button type="submit" class="btn-main side-btn-main" id="btnSave">
             <span class="btn-shimmer"></span>
             <svg class="btn-spinner" id="saveSpinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
             <svg class="btn-icon" id="saveIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
@@ -477,20 +456,9 @@
         </div>
       </div>
 
+    </div>
 
-
-
-    </aside>
-  </div>
-
-
-  <!-- Floating Back to Top Button -->
-  <button type="button" class="back-to-top" id="btnBackToTop" title="返回顶部" aria-label="返回顶部">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M18 15l-6-6-6 6"/>
-    </svg>
-    <span class="back-to-top-tip">返回顶部</span>
-  </button>
+  </form>
 
 </div>
 
