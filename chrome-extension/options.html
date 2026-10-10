@@ -475,35 +475,6 @@
           </div>
         </div>
 
-        <!-- Bottom Actions (表单提交与导入导出) -->
-        <div class="form-actions">
-          <button type="submit" class="btn-main" id="btnSave">
-            <span class="btn-shimmer"></span>
-            <svg class="btn-spinner" id="saveSpinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
-            <svg class="btn-icon" id="saveIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            <span id="btnSaveText">保存配置并立即测试</span>
-            <span class="kbd-pill" title="快捷键 Ctrl+S 保存">Ctrl+S</span>
-            <span class="unsaved-dot" id="unsavedDot" title="有尚未保存的更改"></span>
-          </button>
-
-          <div class="aux-actions">
-            <button type="button" class="btn-aux" id="btnExportConfig" title="导出当前所有配置为 JSON 备份文件">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              <span>导出配置</span>
-            </button>
-
-            <button type="button" class="btn-aux" id="btnImportConfig" title="从 JSON 备份文件恢复配置">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              <span>导入配置</span>
-            </button>
-            <input type="file" id="importFileInput" accept=".json,application/json" style="display:none">
-
-            <button type="button" class="btn-ghost-danger" id="btnResetDefaults" title="将所有设置恢复为出厂默认">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-              <span>恢复默认</span>
-            </button>
-          </div>
-        </div>
       </form>
     </div>
 
@@ -614,6 +585,36 @@
           </div>
         </div>
       </details>
+
+      <!-- Configuration Actions Card (右侧操作与配置中心) -->
+      <div class="card side-card side-actions-card" id="cardActions">
+        <button type="submit" form="form" class="btn-main side-btn-main" id="btnSave">
+          <span class="btn-shimmer"></span>
+          <svg class="btn-spinner" id="saveSpinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+          <svg class="btn-icon" id="saveIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          <span id="btnSaveText">保存配置并立即测试</span>
+          <span class="kbd-pill" title="快捷键 Ctrl+S 保存">Ctrl+S</span>
+          <span class="unsaved-dot" id="unsavedDot" title="有尚未保存的更改"></span>
+        </button>
+
+        <div class="side-aux-grid">
+          <button type="button" class="btn-aux" id="btnExportConfig" title="导出当前所有配置为 JSON 备份文件">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>导出配置</span>
+          </button>
+
+          <button type="button" class="btn-aux" id="btnImportConfig" title="从 JSON 备份文件恢复配置">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>导入配置</span>
+          </button>
+          <input type="file" id="importFileInput" accept=".json,application/json" style="display:none">
+
+          <button type="button" class="btn-ghost-danger side-btn-reset" id="btnResetDefaults" title="将所有设置恢复为出厂默认">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            <span>恢复默认设置</span>
+          </button>
+        </div>
+      </div>
     </aside>
   </div>
 

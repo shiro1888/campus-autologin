@@ -2205,22 +2205,39 @@ select:focus {
 }
 
 /* ==========================================================================
-   Form Actions (Bottom Button Bar)
+   Sidebar Actions Card (侧边栏操作与保存面板)
    ========================================================================== */
-.form-actions {
+.side-actions-card {
+  padding: 16px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-top: 4px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.aux-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+.side-btn-main {
+  width: 100%;
+  justify-content: center;
+  height: 44px;
+}
+
+.side-aux-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.side-aux-grid .btn-aux {
+  height: 38px;
+  padding: 0 10px;
+  justify-content: center;
+  font-size: 12.5px;
+}
+
+.side-btn-reset {
+  grid-column: span 2;
+  height: 36px;
+  justify-content: center;
+  font-size: 12.5px;
 }
 
 .btn-main {

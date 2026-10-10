@@ -970,6 +970,16 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// 点击保存按钮可靠触发表单校验与提交
+const btnSaveEl = $('btnSave');
+if (btnSaveEl) {
+  btnSaveEl.addEventListener('click', () => {
+    if (!btnSaveEl.disabled) {
+      $('form').dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+  });
+}
+
 // --- 顶部快捷：测试连接/检测状态 ---
 $('btnCheckStatus').addEventListener('click', () => {
   refreshStatus(() => {
