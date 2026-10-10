@@ -2820,28 +2820,6 @@ details[open] .faq-content {
   font-size: 12px;
 }
 
-/* ==========================================================================
-   Page Footer
-   ========================================================================== */
-.page-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px 0 0;
-}
-
-.sec-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  color: var(--text-light);
-}
-
-.sec-badge svg {
-  width: 14px;
-  height: 14px;
-}
 
 @keyframes spin {
   from { transform: rotate(0deg); }
