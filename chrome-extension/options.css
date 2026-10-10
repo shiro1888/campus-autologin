@@ -2940,12 +2940,6 @@ details[open] .faq-content {
 
   .dashboard-sidebar {
     position: static;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .side-actions-card {
-    order: -1;
   }
 
   .network-topology-strip {
