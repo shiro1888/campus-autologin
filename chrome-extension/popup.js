@@ -555,13 +555,32 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 refresh();
 
-// --- Linear/Raycast 级卡片鼠标光斑跟随 ---
+// --- Linear/Raycast 级卡片鼠标光斑跟随（rAF 帧率节流与缓存优化） ---
 if (window.matchMedia('(hover: hover)').matches) {
   document.querySelectorAll('.card, .dock-item').forEach((card) => {
+    let rect = null;
+    let rafId = null;
+    card.addEventListener('mouseenter', () => {
+      rect = card.getBoundingClientRect();
+    });
     card.addEventListener('mousemove', (e) => {
-      const rect = card.getBoundingClientRect();
-      card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
-      card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+      if (!rect) rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      if (!rafId) {
+        rafId = window.requestAnimationFrame(() => {
+          card.style.setProperty('--mouse-x', `${x}px`);
+          card.style.setProperty('--mouse-y', `${y}px`);
+          rafId = null;
+        });
+      }
+    });
+    card.addEventListener('mouseleave', () => {
+      rect = null;
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+        rafId = null;
+      }
     });
   });
 }
