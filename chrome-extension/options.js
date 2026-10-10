@@ -108,25 +108,7 @@ function updateTopology(res) {
   }
 }
 
-/** 运营商快速切换微标签 */
-function initIspChips() {
-  document.querySelectorAll('.isp-chip').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      const val = chip.getAttribute('data-isp');
-      if (!val) return;
-      $('isp').value = val;
-      syncCustomSelect('isp');
-      syncIspChips(val);
-      save(() => showToast('已切换运营商: ' + chip.textContent.trim(), 'ok'));
-    });
-  });
-}
 
-function syncIspChips(val) {
-  document.querySelectorAll('.isp-chip').forEach((chip) => {
-    chip.classList.toggle('active', chip.getAttribute('data-isp') === String(val));
-  });
-}
 
 /** 主题切换管理 */
 let currentThemePref = 'auto';
@@ -587,7 +569,6 @@ function load() {
     const storedIsp = typeof s.isp === 'string' ? s.isp : String(s.isp || '1');
     $('isp').value = ['1', '2', '3', '4'].indexOf(storedIsp) !== -1 ? storedIsp : '1';
     syncCustomSelect('isp');
-    syncIspChips($('isp').value);
 
     pickClosest('intervalMin', s.intervalMin === undefined ? DEFAULTS.intervalMin : s.intervalMin);
     pickClosest('offlineIntervalMin', s.offlineIntervalMin === undefined ? DEFAULTS.offlineIntervalMin : s.offlineIntervalMin);
@@ -1330,7 +1311,6 @@ $('adaptive').addEventListener('change', () => {
 // --- 下拉框改动即时保存 ---
 ['intervalMin', 'offlineIntervalMin', 'isp'].forEach((id) => {
   $(id).addEventListener('change', () => {
-    if (id === 'isp') syncIspChips($(id).value);
     save(() => showToast('参数已自动保存并生效。', 'ok'));
   });
 });
@@ -1339,7 +1319,6 @@ $('adaptive').addEventListener('change', () => {
 initTheme();
 initNavigation();
 initCustomSelects();
-initIspChips();
 load();
 
 // 适配 macOS / Windows 键盘快捷键指示徽章
