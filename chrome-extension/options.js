@@ -323,21 +323,17 @@ function initNavigation() {
     });
   }
 
-  // 滚动与视口尺寸变化监听（节流）
+  // 滚动与视口尺寸变化监听（基于 requestAnimationFrame 节流杜绝掉帧）
   const onScroll = () => {
-    // 处理返回顶部按钮显隐
-    if (btt) {
-      if (window.scrollY > 180) {
-        btt.classList.add('visible');
-      } else {
-        btt.classList.remove('visible');
-      }
-    }
-
-    // 更新导航高亮
-    if (!isClickScrolling && !isScrollTicking) {
+    if (!isScrollTicking) {
       window.requestAnimationFrame(() => {
-        updateActiveNav();
+        const scrollY = window.scrollY;
+        if (btt) {
+          btt.classList.toggle('visible', scrollY > 180);
+        }
+        if (!isClickScrolling) {
+          updateActiveNav();
+        }
         isScrollTicking = false;
       });
       isScrollTicking = true;
@@ -1400,15 +1396,4 @@ chrome.storage.onChanged.addListener((changes, area) => {
     applyTheme(changes.theme.newValue || 'auto');
   }
 });
-
-// --- Linear/Raycast 级卡片鼠标光斑跟随 ---
-if (window.matchMedia('(hover: hover)').matches) {
-  document.querySelectorAll('.stat-card, .form-card, .side-card, .card').forEach((card) => {
-    card.addEventListener('mousemove', (e) => {
-      const rect = card.getBoundingClientRect();
-      card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
-      card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
-    });
-  });
-}
 

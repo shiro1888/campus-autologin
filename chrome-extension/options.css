@@ -106,7 +106,7 @@
 body {
   background-color: var(--bg-page);
   background-image: linear-gradient(180deg, #e8f1fc 0%, #f0f4f9 280px, #f0f4f9 100%);
-  background-attachment: fixed;
+  background-repeat: no-repeat;
   color: var(--text-main);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", sans-serif;
   font-size: 14px;
@@ -121,35 +121,31 @@ body {
 [data-theme="dark"] body {
   background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px);
   background-size: 28px 28px;
-  background-attachment: scroll;
 }
 
 @media (prefers-color-scheme: dark) {
   [data-theme="auto"] body {
     background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px);
     background-size: 28px 28px;
-    background-attachment: scroll;
   }
 }
 
-/* Ambient Top Light Mesh */
+/* Ambient Top Light Mesh (硬件加速独立层，杜绝页面滚动重绘与滤波开销) */
 .page-ambient-mesh {
-  position: fixed;
+  position: absolute;
   top: -180px;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate3d(-50%, 0, 0);
   width: 1000px;
   height: 380px;
-  background: radial-gradient(circle at 50% 30%, rgba(37, 99, 235, 0.07) 0%, transparent 65%);
-  filter: blur(70px);
+  background: radial-gradient(circle at 50% 35%, rgba(37, 99, 235, 0.06) 0%, rgba(37, 99, 235, 0.02) 40%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
 
 [data-theme="dark"] .page-ambient-mesh {
-  background: radial-gradient(circle at 30% 40%, rgba(37, 99, 235, 0.14) 0%, transparent 60%),
-              radial-gradient(circle at 70% 30%, rgba(16, 185, 129, 0.12) 0%, transparent 60%);
-  filter: blur(80px);
+  background: radial-gradient(circle at 30% 40%, rgba(37, 99, 235, 0.1) 0%, rgba(37, 99, 235, 0.03) 45%, transparent 65%),
+              radial-gradient(circle at 70% 30%, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.02) 45%, transparent 65%);
 }
 
 /* --- Container --- */
@@ -323,7 +319,6 @@ body {
   font-weight: 600;
   box-shadow: var(--shadow-sm);
   transition: all 0.25s var(--ease-spring);
-  backdrop-filter: blur(12px);
 }
 
 .theme-toggle-btn:hover {
@@ -356,7 +351,6 @@ body {
   font-size: 13px;
   font-weight: 500;
   transition: all 0.25s var(--ease-spring);
-  backdrop-filter: blur(12px);
 }
 
 .portal-link-btn:hover {
@@ -404,6 +398,7 @@ body {
   align-items: center;
   justify-content: center;
   margin: -10px 0 2px;
+  transform: translateZ(0);
 }
 
 .nav-track {
@@ -412,8 +407,6 @@ body {
   gap: 4px;
   padding: 5px 8px;
   background: var(--bg-card);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-pill);
   box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.08), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
@@ -510,8 +503,7 @@ body {
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
   overflow: hidden;
-  backdrop-filter: blur(16px);
-  transition: all 0.3s var(--ease-smooth);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .card:hover {
@@ -1062,52 +1054,6 @@ body {
 
 [data-theme="dark"] .stat-card:hover {
   box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(59, 130, 246, 0.22);
-}
-
-/* Linear/Raycast 级鼠标光斑跟随 (Spotlight Glow) */
-.stat-card,
-.form-card,
-.side-card {
-  --mouse-x: -999px;
-  --mouse-y: -999px;
-}
-
-.stat-card::after,
-.form-card::after,
-.side-card::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: radial-gradient(
-    200px circle at var(--mouse-x) var(--mouse-y),
-    rgba(37, 99, 235, 0.35),
-    transparent 70%
-  );
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-  z-index: 3;
-}
-
-[data-theme="dark"] .stat-card::after,
-[data-theme="dark"] .form-card::after,
-[data-theme="dark"] .side-card::after {
-  background: radial-gradient(
-    220px circle at var(--mouse-x) var(--mouse-y),
-    rgba(96, 165, 250, 0.4),
-    transparent 70%
-  );
-}
-
-.stat-card:hover::after,
-.form-card:hover::after,
-.side-card:hover::after {
-  opacity: 1;
 }
 
 /* 就地触感复制浮动微气泡 */
@@ -1756,8 +1702,6 @@ select:focus {
   z-index: 100;
   padding: 6px;
   background: var(--bg-card);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-popover);
@@ -2344,7 +2288,6 @@ select:focus {
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-color);
   background: var(--bg-card);
-  backdrop-filter: blur(12px);
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 500;
@@ -2484,8 +2427,6 @@ select:focus {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   position: relative;
   overflow: hidden;
   display: flex;
@@ -2856,8 +2797,6 @@ details[open] .faq-content {
   border-radius: 50%;
   border: 1px solid var(--border-color);
   background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   color: var(--text-muted);
   box-shadow: 0 10px 28px -4px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06);
   cursor: pointer;
