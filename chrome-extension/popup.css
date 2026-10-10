@@ -2,7 +2,7 @@
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
   --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
-  --primary-shadow: 0 2px 10px -1px rgba(37, 99, 235, 0.35);
+  --primary-shadow: 0 4px 18px -2px rgba(37, 99, 235, 0.38);
 
   --success: #10b981;
   --success-glow: rgba(16, 185, 129, 0.2);
@@ -20,29 +20,29 @@
   --warning-border: #fde68a;
   --warning-bg: #fffbeb;
 
-  --bg-page: #f0f4f9;
+  --bg-page: #f8fafc;
   --bg-card: #ffffff;
-  --bg-dock: #ffffff;
-  --bg-card-subtle: #f8fafc;
+  --bg-dock: rgba(255, 255, 255, 0.95);
+  --bg-card-subtle: rgba(241, 245, 249, 0.85);
 
   --text-main: #0f172a;
   --text-muted: #334155;
   --text-light: #64748b;
 
-  --border-hairline: #e2e8f0;
-  --border-subtle: #cbd5e1;
+  --border-hairline: rgba(148, 163, 184, 0.2);
+  --border-subtle: rgba(148, 163, 184, 0.32);
 
-  --radius-xl: 18px;
-  --radius-lg: 14px;
-  --radius-md: 10px;
+  --radius-xl: 22px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
   --radius-sm: 8px;
   --radius-pill: 9999px;
 
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
 
-  --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(226, 232, 240, 0.85);
-  --shadow-dock: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(226, 232, 240, 0.85);
+  --shadow-card: 0 4px 20px -3px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --shadow-dock: 0 2px 14px -2px rgba(15, 23, 42, 0.05);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
@@ -96,7 +96,6 @@
 body {
   width: 375px;
   background-color: var(--bg-page);
-  background-image: linear-gradient(180deg, #e8f1fc 0%, #f0f4f9 160px, #f0f4f9 100%);
   color: var(--text-main);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", sans-serif;
   font-size: 13px;
@@ -105,16 +104,6 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-}
-
-[data-theme="dark"] body {
-  background-image: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) body {
-    background-image: none;
-  }
 }
 
 @keyframes popupEntrance {
@@ -219,18 +208,8 @@ body {
   font-weight: 700;
   font-size: 13.5px;
   line-height: 1.25;
-  color: #1e40af;
-  letter-spacing: -0.015em;
-}
-
-[data-theme="dark"] .brand-name {
   color: var(--text-main);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .brand-name {
-    color: var(--text-main);
-  }
+  letter-spacing: -0.015em;
 }
 
 .brand-sub {
