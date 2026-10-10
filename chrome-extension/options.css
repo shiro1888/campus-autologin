@@ -2420,12 +2420,6 @@ select:focus {
   }
 }
 
-@media (max-width: 640px) {
-  .dock-aux-group {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 768px) {
   body {
     padding: 24px 16px 100px;
@@ -2467,6 +2461,10 @@ select:focus {
 }
 
 @media (max-width: 640px) {
+  .dock-aux-group {
+    grid-template-columns: 1fr;
+  }
+
   .network-topology-strip {
     flex-direction: column;
     align-items: stretch;
