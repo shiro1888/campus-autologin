@@ -511,12 +511,12 @@ $('openOptions').addEventListener('click', (e) => {
 });
 
 // --- 同步设置页选择的主题 ---
-let currentThemePref = 'auto';
 function applyPopupTheme(theme) {
-  currentThemePref = theme || 'auto';
-  const sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const effective = currentThemePref === 'auto' ? (sysDark ? 'dark' : 'light') : currentThemePref;
-  document.documentElement.setAttribute('data-theme', effective);
+  if (theme && theme !== 'auto') {
+    document.documentElement.setAttribute('data-theme', theme);
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
 }
 
 // --- 一键切换深色/浅色主题 (太阳/月亮) ---
@@ -542,13 +542,6 @@ if (btnTheme) {
   });
 }
 
-if (window.matchMedia) {
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (currentThemePref === 'auto') {
-      applyPopupTheme('auto');
-    }
-  });
-}
 
 chrome.storage.local.get({ theme: 'auto' }, (s) => {
   applyPopupTheme(s && s.theme);
