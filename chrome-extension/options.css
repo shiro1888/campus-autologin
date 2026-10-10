@@ -2449,16 +2449,6 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  position: sticky;
-  top: 76px;
-  max-height: calc(100vh - 92px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-}
-
-.dashboard-sidebar::-webkit-scrollbar {
-  display: none;
 }
 
 /* ==========================================================================
