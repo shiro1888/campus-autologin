@@ -423,7 +423,7 @@ $('btnLogout').addEventListener('click', () => {
 
 // --- 一键复制 IP ---
 $('ipChip').addEventListener('click', (e) => {
-  if (!currentIp || currentIp === '未检测到') return;
+  if (!currentIp || currentIp === '未检测到' || currentIp === '未连接') return;
 
   navigator.clipboard.writeText(currentIp).then(() => {
     const chip = $('ipChip');

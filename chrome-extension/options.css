@@ -3086,6 +3086,18 @@ details[open] .faq-content {
     border-radius: var(--radius-lg);
   }
 
+  .side-card {
+    padding: 16px 14px;
+  }
+
+  .faq-summary {
+    padding: 14px 14px;
+  }
+
+  .faq-content {
+    padding: 12px 14px 16px;
+  }
+
   .card-header {
     gap: 10px;
   }
