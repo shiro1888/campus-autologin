@@ -181,7 +181,7 @@ function initTheme() {
 function initNavigation() {
   const navItems = document.querySelectorAll('.sticky-nav .nav-item');
   const btt = $('btnBackToTop');
-  const sectionIds = ['statusWidget', 'cardCredentials', 'cardPolicy', 'cardTriggers', 'cardFaq'];
+  const sectionIds = ['statusWidget', 'cardCredentials', 'cardPolicy', 'cardTriggers'];
 
   let isClickScrolling = false;
   let clickTimer = null;
@@ -214,7 +214,7 @@ function initNavigation() {
       return;
     }
 
-    // 页面滚动至接近底部（距底 70px 内）时，锁定高亮末尾模块（常见问题）
+    // 页面滚动至接近底部（距底 70px 内）时，锁定高亮末尾模块
     if (scrollY + viewportHeight >= docHeight - 70) {
       setActiveNav(sectionIds[sectionIds.length - 1]);
       return;
@@ -244,11 +244,6 @@ function initNavigation() {
       const targetEl = $(targetId);
       if (!targetEl) return;
 
-      // 若目标为 FAQ 折叠栏，点击导航时自动展开
-      if (targetId === 'cardFaq' && targetEl.tagName === 'DETAILS') {
-        targetEl.open = true;
-      }
-
       // 锁定滚动监听，防止平滑滚动过程中的中间区域抢占高亮
       isClickScrolling = true;
       if (clickTimer) clearTimeout(clickTimer);
@@ -276,14 +271,6 @@ function initNavigation() {
         updateActiveNav();
       }
     }, { passive: true });
-  }
-
-  // 监听 FAQ 折叠状态变化，展开/折叠时重新校验视口高亮
-  const faqEl = $('cardFaq');
-  if (faqEl) {
-    faqEl.addEventListener('toggle', () => {
-      if (!isClickScrolling) updateActiveNav();
-    });
   }
 
   // 滚动与视口尺寸变化监听（基于 requestAnimationFrame 节流杜绝掉帧）

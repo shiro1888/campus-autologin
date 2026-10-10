@@ -469,8 +469,7 @@ body {
 #statusWidget,
 #cardCredentials,
 #cardPolicy,
-#cardTriggers,
-#cardFaq {
+#cardTriggers {
   scroll-margin-top: 76px;
 }
 
@@ -2591,148 +2590,7 @@ select:focus {
 
 
 
-/* FAQ Summary Badge and Title enhancement */
-.faq-summary-badge {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: rgba(37, 99, 235, 0.1);
-  color: var(--primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
 
-[data-theme="dark"] .faq-summary-badge {
-  background: rgba(59, 130, 246, 0.18);
-  color: #60a5fa;
-}
-
-.faq-summary-badge svg {
-  width: 17px;
-  height: 17px;
-}
-
-.faq-summary-titles {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.faq-main-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.faq-sub-title {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-/* ==========================================================================
-   FAQ / Accordion Card (右侧辅助排障卡)
-   ========================================================================== */
-.faq-card {
-  padding: 0;
-  gap: 0;
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-}
-
-.faq-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  cursor: pointer;
-  list-style: none;
-  user-select: none;
-  transition: background-color 0.2s ease;
-}
-
-.faq-summary:hover {
-  background: var(--bg-card-subtle);
-}
-
-.faq-summary::-webkit-details-marker { display: none; }
-
-.faq-header-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-weight: 600;
-  color: var(--text-main);
-  font-size: 14px;
-}
-
-.faq-icon {
-  width: 18px;
-  height: 18px;
-  color: var(--primary);
-}
-
-.faq-arrow {
-  width: 16px;
-  height: 16px;
-  color: var(--text-light);
-  transition: transform 0.25s var(--ease-spring);
-}
-
-details[open] .faq-arrow {
-  transform: rotate(180deg);
-}
-
-.faq-content {
-  padding: 14px 20px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-details[open] .faq-content {
-  animation: faq-slide-down 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes faq-slide-down {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.faq-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.faq-q {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.faq-a {
-  font-size: 13px;
-  color: var(--text-muted);
-  line-height: 1.5;
-}
-
-.faq-a code {
-  background: var(--stat-bg);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-}
 
 
 @keyframes spin {
@@ -3021,13 +2879,6 @@ details[open] .faq-content {
     padding: 16px 14px;
   }
 
-  .faq-summary {
-    padding: 14px 14px;
-  }
-
-  .faq-content {
-    padding: 12px 14px 16px;
-  }
 
   .card-header {
     gap: 10px;
@@ -3129,7 +2980,6 @@ details[open] .faq-content {
 .portal-link-btn:focus-visible,
 .nav-item:focus-visible,
 .back-to-top:focus-visible,
-.faq-summary:focus-visible,
 #cardStatIp:focus-visible,
 #stMac:focus-visible,
 .toggle-switch input:focus-visible + .slider {
