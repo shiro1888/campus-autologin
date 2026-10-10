@@ -354,7 +354,7 @@ async function checkStatus() {
   try {
     text = await fetchText(url);
   } catch (e) {
-    return { reachable: false, online: false, raw: null, pingMs: -1, message: '不在校园网内 / 门户不可达' };
+    return { reachable: false, online: false, raw: null, pingMs: -1, message: '网络连接失败，请检查 Wi-Fi 或网线' };
   }
   const pingMs = Date.now() - t0;
 
@@ -449,7 +449,7 @@ async function doLogin(settings) {
   try {
     text = await fetchText(url);
   } catch (e) {
-    return fail('不在校园网内 / 门户不可达', false);
+    return fail('网络连接失败，请检查 Wi-Fi 或网线', false);
   }
 
   const data = parseJsonp(text);
@@ -507,7 +507,7 @@ async function doLogin(settings) {
 async function doLogout() {
   const st = await checkStatus();
   if (!st.reachable) {
-    return fail('不在校园网内 / 门户不可达', false);
+    return fail('网络连接失败，请检查 Wi-Fi 或网线', false);
   }
   const raw = st.raw || {};
   const ip = String(raw.v4ip || raw.ss5 || '');
@@ -1033,7 +1033,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         manualLogout: false,
         running: false,
         onlineSince: null,
-        message: '不在校园网内 / 门户不可达'
+        message: '网络连接失败，请检查 Wi-Fi 或网线'
       }));
     return true;
   }

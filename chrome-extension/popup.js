@@ -258,9 +258,9 @@ function refresh() {
 
     if (!res.reachable) {
       durationTicker.stop();
-      setStatus('未连接校园网', paused
-        ? '门户不可达；自动登录当前处于暂停状态'
-        : '门户不可达，请连接校园 Wi-Fi 或插网线', 'off');
+      setStatus('网络连接失败', paused
+        ? '未连上校园网；自动登录当前处于暂停状态'
+        : '未能连接到校园网，请检查 Wi-Fi 或插好网线', 'off');
       setLocalIp('');
       $('onlineDuration').textContent = '网络断开';
       $('btnLogin').classList.remove('online-mode');

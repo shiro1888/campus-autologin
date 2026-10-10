@@ -579,43 +579,43 @@
           </ul>
         </div>
       </div>
+
+      <!-- FAQ / Help Accordion (右侧辅助排障指南与常见问题) -->
+      <details class="card side-card faq-card" id="cardFaq">
+        <summary class="faq-summary">
+          <div class="faq-header-content">
+            <div class="faq-summary-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div class="faq-summary-titles">
+              <span class="faq-main-title">排障指南与常见问题</span>
+              <span class="faq-sub-title">4 组常见问题解答</span>
+            </div>
+          </div>
+          <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </summary>
+
+        <div class="faq-content">
+          <div class="faq-item">
+            <div class="faq-q">❓ 提示「网络连接失败」？</div>
+            <div class="faq-a">表示当前电脑未连接到校园网络（Wi-Fi 或网线接口），或者网卡正在获取 IP 地址。请确认电脑已连接校园网 Wi-Fi。</div>
+          </div>
+          <div class="faq-item">
+            <div class="faq-q">❓ 提示「密码错误」？</div>
+            <div class="faq-a">首先核对密码是否正确；其次，如果办理了电信/联通融合宽带，需在上方「运营商选择」切换为对应的运营商后缀。</div>
+          </div>
+          <div class="faq-item">
+            <div class="faq-q">❓ 账号密码安全吗？</div>
+            <div class="faq-a">绝对安全。所有凭据均保存在 Chrome 本地沙盒（<code>chrome.storage.local</code>），代码纯本地运行，不含任何外部上报与第三方请求。</div>
+          </div>
+          <div class="faq-item">
+            <div class="faq-q">❓ 修改代码后如何确认生效？</div>
+            <div class="faq-a">运行项目根目录下的 <code>reload_extension.bat</code>，在扩展管理页点击刷新。顶部右上角版本号显示为 <b>v1.0.0</b> 即代表最新版本生效。</div>
+          </div>
+        </div>
+      </details>
     </aside>
   </div>
-
-  <!-- FAQ / Help Accordion (底部全宽排障指南与常见问题) -->
-  <details class="card faq-card" id="cardFaq">
-    <summary class="faq-summary">
-      <div class="faq-header-content">
-        <div class="faq-summary-badge">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        </div>
-        <div class="faq-summary-titles">
-          <span class="faq-main-title">排障指南与常见问题</span>
-          <span class="faq-sub-title">4 组常见问题解答</span>
-        </div>
-      </div>
-      <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-    </summary>
-
-    <div class="faq-content">
-      <div class="faq-item">
-        <div class="faq-q">❓ 提示「不在校园网内 / 门户不可达」？</div>
-        <div class="faq-a">表示当前电脑未连接到校园网络（Wi-Fi 或网线接口），或者网卡正在获取 IP 地址。请确认电脑已连接校园网 Wi-Fi。</div>
-      </div>
-      <div class="faq-item">
-        <div class="faq-q">❓ 提示「密码错误」？</div>
-        <div class="faq-a">首先核对密码是否正确；其次，如果办理了电信/联通融合宽带，需在上方「运营商选择」切换为对应的运营商后缀。</div>
-      </div>
-      <div class="faq-item">
-        <div class="faq-q">❓ 账号密码安全吗？</div>
-        <div class="faq-a">绝对安全。所有凭据均保存在 Chrome 本地沙盒（<code>chrome.storage.local</code>），代码纯本地运行，不含任何外部上报与第三方请求。</div>
-      </div>
-      <div class="faq-item">
-        <div class="faq-q">❓ 修改代码后如何确认生效？</div>
-        <div class="faq-a">运行项目根目录下的 <code>reload_extension.bat</code>，在扩展管理页点击刷新。顶部右上角版本号显示为 <b>v1.0.0</b> 即代表最新版本生效。</div>
-      </div>
-    </div>
-  </details>
 
   <!-- Security Footer -->
   <footer class="page-footer">

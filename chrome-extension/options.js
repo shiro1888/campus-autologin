@@ -128,9 +128,9 @@ function updateTopology(res) {
   }
 
   if (!res.reachable) {
-    if (authVal) authVal.textContent = '不可达';
+    if (authVal) authVal.textContent = '连接失败';
     if (authChip) authChip.className = 'topo-chip-badge off';
-    if (internetVal) internetVal.textContent = '未通畅';
+    if (internetVal) internetVal.textContent = '未连接';
     if (linkAuth) linkAuth.className = 'topo-link off';
   } else if (res.online) {
     if (authVal) authVal.textContent = '已认证 ✓';
@@ -882,7 +882,7 @@ function refreshStatus(cb) {
       }
       if (logoAv) logoAv.className = 'logo-beacon off';
       if (portalDot) portalDot.className = 'portal-dot off';
-      textEl.textContent = res.manualLogout ? '不在校园网内 · 已暂停' : '不在校园网内';
+      textEl.textContent = res.manualLogout ? '网络连接失败 · 已暂停' : '网络连接失败';
     } else if (res.online) {
       pill.className = 'status-pill on';
       if (heroEl) {

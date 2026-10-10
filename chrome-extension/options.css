@@ -2686,10 +2686,11 @@ select:focus {
 }
 
 /* ==========================================================================
-   FAQ / Accordion Card
+   FAQ / Accordion Card (右侧辅助排障卡)
    ========================================================================== */
 .faq-card {
   padding: 0;
+  gap: 0;
   border-radius: var(--radius-xl);
 }
 
@@ -2697,10 +2698,15 @@ select:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 24px;
+  padding: 16px 20px;
   cursor: pointer;
   list-style: none;
   user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.faq-summary:hover {
+  background: var(--bg-card-subtle);
 }
 
 .faq-summary::-webkit-details-marker { display: none; }
@@ -2708,7 +2714,7 @@ select:focus {
 .faq-header-content {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-weight: 600;
   color: var(--text-main);
   font-size: 14px;
@@ -2732,11 +2738,11 @@ details[open] .faq-arrow {
 }
 
 .faq-content {
-  padding: 6px 24px 24px;
+  padding: 14px 20px 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  border-top: 1px solid var(--border-color);
+  gap: 14px;
+  border-top: 1px solid var(--border-subtle);
 }
 
 details[open] .faq-content {
