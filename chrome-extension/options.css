@@ -1358,7 +1358,7 @@ body {
 
 .card-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 14px;
 }
 
@@ -1966,54 +1966,6 @@ select:focus {
   pointer-events: none;
 }
 
-.tip-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  background: rgba(37, 99, 235, 0.05);
-  border: 1px solid rgba(37, 99, 235, 0.15);
-  border-left: 3px solid var(--primary);
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  font-size: 12.5px;
-  color: var(--text-muted);
-  line-height: 1.5;
-  margin-top: 4px;
-}
-
-[data-theme="dark"] .tip-banner {
-  background: rgba(59, 130, 246, 0.08);
-  border-color: rgba(59, 130, 246, 0.2);
-  border-left-color: #60a5fa;
-  color: #cbd5e1;
-}
-
-.tip-banner-icon {
-  width: 16px;
-  height: 16px;
-  color: var(--primary);
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-[data-theme="dark"] .tip-banner-icon {
-  color: #60a5fa;
-}
-
-.tip-banner-text {
-  flex: 1;
-}
-
-.tip-banner-text b {
-  color: var(--text-main);
-  font-weight: 600;
-}
-
-.field-tip {
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.5;
-}
 
 /* ==========================================================================
    Switch Rows & Feature Tiles (iOS Style Toggle Switches)
@@ -2149,11 +2101,6 @@ select:focus {
 [data-theme="dark"] .badge-primary { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
 [data-theme="dark"] .badge-neutral { background: rgba(255, 255, 255, 0.08); color: #cbd5e1; border-color: rgba(255, 255, 255, 0.12); }
 
-.switch-desc {
-  font-size: 12.5px;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
 
 /* Toggle Switch Knob */
 .toggle-switch {
