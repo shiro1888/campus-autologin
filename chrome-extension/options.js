@@ -42,6 +42,12 @@ function showToast(text, kind) {
   }, 4500);
 }
 
+// 点击悬浮 Toast 胶囊即可立即快速关闭
+$('toastBar')?.addEventListener('click', () => {
+  $('toastBar').className = 'toast-bar';
+  if (toastTimer) clearTimeout(toastTimer);
+});
+
 /** 动态在线计时器 (秒表实时跳动) */
 const durationTicker = createTicker((text) => {
   $('stTime').textContent = text;
