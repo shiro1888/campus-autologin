@@ -431,6 +431,79 @@ body {
   background: radial-gradient(circle at 35% 35%, rgba(148, 163, 184, 0.12) 0%, transparent 70%);
 }
 
+/* ==========================================================================
+   Border Beam (Magic UI / Raycast 边缘巡回流光微交互)
+   ========================================================================== */
+@property --beam-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes border-beam-spin {
+  to {
+    --beam-angle: 360deg;
+  }
+}
+
+.status-card::after {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--beam-angle) at 50% 50%,
+    transparent 0deg,
+    transparent 280deg,
+    var(--primary) 325deg,
+    rgba(255, 255, 255, 0.95) 350deg,
+    var(--primary) 360deg
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 3;
+  animation: border-beam-spin 6s linear infinite;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 4px var(--primary));
+  transition: opacity 0.3s ease;
+}
+
+.status-card.on::after {
+  background: conic-gradient(
+    from var(--beam-angle) at 50% 50%,
+    transparent 0deg,
+    transparent 280deg,
+    #10b981 325deg,
+    #ffffff 350deg,
+    #10b981 360deg
+  );
+  filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.8));
+  animation-duration: 5s;
+}
+
+.status-card.off::after {
+  background: conic-gradient(
+    from var(--beam-angle) at 50% 50%,
+    transparent 0deg,
+    transparent 300deg,
+    #ef4444 340deg,
+    #fca5a5 355deg,
+    #ef4444 360deg
+  );
+  filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.6));
+  animation-duration: 8s;
+  opacity: 0.6;
+}
+
+[data-theme="light"] .status-card::after {
+  opacity: 0.75;
+  filter: drop-shadow(0 0 3px rgba(37, 99, 235, 0.35));
+}
+
 /* ON State: Vibrant Emerald & Cyan Aurora */
 .status-card.on {
   background: radial-gradient(circle at 14% 18%, rgba(16, 185, 129, 0.16) 0%, rgba(16, 185, 129, 0.02) 60%, transparent 80%),

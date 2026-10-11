@@ -463,6 +463,92 @@ body {
   100% { transform: scale(0.95) translate(-8px, 6px); opacity: 0.8; }
 }
 
+/* ==========================================================================
+   Border Beam (Magic UI / Raycast 边缘巡回流光微交互)
+   ========================================================================== */
+@property --beam-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes border-beam-spin {
+  to {
+    --beam-angle: 360deg;
+  }
+}
+
+.status-hero::after {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--beam-angle) at 50% 50%,
+    transparent 0deg,
+    transparent 280deg,
+    var(--primary) 325deg,
+    rgba(255, 255, 255, 0.95) 350deg,
+    var(--primary) 360deg
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 3;
+  animation: border-beam-spin 8s linear infinite;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 5px var(--primary));
+  transition: opacity 0.3s ease;
+}
+
+.status-hero.hero-on::after {
+  background: conic-gradient(
+    from var(--beam-angle) at 50% 50%,
+    transparent 0deg,
+    transparent 280deg,
+    #10b981 325deg,
+    #ffffff 350deg,
+    #10b981 360deg
+  );
+  filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.8));
+  animation-duration: 7s;
+}
+
+.status-hero.hero-off::after {
+  background: conic-gradient(
+    from var(--beam-angle) at 50% 50%,
+    transparent 0deg,
+    transparent 300deg,
+    #ef4444 340deg,
+    #fca5a5 355deg,
+    #ef4444 360deg
+  );
+  filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.6));
+  animation-duration: 10s;
+  opacity: 0.6;
+}
+
+.status-hero.hero-wait::after {
+  background: conic-gradient(
+    from var(--beam-angle) at 50% 50%,
+    transparent 0deg,
+    transparent 290deg,
+    #f59e0b 330deg,
+    #fef3c7 350deg,
+    #f59e0b 360deg
+  );
+  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.7));
+  animation-duration: 6s;
+}
+
+[data-theme="light"] .status-hero::after {
+  opacity: 0.75;
+  filter: drop-shadow(0 0 3px rgba(37, 99, 235, 0.35));
+}
+
 .hero-top-bar {
   display: flex;
   align-items: center;
