@@ -79,9 +79,16 @@
    * 校园网门户普遍以 GBK 为主，即便网关误标 utf-8 或未标 charset，
    * 也应优先尝试 GBK/GB18030，避免被浏览器默认 UTF-8 截断成乱码 (U+FFFD)。
    */
-  function fetchPortalText(url) {
-    return fetch(url, { cache: 'no-store', credentials: 'include' })
+  function fetchPortalText(url, timeoutMs = 8000) {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    return fetch(url, {
+      cache: 'no-store',
+      credentials: 'include',
+      signal: controller ? controller.signal : undefined
+    })
       .then(function (resp) {
+        if (timer) clearTimeout(timer);
         return resp.arrayBuffer().then(function (buf) {
           const ct = String(resp.headers && resp.headers.get ? (resp.headers.get('content-type') || '') : '');
           const m = /charset\s*=\s*"?([\w-]+)"?/i.exec(ct);
@@ -101,6 +108,10 @@
           }
           return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
         });
+      })
+      .catch(function (err) {
+        if (timer) clearTimeout(timer);
+        throw err;
       });
   }
 

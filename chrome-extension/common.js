@@ -165,38 +165,10 @@ function createSparkline(containerId, maxBars = 5) {
 }
 
 /**
- * 启用卡片鼠标微光跟随效果 (rAF 帧率节流)
- * @param {string} selector 元素选择器
+ * 启用卡片鼠标微光跟随效果（已精简：保持卡片克制高级无闪烁）
  */
-function initMouseGlow(selector = '.card') {
-  if (window.matchMedia && window.matchMedia('(hover: hover)').matches) {
-    document.querySelectorAll(selector).forEach((card) => {
-      let rect = null;
-      let rafId = null;
-      card.addEventListener('mouseenter', () => {
-        rect = card.getBoundingClientRect();
-      });
-      card.addEventListener('mousemove', (e) => {
-        if (!rect) rect = card.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        if (!rafId) {
-          rafId = window.requestAnimationFrame(() => {
-            card.style.setProperty('--mouse-x', `${x}px`);
-            card.style.setProperty('--mouse-y', `${y}px`);
-            rafId = null;
-          });
-        }
-      });
-      card.addEventListener('mouseleave', () => {
-        rect = null;
-        if (rafId) {
-          window.cancelAnimationFrame(rafId);
-          rafId = null;
-        }
-      });
-    });
-  }
+function initMouseGlow() {
+  // 卡片保持纯净沉静边框，不注入额外 mousemove 监听与 rAF 循环
 }
 
 /**

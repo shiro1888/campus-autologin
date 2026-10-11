@@ -1339,6 +1339,7 @@ def cmd_gui(args, cfg) -> int:
         try:
             with open(CONFIG_PATH, "w", encoding="utf-8") as fh:
                 json.dump(saved_cfg, fh, indent=2, ensure_ascii=False)
+            cfg.update(saved_cfg)
             messagebox.showinfo("提示", "配置已成功保存至 config.json")
         except Exception as e:
             messagebox.showerror("保存失败", str(e))

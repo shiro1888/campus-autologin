@@ -930,47 +930,8 @@ body {
   box-shadow: 0 0 5px rgba(239, 68, 68, 0.4);
 }
 
-/* Linear/Raycast 级鼠标光斑跟随 (Spotlight Glow) */
-.card,
-.dock-item {
-  --mouse-x: -999px;
-  --mouse-y: -999px;
-}
 
-.card::after,
-.dock-item::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: radial-gradient(
-    140px circle at var(--mouse-x) var(--mouse-y),
-    rgba(37, 99, 235, 0.32),
-    transparent 70%
-  );
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-  z-index: 3;
-}
 
-[data-theme="dark"] .card::after,
-[data-theme="dark"] .dock-item::after {
-  background: radial-gradient(
-    150px circle at var(--mouse-x) var(--mouse-y),
-    rgba(96, 165, 250, 0.38),
-    transparent 70%
-  );
-}
-
-.card:hover::after,
-.dock-item:hover::after {
-  opacity: 1;
-}
 
 /* 就地触感复制浮动微气泡 */
 .floating-copy-bubble {
