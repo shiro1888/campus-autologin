@@ -1191,7 +1191,7 @@ if (/Mac/i.test(navigator.platform || navigator.userAgent)) {
 }
 
 // 当偏好设置页面在前台激活时，每 15 秒自动向后台刷新一次网关状态（流量与Ping）
-setInterval(() => {
+const statusPollTimer = setInterval(() => {
   if (document.visibilityState === 'visible') {
     refreshStatus();
   }
@@ -1204,9 +1204,11 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-
-// --- 卡片鼠标微光跟随 ---
-initMouseGlow('.stat-card, .form-card, .side-card, .card');
+// 页面卸载时清理所有计时器
+window.addEventListener('beforeunload', () => {
+  clearInterval(statusPollTimer);
+  durationTicker.stop();
+});
 
 // --- 强调色切换选择器 ---
 function setAccentColor(accent) {

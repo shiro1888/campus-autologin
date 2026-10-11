@@ -835,6 +835,7 @@ async function autoLogin(trigger, manual) {
  */
 async function ensureAlarm() {
   try {
+    await hydrateState();
     const settings = await getSettings();
     let period;
     // 暂停态从设置里读，而不是靠调用方传参。

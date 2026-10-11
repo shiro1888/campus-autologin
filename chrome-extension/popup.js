@@ -519,5 +519,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 initAccent();
 refresh();
 
-// --- 卡片鼠标微光跟随 ---
-initMouseGlow('.card, .dock-item');
+// 页面隐藏/关闭时清理计时器
+window.addEventListener('pagehide', () => {
+  durationTicker.stop();
+});

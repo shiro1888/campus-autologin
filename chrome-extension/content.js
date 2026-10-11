@@ -357,9 +357,9 @@
       // 同网段可被篡改 —— 若直接拼进 innerHTML，等价于把任意 HTML/JS 注入门户页面
       // （实测 <img src=x onerror=...> 会真的执行）。
       hud.innerHTML = '<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:' + iconBg + ';color:#fff;font-size:11px;font-weight:bold;"></span> <span></span>';
-      const iconEl = hud.firstChild;
+      const iconEl = hud.firstElementChild;
       if (iconEl) iconEl.textContent = icon;
-      const textEl = hud.lastChild;
+      const textEl = hud.lastElementChild;
       if (textEl) textEl.textContent = String(text == null ? '' : text);
       if (state === 'success' || state === 'error') {
         setTimeout(function () {

@@ -164,12 +164,6 @@ function createSparkline(containerId, maxBars = 5) {
   };
 }
 
-/**
- * 启用卡片鼠标微光跟随效果（已精简：保持卡片克制高级无闪烁）
- */
-function initMouseGlow() {
-  // 卡片保持纯净沉静边框，不注入额外 mousemove 监听与 rAF 循环
-}
 
 /**
  * 设置或切换主题强调色 (科技蓝、极光紫、翡翠绿、落日橙、玫瑰粉)
