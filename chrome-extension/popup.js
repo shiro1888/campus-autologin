@@ -516,6 +516,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
+initAccent();
 refresh();
 
 // --- 卡片鼠标微光跟随 ---

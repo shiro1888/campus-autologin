@@ -199,3 +199,30 @@ function initMouseGlow(selector = '.card') {
   }
 }
 
+/**
+ * 设置或切换主题强调色 (科技蓝、极光紫、翡翠绿、落日橙、玫瑰粉)
+ */
+function applyAccent(accent) {
+  const valid = ['blue', 'purple', 'emerald', 'amber', 'rose'];
+  const target = valid.includes(accent) ? accent : 'blue';
+  document.documentElement.setAttribute('data-accent', target);
+}
+
+function initAccent(callback) {
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.get({ accentColor: 'blue' }, (res) => {
+      const acc = res && res.accentColor ? res.accentColor : 'blue';
+      applyAccent(acc);
+      if (typeof callback === 'function') callback(acc);
+    });
+    if (chrome.storage.onChanged) {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && changes.accentColor) {
+          applyAccent(changes.accentColor.newValue);
+          if (typeof callback === 'function') callback(changes.accentColor.newValue);
+        }
+      });
+    }
+  }
+}
+

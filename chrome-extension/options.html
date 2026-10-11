@@ -28,6 +28,25 @@
     </div>
 
     <div class="header-actions-bar">
+      <!-- Command Palette Trigger -->
+      <button type="button" class="cmd-palette-btn" id="btnOpenCmd" title="打开快捷命令面板 (快捷键 Ctrl+K)">
+        <svg class="cmd-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <span class="cmd-btn-text">快捷指令</span>
+        <kbd class="cmd-kbd">Ctrl K</kbd>
+      </button>
+
+      <!-- Accent Color Switcher -->
+      <div class="accent-palette-bar" id="accentPaletteBar" title="切换个性化强调色">
+        <button type="button" class="accent-dot active" data-accent="blue" title="科技蓝 (默认)"></button>
+        <button type="button" class="accent-dot" data-accent="purple" title="极光紫"></button>
+        <button type="button" class="accent-dot" data-accent="emerald" title="翡翠绿"></button>
+        <button type="button" class="accent-dot" data-accent="amber" title="落日橙"></button>
+        <button type="button" class="accent-dot" data-accent="rose" title="玫瑰粉"></button>
+      </div>
+
       <!-- Theme Switcher -->
       <button type="button" class="theme-toggle-btn" id="btnThemeToggle" title="切换深色/浅色模式">
         <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
@@ -452,6 +471,27 @@
 
   </form>
 
+</div>
+
+<!-- Raycast / Linear 风格快捷指令面板 (Command Palette) -->
+<div id="cmdPalette" class="cmd-palette-modal" style="display: none;" aria-hidden="true">
+  <div class="cmd-backdrop" id="cmdBackdrop"></div>
+  <div class="cmd-box" id="cmdBox" role="dialog" aria-modal="true" aria-label="快捷指令面板">
+    <div class="cmd-input-wrap">
+      <svg class="cmd-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input type="text" id="cmdInput" placeholder="输入命令或关键词 (如 login, turbo, theme, ip, copy)..." autocomplete="off" spellcheck="false">
+      <kbd class="cmd-esc-hint" id="cmdEscHint">ESC</kbd>
+    </div>
+    <div class="cmd-list" id="cmdList"></div>
+    <div class="cmd-footer">
+      <span class="cmd-tip"><kbd>↑</kbd><kbd>↓</kbd> 切换</span>
+      <span class="cmd-tip"><kbd>↵</kbd> 执行</span>
+      <span class="cmd-tip"><kbd>ESC</kbd> 退出</span>
+    </div>
+  </div>
 </div>
 
 <script src="common.js"></script>
