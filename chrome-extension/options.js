@@ -768,7 +768,9 @@ $('form').addEventListener('submit', (e) => {
   // 只有「测试登录」才需要凭据；设置本身先保存下来
   if (!hasCredentials()) {
     showToast('请先填写上网账号和密码，再点「保存并立即测试」。', 'err');
-    $('account').focus();
+    const s = readForm();
+    if (!s.account) $('account').focus();
+    else if (!s.password) $('password').focus();
     return;
   }
 
