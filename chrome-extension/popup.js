@@ -192,7 +192,7 @@ function refresh() {
       renderPingSparkline(res.pingMs);
     } else {
       pingEl.textContent = res.reachable ? '< 10 ms' : '超时';
-      pingEl.className = 'dock-value mono';
+      pingEl.className = res.reachable ? 'dock-value mono ping-fast' : 'dock-value mono ping-slow';
       pingEl.title = res.reachable ? '网关连通正常' : '网关不可达';
       renderPingSparkline(res.reachable ? 8 : -1);
     }
