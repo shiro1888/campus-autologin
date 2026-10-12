@@ -3,7 +3,7 @@
   "name": "Campus AutoLogin",
   "version": "1.0.0",
   "description": "自动登录 Dr.COM / 哆点 ePortal 校园网门户（172.30.100.2），断线自动重连。",
-  "minimum_chrome_version": "102",
+  "minimum_chrome_version": "111",
   "permissions": [
     "storage",
     "alarms",
