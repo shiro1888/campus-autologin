@@ -344,7 +344,7 @@ $('btnLogin').addEventListener('click', () => {
       setMsg('后台未响应，请刷新插件', 'err');
       return;
     }
-    setMsg(res.message || '完成', res.ok ? 'ok' : 'err');
+    setMsg(res.message || '完成', res.ok ? 'ok' : (res.skipped ? 'info' : 'err'));
     setTimeout(refresh, 500);
   });
 });
@@ -379,7 +379,7 @@ $('btnLogout').addEventListener('click', () => {
       setMsg('注销请求超时，请到门户手动操作', 'err');
       return;
     }
-    setMsg(res.message || '注销完成', res.ok ? 'ok' : 'err');
+    setMsg(res.message || '注销完成', res.ok ? 'ok' : (res.skipped ? 'info' : 'err'));
     setTimeout(refresh, 600);
   });
 });

@@ -797,7 +797,7 @@ $('form').addEventListener('submit', (e) => {
         return;
       }
 
-      showToast(res.message || '配置已生效', res.ok ? 'ok' : 'err');
+      showToast(res.message || '配置已生效', res.ok ? 'ok' : (res.skipped ? 'info' : 'err'));
       refreshStatus();
     });
   });
@@ -834,7 +834,7 @@ $('btnLoginNow').addEventListener('click', () => {
       showToast('后台未响应', 'err');
       return;
     }
-    showToast(res.message || '登录请求完成', res.ok ? 'ok' : 'err');
+    showToast(res.message || '登录请求完成', res.ok ? 'ok' : (res.skipped ? 'info' : 'err'));
     refreshStatus();
   });
 });
@@ -969,7 +969,7 @@ $('btnLogoutNow').addEventListener('click', () => {
       showToast('注销超时，请到门户手动注销', 'err');
       return;
     }
-    showToast(res.message || '注销完成', res.ok ? 'ok' : 'err');
+    showToast(res.message || '注销完成', res.ok ? 'ok' : (res.skipped ? 'info' : 'err'));
     refreshStatus();
   });
 });
