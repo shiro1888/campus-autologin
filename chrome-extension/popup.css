@@ -941,27 +941,29 @@ body {
   transition: width 0.5s var(--ease-smooth);
 }
 
-.dock-value.ping-fast {
-  color: #10b981;
+.dock-value.ping-fast,
+.dock-value.ping-normal,
+.dock-value.ping-slow {
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
 
-.dock-value.ping-fast::after {
+.dock-value.ping-fast::after,
+.dock-value.ping-normal::after,
+.dock-value.ping-slow::after {
   content: "";
   display: inline-block;
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 6px #10b981;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
   animation: ping-pulse-dot 1.8s ease-in-out infinite;
 }
 
-@keyframes ping-pulse-dot {
-  0%, 100% { transform: scale(0.85); opacity: 0.55; }
-  50% { transform: scale(1.35); opacity: 1; }
+.dock-value.ping-fast {
+  color: #10b981;
 }
 
 .dock-value.ping-normal {
@@ -970,6 +972,11 @@ body {
 
 .dock-value.ping-slow {
   color: #ef4444;
+}
+
+@keyframes ping-pulse-dot {
+  0%, 100% { transform: scale(0.85); opacity: 0.55; }
+  50% { transform: scale(1.35); opacity: 1; }
 }
 
 /* Apple/Cloudflare Radar 迷你心跳信号柱 */
@@ -1305,18 +1312,16 @@ body {
   height: 200%;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
   transform: rotate(25deg);
+  animation: btn-sweep 4.5s ease-in-out infinite;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s ease;
 }
 
 .btn-primary:hover .btn-shimmer {
-  opacity: 1;
-  animation: btn-sweep 1.2s ease-in-out;
+  animation: btn-sweep 1.3s ease-in-out infinite;
 }
 
 @keyframes btn-sweep {
-  0% {
+  0%, 75% {
     left: -80%;
   }
   100% {
