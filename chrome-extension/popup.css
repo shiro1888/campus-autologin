@@ -1118,13 +1118,16 @@ body {
   min-width: 0;
 }
 
-#account {
-  cursor: pointer;
-  transition: color 0.18s ease;
+.dock-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
-#account:hover {
-  color: var(--primary);
+.dock-value.masked {
+  letter-spacing: 0.04em;
+  opacity: 0.95;
 }
 
 .dock-copy-btn {

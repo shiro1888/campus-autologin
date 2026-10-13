@@ -58,7 +58,7 @@ function setMsg(text, kind, autoDismissMs = 3200) {
     ? '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>'
     : '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
 
-  if (autoDismissMs && kind === 'ok') {
+  if (autoDismissMs && kind !== 'err') {
     msgTimer = setTimeout(() => {
       box.className = 'msg-box';
     }, autoDismissMs);
@@ -67,6 +67,41 @@ function setMsg(text, kind, autoDismissMs = 3200) {
 
 let currentIp = '';
 let currentAccount = '';
+let isMasked = false;
+
+function maskAccount(acc) {
+  if (!acc || typeof acc !== 'string') return '';
+  const trimmed = acc.trim();
+  if (trimmed.length <= 4) return '****';
+  if (trimmed.length <= 7) return trimmed.slice(0, 2) + '****' + trimmed.slice(-2);
+  return trimmed.slice(0, 3) + '****' + trimmed.slice(-4);
+}
+
+function updateAccountDisplay() {
+  const accEl = $('account');
+  const maskBtn = $('btnToggleMask');
+  const maskIcon = $('maskIcon');
+  if (!accEl) return;
+
+  if (isMasked && currentAccount) {
+    accEl.textContent = maskAccount(currentAccount);
+    accEl.classList.add('masked');
+    accEl.title = '自习室防窥模式（点击切换明文显示）';
+    if (maskBtn) maskBtn.title = '当前：自习室防窥（点击显示明文）';
+    if (maskIcon) {
+      maskIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+    }
+  } else {
+    accEl.textContent = currentAccount || '未设置';
+    accEl.classList.remove('masked');
+    accEl.title = currentAccount ? `点击开启自习室防窥: ${currentAccount}` : '尚未设置认证账号';
+    if (maskBtn) maskBtn.title = '当前：明文显示（点击开启自习室防窥）';
+    if (maskIcon) {
+      maskIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    }
+  }
+}
+
 function setLocalIp(ip) {
   currentIp = ip || '';
   $('localIp').textContent = currentIp || '未连接';
@@ -102,16 +137,13 @@ function refresh() {
   let paused = false;
 
   chrome.storage.local.get(
-    ['account', 'isp', 'intervalMin', 'offlineIntervalMin', 'adaptive', 'lastResult'],
+    ['account', 'isp', 'intervalMin', 'offlineIntervalMin', 'adaptive', 'lastResult', 'privacyMask'],
     (s) => {
       // 只接受字符串：account 被手改/来自旧版本时可能不是字符串，
       // 直接放进 textContent 会显示成 "[object Object]"。
       currentAccount = (s && typeof s.account === 'string') ? s.account : '';
-      const accEl = $('account');
-      if (accEl) {
-        accEl.textContent = currentAccount || '未设置';
-        accEl.title = currentAccount ? `点击复制账号: ${currentAccount}` : '尚未设置认证账号';
-      }
+      isMasked = !!(s && s.privacyMask);
+      updateAccountDisplay();
 
       const ispNames = { '1': '校园', '2': '电信', '3': '联通', '4': '其他' };
       const ispFullNames = { '1': '校园用户 (默认)', '2': '校园电信 (@dx)', '3': '校园联通 (@lt)', '4': '校园其他' };
@@ -169,6 +201,21 @@ function refresh() {
       setStatus('后台无响应', '扩展 Service Worker 可能休眠，请重试', 'off');
       setLocalIp('');
       $('onlineDuration').textContent = '—';
+      const popPing = $('popPing');
+      if (popPing) {
+        popPing.textContent = '—';
+        popPing.className = 'dock-value mono';
+      }
+      renderPingSparkline(-1);
+      const popFlow = $('popFlow');
+      if (popFlow) popFlow.textContent = '—';
+      const flowWrap = $('flowBarWrap');
+      if (flowWrap) flowWrap.style.display = 'none';
+      const btnLogin = $('btnLogin');
+      if (btnLogin) {
+        btnLogin.classList.remove('online-mode');
+        $('btnLoginText').textContent = '立即登录';
+      }
       $('btnLogout').disabled = true;
       return;
     }
@@ -356,7 +403,7 @@ $('btnLogin').addEventListener('click', () => {
       setMsg('后台未响应，请刷新插件', 'err');
       return;
     }
-    setMsg(res.message || '完成', res.ok ? 'ok' : (res.skipped ? 'info' : 'err'));
+    setMsg(res.message || '完成', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));
     setTimeout(refresh, 500);
   });
 });
@@ -391,7 +438,7 @@ $('btnLogout').addEventListener('click', () => {
       setMsg('注销请求超时，请到门户手动操作', 'err');
       return;
     }
-    setMsg(res.message || '注销完成', res.ok ? 'ok' : (res.skipped ? 'info' : 'err'));
+    setMsg(res.message || '注销完成', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));
     setTimeout(refresh, 600);
   });
 });
@@ -449,6 +496,18 @@ function copyAccount(e) {
   });
 }
 
+const btnMask = $('btnToggleMask');
+if (btnMask) {
+  btnMask.addEventListener('click', (e) => {
+    e.stopPropagation();
+    isMasked = !isMasked;
+    chrome.storage.local.set({ privacyMask: isMasked });
+    updateAccountDisplay();
+    showFloatingBubble(e, isMasked ? '已开启防窥 👁️' : '已显示明文 👁️');
+    setMsg(isMasked ? '已开启自习室防窥模式' : '已恢复明文显示', 'info', 1600);
+  });
+}
+
 const btnCopyAcc = $('btnCopyAccount');
 if (btnCopyAcc) {
   btnCopyAcc.addEventListener('click', (e) => {
@@ -461,7 +520,13 @@ const accEl = $('account');
 if (accEl) {
   accEl.addEventListener('click', (e) => {
     e.stopPropagation();
-    copyAccount(e);
+    if (currentAccount) {
+      isMasked = !isMasked;
+      chrome.storage.local.set({ privacyMask: isMasked });
+      updateAccountDisplay();
+      showFloatingBubble(e, isMasked ? '已开启防窥 👁️' : '已显示明文 👁️');
+      setMsg(isMasked ? '已开启自习室防窥模式' : '已恢复明文显示', 'info', 1600);
+    }
   });
 }
 
