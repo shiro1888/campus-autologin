@@ -550,9 +550,9 @@ function refreshStatus(cb) {
     }
 
     const raw = res.raw || {};
-    const ip = raw.v4ip || raw.ss5 || '';
+    const ip = raw.v4ip || raw.ss5 || res.ip || '';
     $('stIp').textContent = ip || '未获取到';
-    $('stMac').textContent = raw.ss1 ? ('物理 MAC: ' + fmtMac(raw.ss1)) : '物理 MAC: —';
+    $('stMac').textContent = (raw.ss1 || res.mac) ? ('物理 MAC: ' + fmtMac(raw.ss1 || res.mac)) : '物理 MAC: —';
 
     if (res.online) {
       let durationInput = null;
@@ -714,7 +714,18 @@ function refreshStatus(cb) {
     }
 
     updateTopology(res);
+    triggerTelemetryFade();
     if (cb) cb();
+  });
+}
+
+/** 遥测数据刷新时的平滑微动效 */
+function triggerTelemetryFade() {
+  const vals = document.querySelectorAll('.stat-val, .topo-val');
+  vals.forEach((el) => {
+    el.classList.remove('val-pulse');
+    void el.offsetWidth;
+    el.classList.add('val-pulse');
   });
 }
 

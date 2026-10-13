@@ -906,6 +906,21 @@ body {
   transition: color 0.2s ease;
 }
 
+@keyframes metric-gentle-fade {
+  0% {
+    opacity: 0.55;
+    transform: translateY(-1.5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.val-pulse {
+  animation: metric-gentle-fade 0.22s var(--ease-smooth);
+}
+
 /* Micro Dual-color Traffic Ratio Bar */
 .flow-bar-wrap {
   display: flex;

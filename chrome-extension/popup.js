@@ -323,6 +323,18 @@ function refresh() {
       setLocalIp(ip);
       $('onlineDuration').textContent = '未在线';
     }
+
+    triggerTelemetryFade();
+  });
+}
+
+/** 遥测数据刷新时的平滑微动效 */
+function triggerTelemetryFade() {
+  const vals = document.querySelectorAll('.dock-value');
+  vals.forEach((el) => {
+    el.classList.remove('val-pulse');
+    void el.offsetWidth;
+    el.classList.add('val-pulse');
   });
 }
 
