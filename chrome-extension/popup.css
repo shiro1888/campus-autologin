@@ -105,6 +105,28 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Subtle Mac-style Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
 @keyframes popupEntrance {
   from {
     opacity: 0;
@@ -271,9 +293,14 @@ body {
 
 .ver-pill:hover {
   color: var(--primary);
-  border-color: rgba(37, 99, 235, 0.35);
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
   background: var(--bg-card);
   transform: translateY(-0.5px) scale(1.04);
+}
+
+[data-theme="dark"] .ver-pill {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .ver-pill:active {
@@ -298,7 +325,8 @@ body {
   color: var(--primary);
   border-color: var(--border-subtle);
   background: var(--bg-card);
-  transform: rotate(30deg) scale(1.05);
+  transform: translateY(-1px) scale(1.06);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
 }
 
 .icon-btn:active {
@@ -346,12 +374,19 @@ body {
 }
 
 .theme-btn:hover {
-  transform: rotate(20deg) scale(1.08);
   color: #f59e0b;
+}
+
+.theme-btn:hover svg {
+  transform: rotate(18deg) scale(1.12);
 }
 
 [data-theme="dark"] .theme-btn:hover {
   color: #fbbf24;
+}
+
+#btnRefresh:hover .icon-refresh {
+  transform: rotate(45deg);
 }
 
 .icon-refresh {
@@ -789,9 +824,14 @@ body {
 
 .dock-item:hover {
   background: var(--bg-card-subtle);
-  border-color: var(--border-subtle);
-  transform: translateY(-1.5px);
-  box-shadow: 0 6px 18px -2px rgba(15, 23, 42, 0.08), var(--glass-highlight);
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--border-subtle));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px -2px rgba(15, 23, 42, 0.08), var(--glass-highlight);
+}
+
+[data-theme="dark"] .dock-item:hover {
+  border-color: color-mix(in srgb, var(--primary) 36%, rgba(255, 255, 255, 0.14));
+  box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.5), var(--glass-highlight);
 }
 
 .dock-item:active {
@@ -1122,8 +1162,14 @@ body {
 .dock-btn-group {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 1.5px;
   flex-shrink: 0;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-hairline);
+  padding: 1.5px;
+  border-radius: var(--radius-pill);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .dock-value.masked {
@@ -1134,13 +1180,13 @@ body {
 .dock-copy-btn {
   background: transparent;
   border: none;
-  padding: 2px 3px;
+  padding: 2.5px 5px;
   cursor: pointer;
   color: var(--text-light);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   transition: all 0.2s var(--ease-spring);
   flex-shrink: 0;
   line-height: 1;
@@ -1154,17 +1200,19 @@ body {
 
 .dock-copy-btn:hover {
   color: var(--primary);
-  background: rgba(37, 99, 235, 0.08);
-  transform: scale(1.15);
+  background: var(--bg-card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transform: scale(1.08);
 }
 
 .dock-copy-btn:active {
-  transform: scale(0.9);
+  transform: scale(0.92);
 }
 
 .dock-copy-btn.copied {
   color: #10b981;
-  transform: scale(1.15);
+  background: rgba(16, 185, 129, 0.12);
+  transform: scale(1.08);
 }
 
 .dock-item.copied-flash {

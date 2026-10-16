@@ -127,10 +127,10 @@ function refresh() {
   };
 
   try {
-    const ver = chrome.runtime.getManifest().version;
+    const ver = chrome.runtime?.getManifest?.()?.version;
     $('ver').textContent = 'v' + (ver || '1.0.0');
   } catch (e) {
-    $('ver').textContent = '';
+    if (!$('ver').textContent) $('ver').textContent = 'v1.0.0';
   }
 
   // 是否处于「手动注销暂停」状态（由后台在 status 响应里一并返回）
@@ -287,7 +287,7 @@ function refresh() {
       $('btnLoginText').textContent = '重新验证';
       $('btnLogout').disabled = false;
 
-      const ip = rawData.v4ip || rawData.ss5 || '';
+      const ip = (rawData.v4ip && rawData.v4ip !== '0.0.0.0') ? rawData.v4ip : (rawData.ss5 || res.ip || '');
       setLocalIp(ip);
 
       // 智能计算在线时长：
@@ -366,7 +366,7 @@ function refresh() {
       $('btnLoginText').textContent = paused ? '恢复登录' : '立即登录';
       $('btnLogout').disabled = true;
 
-      const ip = rawData.v4ip || rawData.ss5 || '';
+      const ip = (rawData.v4ip && rawData.v4ip !== '0.0.0.0') ? rawData.v4ip : (rawData.ss5 || res.ip || '');
       setLocalIp(ip);
       $('onlineDuration').textContent = '未在线';
     }

@@ -111,6 +111,39 @@ html {
   overflow-x: hidden;
 }
 
+/* Sleek Mac-style Global Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+  background-clip: padding-box;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  background-clip: padding-box;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+  background-clip: padding-box;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -1260,10 +1293,12 @@ body {
 
 .stat-card:hover {
   transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--primary) 24%, var(--border-color));
   box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.08);
 }
 
 [data-theme="dark"] .stat-card:hover {
+  border-color: color-mix(in srgb, var(--primary) 34%, rgba(255, 255, 255, 0.12));
   box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.35);
 }
 
@@ -1527,9 +1562,20 @@ body {
 }
 
 .stat-val.note {
-  font-size: 12.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
   font-weight: 500;
   color: var(--text-muted);
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-color);
+  padding: 3.5px 11px;
+  border-radius: var(--radius-pill);
+  max-width: 65%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+  transition: all 0.2s ease;
 }
 
 .stat-sub {
@@ -2355,6 +2401,14 @@ select:focus {
 
 .toggle-switch input:checked + .slider::before {
   transform: translateX(20px);
+}
+
+.toggle-switch:active .slider::before {
+  width: 25px;
+}
+
+.toggle-switch:active input:checked + .slider::before {
+  transform: translateX(17px);
 }
 
 /* ==========================================================================

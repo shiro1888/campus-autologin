@@ -425,10 +425,10 @@ document.addEventListener('keydown', (e) => {
 /** 从本地存储加载配置到表单 */
 function load() {
   try {
-    const ver = chrome.runtime.getManifest().version;
+    const ver = chrome.runtime?.getManifest?.()?.version;
     $('ver').textContent = 'v' + (ver || '1.0.0');
   } catch (e) {
-    $('ver').textContent = '';
+    if (!$('ver').textContent) $('ver').textContent = 'v1.0.0';
   }
 
   chrome.storage.local.get(DEFAULTS, (s) => {
@@ -1035,7 +1035,7 @@ if ($('btnExportConfig')) {
     chrome.storage.local.get(null, (all) => {
       const cfg = {
         _app: 'Campus AutoLogin',
-        _version: chrome.runtime.getManifest().version || '1.0.0',
+        _version: chrome.runtime?.getManifest?.()?.version || '1.0.0',
         _exported_at: new Date().toLocaleString(),
         account: all.account || '',
         password: all.password || '',
