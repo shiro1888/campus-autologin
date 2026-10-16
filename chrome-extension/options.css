@@ -1285,6 +1285,7 @@ body {
   box-shadow: 0 4px 14px rgba(5, 150, 105, 0.45);
   transform: translate(-50%, -100%);
   animation: float-bubble 0.85s var(--ease-spring) forwards;
+  white-space: nowrap !important;
 }
 
 @keyframes float-bubble {

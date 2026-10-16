@@ -122,10 +122,12 @@ function showFloatingBubble(e, text = '已复制 ✓') {
     const bubble = document.createElement('div');
     bubble.className = 'floating-copy-bubble';
     bubble.textContent = text;
-    const x = e && e.clientX ? e.clientX : (window.innerWidth / 2);
-    const y = e && e.clientY ? e.clientY : (window.innerHeight / 2);
-    bubble.style.left = `${x}px`;
-    bubble.style.top = `${y}px`;
+    const rawX = e && e.clientX ? e.clientX : (window.innerWidth / 2);
+    const rawY = e && e.clientY ? e.clientY : (window.innerHeight / 2);
+    const clampedX = Math.max(55, Math.min(window.innerWidth - 55, rawX));
+    const clampedY = Math.max(25, rawY);
+    bubble.style.left = `${clampedX}px`;
+    bubble.style.top = `${clampedY}px`;
     document.body.appendChild(bubble);
     setTimeout(() => bubble.remove(), 900);
   } catch (err) {}

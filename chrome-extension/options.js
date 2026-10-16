@@ -883,7 +883,6 @@ $('btnCopyReport').addEventListener('click', (e) => {
 
     navigator.clipboard.writeText(report).then(() => {
       span.textContent = '已复制 ✓';
-      showFloatingBubble(e, '诊断报告已复制 ✓');
       showToast('诊断报告已成功复制到剪贴板', 'ok');
       setTimeout(() => {
         span.textContent = originalText;
@@ -901,7 +900,6 @@ if (cardStatIp) {
     const ip = $('stIp').textContent.trim();
     if (ip && ip !== '—' && ip !== '正在获取…' && ip !== '未获取到') {
       navigator.clipboard.writeText(ip).then(() => {
-        showFloatingBubble(e, '已复制 IP ✓');
         showToast('已复制本机 IP: ' + ip, 'ok');
         const pill = $('ipCopyPill');
         if (pill) {
@@ -934,7 +932,6 @@ if (stMac) {
     const match = txt.match(/([0-9a-fA-F:-]{12,17})/);
     if (match && match[1]) {
       navigator.clipboard.writeText(match[1]).then(() => {
-        showFloatingBubble(e, '已复制 MAC ✓');
         showToast('已复制物理 MAC: ' + match[1], 'ok');
       }).catch(() => {
         showToast('复制失败', 'err');

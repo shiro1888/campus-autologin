@@ -453,8 +453,7 @@ $('ipChip').addEventListener('click', (e) => {
     const oldHtml = copyIcon.innerHTML;
     chip.classList.add('copied');
     copyIcon.innerHTML = '<polyline points="20 6 9 17 4 12" stroke="#10b981" stroke-width="2.5" fill="none"/>';
-    setMsg(`已复制 IP: ${currentIp}`, 'ok', 1800);
-    showFloatingBubble(e, '已复制 IP ✓');
+    setMsg('已复制 IP 到剪贴板', 'ok', 1600);
 
     setTimeout(() => {
       copyIcon.innerHTML = oldHtml;
@@ -489,8 +488,7 @@ function copyAccount(e) {
         if (btn) btn.classList.remove('copied');
       }, 1500);
     }
-    setMsg(`已复制账号: ${currentAccount}`, 'ok', 1800);
-    showFloatingBubble(e, '已复制账号 ✓');
+    setMsg('已复制账号到剪贴板', 'ok', 1600);
   }).catch(() => {
     setMsg(`账号: ${currentAccount}`, 'info', 2500);
   });
@@ -503,7 +501,6 @@ if (btnMask) {
     isMasked = !isMasked;
     chrome.storage.local.set({ privacyMask: isMasked });
     updateAccountDisplay();
-    showFloatingBubble(e, isMasked ? '已开启防窥 👁️' : '已显示明文 👁️');
     setMsg(isMasked ? '已开启自习室防窥模式' : '已恢复明文显示', 'info', 1600);
   });
 }
@@ -524,8 +521,18 @@ if (accEl) {
       isMasked = !isMasked;
       chrome.storage.local.set({ privacyMask: isMasked });
       updateAccountDisplay();
-      showFloatingBubble(e, isMasked ? '已开启防窥 👁️' : '已显示明文 👁️');
       setMsg(isMasked ? '已开启自习室防窥模式' : '已恢复明文显示', 'info', 1600);
+    }
+  });
+}
+
+const msgBoxEl = $('msgBox');
+if (msgBoxEl) {
+  msgBoxEl.addEventListener('click', () => {
+    msgBoxEl.className = 'msg-box';
+    if (msgTimer) {
+      clearTimeout(msgTimer);
+      msgTimer = null;
     }
   });
 }
