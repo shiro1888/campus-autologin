@@ -431,7 +431,7 @@ class Portal:
         ip = mac = ac_ip = ""
         try:
             st = self.status()
-            ip = str(st.get("v4ip") or st.get("ss5") or "")
+            ip = next((str(v) for v in [st.get("v4ip"), st.get("ss5")] if v and v != "0.0.0.0"), "")
             mac = str(st.get("ss1") or "")
             ac_ip = str(st.get("ss6") or "")
         except NetworkError:
@@ -611,7 +611,7 @@ def cmd_status(args, cfg) -> int:
     portal = _make_portal(args, cfg, require_credentials=False)
     st = portal.status()
     online = int(st.get("result", 0)) == 1
-    ip = st.get("v4ip") or st.get("ss5") or detect_local_ip(portal.host_only)
+    ip = next((v for v in [st.get("v4ip"), st.get("ss5")] if v and v != "0.0.0.0"), None) or detect_local_ip(portal.host_only)
     flow_text = _format_flow(st.get("flow", 0))
     # fee 由门户返回，可能是空串/非数字。此处必须容错，
     # 否则一个畸形字段就会让整个 status 命令抛 ValueError 崩掉。
@@ -1203,7 +1203,7 @@ def cmd_gui(args, cfg) -> int:
                 st = portal.status()
                 ping_ms = int((time.time() - t0) * 1000)
                 online = int(st.get("result", 0)) == 1
-                ip = st.get("v4ip") or st.get("ss5") or detect_local_ip(portal.host_only)
+                ip = next((v for v in [st.get("v4ip"), st.get("ss5")] if v and v != "0.0.0.0"), None) or detect_local_ip(portal.host_only)
                 current_detected_ip[0] = ip
                 flow = _format_flow(st.get("flow", 0))
                 time_str = st.get("stime", "")
@@ -1242,7 +1242,7 @@ def cmd_gui(args, cfg) -> int:
                 st = portal.status()
                 c_auth = st.get("_http", 200)
                 online = int(st.get("result", 0)) == 1
-                ip = st.get("v4ip") or st.get("ss5") or detect_local_ip(portal.host_only)
+                ip = next((v for v in [st.get("v4ip"), st.get("ss5")] if v and v != "0.0.0.0"), None) or detect_local_ip(portal.host_only)
                 diag = (
                     "【校园网连接自检结果】\n\n"
                     "• 门户首页 (端口 80): HTTP %d %s\n"

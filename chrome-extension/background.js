@@ -510,7 +510,7 @@ async function doLogout() {
     return fail('网络连接失败，请检查 Wi-Fi 或网线', false);
   }
   const raw = st.raw || {};
-  const ip = String(raw.v4ip || raw.ss5 || '');
+  const ip = String([raw.v4ip, raw.ss5].find((v) => v && v !== '0.0.0.0') || '');
   const mac = String(raw.ss1 || '000000000000');
   const ac_ip = String(raw.ss6 || '');
 

@@ -290,7 +290,7 @@ function refresh() {
       $('btnLoginText').textContent = '重新验证';
       $('btnLogout').disabled = false;
 
-      const ip = (rawData.v4ip && rawData.v4ip !== '0.0.0.0') ? rawData.v4ip : (rawData.ss5 || '');
+      const ip = [rawData.v4ip, rawData.ss5].find((v) => v && v !== '0.0.0.0') || '';
       setLocalIp(ip);
 
       // 智能计算在线时长：
@@ -369,7 +369,7 @@ function refresh() {
       $('btnLoginText').textContent = paused ? '恢复登录' : '立即登录';
       $('btnLogout').disabled = true;
 
-      const ip = (rawData.v4ip && rawData.v4ip !== '0.0.0.0') ? rawData.v4ip : (rawData.ss5 || '');
+      const ip = [rawData.v4ip, rawData.ss5].find((v) => v && v !== '0.0.0.0') || '';
       setLocalIp(ip);
       $('onlineDuration').textContent = '未在线';
     }

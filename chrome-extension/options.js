@@ -553,9 +553,9 @@ function refreshStatus(cb) {
     }
 
     const raw = res.raw || {};
-    const ip = (raw.v4ip && raw.v4ip !== '0.0.0.0') ? raw.v4ip : (raw.ss5 || '');
+    const ip = [raw.v4ip, raw.ss5].find((v) => v && v !== '0.0.0.0') || '';
     $('stIp').textContent = ip || '未获取到';
-    $('stMac').textContent = (raw.ss1 || res.mac) ? ('物理 MAC: ' + fmtMac(raw.ss1 || res.mac)) : '物理 MAC: —';
+    $('stMac').textContent = raw.ss1 ? ('物理 MAC: ' + fmtMac(raw.ss1)) : '物理 MAC: —';
 
     if (res.online) {
       let durationInput = null;
