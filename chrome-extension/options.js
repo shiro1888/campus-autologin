@@ -81,7 +81,7 @@ function updateTopology(res) {
   }
 
   const raw = res.raw || {};
-  const ip = raw.v4ip || raw.ss5 || '';
+  const ip = [raw.v4ip, raw.ss5].find((v) => v && v !== '0.0.0.0') || '';
   clientIp.textContent = ip || (res.reachable ? '已连接网关' : '未连接');
 
   if (res.pingMs !== undefined && res.pingMs >= 0) {
