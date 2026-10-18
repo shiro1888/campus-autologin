@@ -424,11 +424,14 @@ document.addEventListener('keydown', (e) => {
 
 /** 从本地存储加载配置到表单 */
 function load() {
-  try {
-    const ver = chrome.runtime?.getManifest?.()?.version;
-    $('ver').textContent = 'v' + (ver || '1.0.0');
-  } catch (e) {
-    if (!$('ver').textContent) $('ver').textContent = 'v1.0.0';
+  const verEl = $('ver');
+  if (verEl) {
+    try {
+      const ver = chrome.runtime?.getManifest?.()?.version;
+      verEl.textContent = 'v' + (ver || '1.0.0');
+    } catch (e) {
+      if (!verEl.textContent) verEl.textContent = 'v1.0.0';
+    }
   }
 
   chrome.storage.local.get(DEFAULTS, (s) => {
@@ -550,7 +553,7 @@ function refreshStatus(cb) {
     }
 
     const raw = res.raw || {};
-    const ip = raw.v4ip || raw.ss5 || res.ip || '';
+    const ip = (raw.v4ip && raw.v4ip !== '0.0.0.0') ? raw.v4ip : (raw.ss5 || '');
     $('stIp').textContent = ip || '未获取到';
     $('stMac').textContent = (raw.ss1 || res.mac) ? ('物理 MAC: ' + fmtMac(raw.ss1 || res.mac)) : '物理 MAC: —';
 
