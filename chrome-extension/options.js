@@ -847,7 +847,7 @@ function save(cb) {
   });
 }
 
-/** 表单里是否已填写账号和密码（用于「保存并立即测试」） */
+/** 表单里是否已填写账号和密码（用于「保存并连接」） */
 function hasCredentials() {
   const s = readForm();
   return !!(s.account && s.password);
@@ -858,13 +858,13 @@ function hasCredentials() {
   $('form').addEventListener(evt, () => $('btnSave').classList.add('has-changes'));
 });
 
-// --- 保存并立即测试 ---
+// --- 保存并连接 ---
 $('form').addEventListener('submit', (e) => {
   e.preventDefault();
 
   // 只有「测试登录」才需要凭据；设置本身先保存下来
   if (!hasCredentials()) {
-    showToast('请先填写上网账号和密码，再点「保存并立即测试」。', 'err');
+    showToast('请先填写上网账号和密码，再点「保存并连接」。', 'err');
     const s = readForm();
     if (!s.account) {
       const acc = $('account');
@@ -889,14 +889,14 @@ $('form').addEventListener('submit', (e) => {
   const btn = $('btnSave');
   btn.disabled = true;
   btn.classList.add('loading');
-  $('btnSaveText').textContent = '正在保存并测试…';
+  $('btnSaveText').textContent = '正在保存并连接…';
   showToast('正在向校园网门户发起验证…', 'info');
 
   save(() => {
     chrome.runtime.sendMessage({ type: 'login' }, (res) => {
       btn.disabled = false;
       btn.classList.remove('loading');
-      $('btnSaveText').textContent = '保存配置并立即测试';
+      $('btnSaveText').textContent = '保存并连接';
 
       if (chrome.runtime.lastError || !res) {
         showToast('保存成功，但后台未响应测试请求', 'err');

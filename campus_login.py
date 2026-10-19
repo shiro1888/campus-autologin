@@ -985,40 +985,72 @@ def cmd_gui(args, cfg) -> int:
         except Exception:
             pass
 
-    bg = "#0f172a"
-    card_bg = "#1e293b"
-    text_color = "#f8fafc"
-    text_muted = "#94a3b8"
-    accent = "#2563eb"
-    success_color = "#10b981"
-    danger_color = "#ef4444"
+    THEME = {
+        "bg": "#0f172a",
+        "card": "#1e293b",
+        "input_bg": "#0b1120",
+        "border": "#334155",
+        "hover": "#475569",
+        "text": "#f8fafc",
+        "text_muted": "#94a3b8",
+        "accent": "#2563eb",
+        "accent_hover": "#1d4ed8",
+        "info": "#3b82f6",
+        "success": "#10b981",
+        "success_border": "#059669",
+        "warning": "#f59e0b",
+        "danger": "#ef4444",
+        "danger_text": "#f87171",
+        "danger_hover_bg": "#7f1d1d",
+        "danger_hover_fg": "#fca5a5",
+        "white": "#ffffff",
+    }
+
+    FONTS = {
+        "title": ("Microsoft YaHei", 15, "bold"),
+        "card_title": ("Microsoft YaHei", 10, "bold"),
+        "label": ("Microsoft YaHei", 9, "bold"),
+        "status": ("Microsoft YaHei", 13, "bold"),
+        "body": ("Microsoft YaHei", 9),
+        "button": ("Microsoft YaHei", 10),
+        "button_bold": ("Microsoft YaHei", 10, "bold"),
+        "mono": ("Consolas", 10),
+    }
+
+    bg = THEME["bg"]
+    card_bg = THEME["card"]
+    text_color = THEME["text"]
+    text_muted = THEME["text_muted"]
+    accent = THEME["accent"]
+    success_color = THEME["success"]
+    danger_color = THEME["danger"]
 
     # Header
-    head = tk.Frame(root, bg=bg, pady=10, padx=18)
+    head = tk.Frame(root, bg=THEME["bg"], pady=10, padx=18)
     head.pack(side="top", fill="x")
-    title = tk.Label(head, text="校园网自动登录", font=("Microsoft YaHei", 15, "bold"), fg=text_color, bg=bg)
+    title = tk.Label(head, text="校园网自动登录", font=FONTS["title"], fg=THEME["text"], bg=THEME["bg"])
     title.pack(anchor="w")
-    sub = tk.Label(head, text="Dr.COM ePortal · 实时自动刷新 (30s)", font=("Microsoft YaHei", 9), fg=text_muted, bg=bg)
+    sub = tk.Label(head, text="Dr.COM ePortal · 实时自动刷新 (30s)", font=FONTS["body"], fg=THEME["text_muted"], bg=THEME["bg"])
     sub.pack(anchor="w", pady=(2, 0))
 
     # Actions Frame（提前固定在窗口底部，确保小屏或高 DPI 缩放下按钮绝不被裁切）
-    btn_frame = tk.Frame(root, bg=bg, padx=18, pady=(4, 12))
+    btn_frame = tk.Frame(root, bg=THEME["bg"], padx=18, pady=(4, 12))
     btn_frame.pack(side="bottom", fill="x")
 
     # 中部可滚动视口 (Canvas + Scrollbar)，适配小屏笔记本与 150%/200% 高 DPI
-    scroll_wrap = tk.Frame(root, bg=bg)
+    scroll_wrap = tk.Frame(root, bg=THEME["bg"])
     scroll_wrap.pack(side="top", fill="both", expand=True)
 
-    scrollbar = tk.Scrollbar(scroll_wrap, orient="vertical", bg="#334155",
-                             activebackground="#475569", troughcolor="#0f172a",
+    scrollbar = tk.Scrollbar(scroll_wrap, orient="vertical", bg=THEME["border"],
+                             activebackground=THEME["hover"], troughcolor=THEME["bg"],
                              bd=0, highlightthickness=0, width=10, relief="flat")
-    canvas = tk.Canvas(scroll_wrap, bg=bg, highlightthickness=0, bd=0, yscrollcommand=scrollbar.set)
+    canvas = tk.Canvas(scroll_wrap, bg=THEME["bg"], highlightthickness=0, bd=0, yscrollcommand=scrollbar.set)
     scrollbar.config(command=canvas.yview)
 
     scrollbar.pack(side="right", fill="y")
     canvas.pack(side="left", fill="both", expand=True)
 
-    body_frame = tk.Frame(canvas, bg=bg)
+    body_frame = tk.Frame(canvas, bg=THEME["bg"])
     canvas_window = canvas.create_window((0, 0), window=body_frame, anchor="nw")
 
     def _on_canvas_configure(event):
@@ -1041,16 +1073,16 @@ def cmd_gui(args, cfg) -> int:
     root.bind_all("<MouseWheel>", _on_mousewheel)
 
     # Status Card
-    st_card = tk.Frame(body_frame, bg=card_bg, padx=16, pady=12, highlightthickness=1, highlightbackground="#334155")
+    st_card = tk.Frame(body_frame, bg=THEME["card"], padx=16, pady=12, highlightthickness=1, highlightbackground=THEME["border"])
     st_card.pack(fill="x", padx=18, pady=(2, 6))
 
-    st_lbl = tk.Label(st_card, text="● 检测状态中…", font=("Microsoft YaHei", 13, "bold"), fg="#f59e0b", bg=card_bg)
+    st_lbl = tk.Label(st_card, text="● 检测状态中…", font=FONTS["status"], fg=THEME["warning"], bg=THEME["card"])
     st_lbl.pack(anchor="w")
 
     # IP Row with Copy Button
-    ip_frame = tk.Frame(st_card, bg=card_bg)
+    ip_frame = tk.Frame(st_card, bg=THEME["card"])
     ip_frame.pack(fill="x", pady=(6, 0))
-    ip_lbl = tk.Label(ip_frame, text="本机 IP: —", font=("Consolas", 10), fg=text_color, bg=card_bg)
+    ip_lbl = tk.Label(ip_frame, text="本机 IP: —", font=FONTS["mono"], fg=THEME["text"], bg=THEME["card"])
     ip_lbl.pack(side="left")
 
     current_detected_ip = [""]
@@ -1060,15 +1092,15 @@ def cmd_gui(args, cfg) -> int:
         if ip_val:
             root.clipboard_clear()
             root.clipboard_append(ip_val)
-            btn_copy_ip.config(text="已复制 ✓", fg=success_color)
-            root.after(1500, lambda: btn_copy_ip.config(text="复制", fg=text_muted))
+            btn_copy_ip.config(text="已复制 ✓", fg=THEME["success"])
+            root.after(1500, lambda: btn_copy_ip.config(text="复制", fg=THEME["text_muted"]))
 
-    btn_copy_ip = tk.Button(ip_frame, text="复制", font=("Microsoft YaHei", 8), bg="#334155", fg=text_muted,
-                            activebackground="#475569", activeforeground=text_color, relief="flat",
+    btn_copy_ip = tk.Button(ip_frame, text="复制", font=FONTS["body"], bg=THEME["border"], fg=THEME["text_muted"],
+                            activebackground=THEME["hover"], activeforeground=THEME["text"], relief="flat",
                             cursor="hand2", padx=6, command=do_copy_ip)
     btn_copy_ip.pack(side="right")
 
-    meta_lbl = tk.Label(st_card, text="已用流量: —  |  时长: —", font=("Microsoft YaHei", 9), fg=text_muted, bg=card_bg)
+    meta_lbl = tk.Label(st_card, text="已用流量: —  |  时长: —", font=FONTS["body"], fg=THEME["text_muted"], bg=THEME["card"])
     meta_lbl.pack(anchor="w", pady=(2, 0))
 
     # 记录从磁盘加载的原始凭据与配置快照，作为未保存修改检测的权威基准
@@ -1080,26 +1112,26 @@ def cmd_gui(args, cfg) -> int:
     }
 
     # Form Card
-    form_card = tk.Frame(body_frame, bg=card_bg, padx=16, pady=12, highlightthickness=1, highlightbackground="#334155")
+    form_card = tk.Frame(body_frame, bg=THEME["card"], padx=16, pady=12, highlightthickness=1, highlightbackground=THEME["border"])
     form_card.pack(fill="x", padx=18, pady=(4, 6))
 
     # 上网账号
-    tk.Label(form_card, text="上网账号", font=("Microsoft YaHei", 9, "bold"), fg=text_color, bg=card_bg).pack(anchor="w")
-    user_ent = tk.Entry(form_card, font=("Microsoft YaHei", 10), bg="#0b1120", fg=text_color,
-                        insertbackground=text_color, relief="flat", highlightthickness=1,
-                        highlightbackground="#334155", highlightcolor="#2563eb")
+    tk.Label(form_card, text="上网账号", font=FONTS["label"], fg=THEME["text"], bg=THEME["card"]).pack(anchor="w")
+    user_ent = tk.Entry(form_card, font=FONTS["button"], bg=THEME["input_bg"], fg=THEME["text"],
+                        insertbackground=THEME["text"], relief="flat", highlightthickness=1,
+                        highlightbackground=THEME["border"], highlightcolor=THEME["accent"])
     user_ent.insert(0, cfg.get("username", ""))
     user_ent.pack(fill="x", pady=(3, 10), ipady=4)
 
     # 登录密码（带显示/隐藏切换小眼睛）
-    tk.Label(form_card, text="登录密码", font=("Microsoft YaHei", 9, "bold"), fg=text_color, bg=card_bg).pack(anchor="w")
-    pwd_wrap = tk.Frame(form_card, bg="#0b1120", highlightthickness=1, highlightbackground="#334155")
+    tk.Label(form_card, text="登录密码", font=FONTS["label"], fg=THEME["text"], bg=THEME["card"]).pack(anchor="w")
+    pwd_wrap = tk.Frame(form_card, bg=THEME["input_bg"], highlightthickness=1, highlightbackground=THEME["border"])
     pwd_wrap.pack(fill="x", pady=(3, 10))
 
-    pass_ent = tk.Entry(pwd_wrap, show="●", font=("Microsoft YaHei", 10), bg="#0b1120", fg=text_color,
-                        insertbackground=text_color, relief="flat", bd=0)
-    pass_ent.bind("<FocusIn>", lambda e: pwd_wrap.config(highlightbackground="#2563eb"))
-    pass_ent.bind("<FocusOut>", lambda e: pwd_wrap.config(highlightbackground="#334155"))
+    pass_ent = tk.Entry(pwd_wrap, show="●", font=FONTS["button"], bg=THEME["input_bg"], fg=THEME["text"],
+                        insertbackground=THEME["text"], relief="flat", bd=0)
+    pass_ent.bind("<FocusIn>", lambda e: pwd_wrap.config(highlightbackground=THEME["accent"]))
+    pass_ent.bind("<FocusOut>", lambda e: pwd_wrap.config(highlightbackground=THEME["border"]))
     pass_ent.insert(0, cfg.get("password", ""))
     pass_ent.pack(side="left", fill="x", expand=True, padx=6, ipady=4)
 
@@ -1125,22 +1157,22 @@ def cmd_gui(args, cfg) -> int:
         if pwd_visible[0]:
             pwd_timer[0] = root.after(10000, _auto_rehide_pwd)
 
-    btn_pwd_toggle = tk.Button(pwd_wrap, text="👁 显示", font=("Microsoft YaHei", 8), bg="#1e293b",
-                               fg=text_muted, activebackground="#334155", activeforeground=text_color,
+    btn_pwd_toggle = tk.Button(pwd_wrap, text="👁 显示", font=FONTS["body"], bg=THEME["card"],
+                               fg=THEME["text_muted"], activebackground=THEME["border"], activeforeground=THEME["text"],
                                relief="flat", bd=0, cursor="hand2", padx=6, command=toggle_pwd)
     btn_pwd_toggle.pack(side="right", padx=4, pady=2)
 
     # 运营商选择 (R3 参数)
-    tk.Label(form_card, text="运营商选择 (R3 认证参数)", font=("Microsoft YaHei", 9, "bold"),
-             fg=text_color, bg=card_bg).pack(anchor="w", pady=(2, 2))
-    isp_frame = tk.Frame(form_card, bg=card_bg)
+    tk.Label(form_card, text="运营商选择 (R3 认证参数)", font=FONTS["label"],
+             fg=THEME["text"], bg=THEME["card"]).pack(anchor="w", pady=(2, 2))
+    isp_frame = tk.Frame(form_card, bg=THEME["card"])
     isp_frame.pack(fill="x", pady=(2, 4))
     raw_cfg_isp = str(cfg.get("isp", "1")).strip()
     isp_var = tk.StringVar(value=raw_cfg_isp if raw_cfg_isp in ISP_CHOICES else "1")
     for isp_k, isp_name in [("1", "校园用户"), ("2", "校园电信"), ("3", "校园联通"), ("4", "校园其他")]:
         r = tk.Radiobutton(isp_frame, text=isp_name, value=isp_k, variable=isp_var,
-                           font=("Microsoft YaHei", 8), fg=text_color, bg=card_bg,
-                           selectcolor="#0f172a", activebackground=card_bg, activeforeground=text_color,
+                           font=FONTS["body"], fg=THEME["text"], bg=THEME["card"],
+                           selectcolor=THEME["bg"], activebackground=THEME["card"], activeforeground=THEME["text"],
                            highlightthickness=0)
         r.pack(side="left", padx=(0, 4))
 
@@ -1176,18 +1208,18 @@ def cmd_gui(args, cfg) -> int:
             pass
 
     # Autostart Card (Windows 计划任务开机自启)
-    auto_card = tk.Frame(body_frame, bg=card_bg, padx=16, pady=10, highlightthickness=1, highlightbackground="#334155")
+    auto_card = tk.Frame(body_frame, bg=THEME["card"], padx=16, pady=10, highlightthickness=1, highlightbackground=THEME["border"])
     auto_card.pack(fill="x", padx=18, pady=(4, 8))
 
-    auto_head = tk.Frame(auto_card, bg=card_bg)
+    auto_head = tk.Frame(auto_card, bg=THEME["card"])
     auto_head.pack(fill="x")
-    tk.Label(auto_head, text="Windows 计划任务开机自启", font=("Microsoft YaHei", 9, "bold"), fg=text_color, bg=card_bg).pack(side="left")
-    auto_st_lbl = tk.Label(auto_head, text="● 检测中…", font=("Microsoft YaHei", 9), fg="#f59e0b", bg=card_bg)
+    tk.Label(auto_head, text="Windows 计划任务开机自启", font=FONTS["card_title"], fg=THEME["text"], bg=THEME["card"]).pack(side="left")
+    auto_st_lbl = tk.Label(auto_head, text="● 检测中…", font=FONTS["body"], fg=THEME["warning"], bg=THEME["card"])
     auto_st_lbl.pack(side="right")
 
-    auto_body = tk.Frame(auto_card, bg=card_bg)
+    auto_body = tk.Frame(auto_card, bg=THEME["card"])
     auto_body.pack(fill="x", pady=(4, 0))
-    tk.Label(auto_body, text="系统启动及网络连接时静默后台认证", font=("Microsoft YaHei", 8), fg=text_muted, bg=card_bg).pack(side="left")
+    tk.Label(auto_body, text="系统启动及网络连接时静默后台认证", font=FONTS["body"], fg=THEME["text_muted"], bg=THEME["card"]).pack(side="left")
 
     autostart_active = [False]
 
@@ -1211,19 +1243,19 @@ def cmd_gui(args, cfg) -> int:
             autostart_active[0] = is_active
             def _ui():
                 if is_active:
-                    auto_card.config(highlightbackground="#059669")
-                    auto_st_lbl.config(text="● 计划任务生效中", fg=success_color)
-                    btn_autostart.config(text="卸载自启", bg="#334155", fg="#f87171",
-                                         activebackground="#475569", activeforeground="#fca5a5")
-                    btn_autostart.bind("<Enter>", lambda e: btn_autostart.config(bg="#475569"))
-                    btn_autostart.bind("<Leave>", lambda e: btn_autostart.config(bg="#334155"))
+                    auto_card.config(highlightbackground=THEME["success_border"])
+                    auto_st_lbl.config(text="● 计划任务生效中", fg=THEME["success"])
+                    btn_autostart.config(text="卸载自启", bg=THEME["border"], fg=THEME["danger_text"],
+                                         activebackground=THEME["hover"], activeforeground=THEME["danger_hover_fg"])
+                    btn_autostart.bind("<Enter>", lambda e: btn_autostart.config(bg=THEME["hover"]))
+                    btn_autostart.bind("<Leave>", lambda e: btn_autostart.config(bg=THEME["border"]))
                 else:
-                    auto_card.config(highlightbackground="#334155")
-                    auto_st_lbl.config(text="○ 未配置自启任务", fg=text_muted)
-                    btn_autostart.config(text="一键配置", bg="#2563eb", fg="#ffffff",
-                                         activebackground="#1d4ed8", activeforeground="#ffffff")
-                    btn_autostart.bind("<Enter>", lambda e: btn_autostart.config(bg="#1d4ed8"))
-                    btn_autostart.bind("<Leave>", lambda e: btn_autostart.config(bg="#2563eb"))
+                    auto_card.config(highlightbackground=THEME["border"])
+                    auto_st_lbl.config(text="○ 未配置自启任务", fg=THEME["text_muted"])
+                    btn_autostart.config(text="一键配置", bg=THEME["accent"], fg=THEME["white"],
+                                         activebackground=THEME["accent_hover"], activeforeground=THEME["white"])
+                    btn_autostart.bind("<Enter>", lambda e: btn_autostart.config(bg=THEME["accent_hover"]))
+                    btn_autostart.bind("<Leave>", lambda e: btn_autostart.config(bg=THEME["accent"]))
             safe_ui(_ui)
         run_async(_task, 'autostart')
 
@@ -1233,7 +1265,7 @@ def cmd_gui(args, cfg) -> int:
                 return
             bat_path = os.path.join(BASE_DIR, "uninstall_autostart.bat")
             if not os.path.isfile(bat_path):
-                st_lbl.config(text="✗ 未找到 uninstall_autostart.bat，请检查项目完整性", fg=danger_color)
+                st_lbl.config(text="✗ 未找到 uninstall_autostart.bat，请检查项目完整性", fg=THEME["danger"])
                 return
             try:
                 os.startfile(bat_path)
@@ -1242,7 +1274,7 @@ def cmd_gui(args, cfg) -> int:
         else:
             bat_path = os.path.join(BASE_DIR, "install_autostart.bat")
             if not os.path.isfile(bat_path):
-                st_lbl.config(text="✗ 未找到 install_autostart.bat，请检查项目完整性", fg=danger_color)
+                st_lbl.config(text="✗ 未找到 install_autostart.bat，请检查项目完整性", fg=THEME["danger"])
                 return
             try:
                 os.startfile(bat_path)
@@ -1250,14 +1282,14 @@ def cmd_gui(args, cfg) -> int:
                 messagebox.showerror("启动失败", str(e))
         root.after(3000, update_autostart_ui)
 
-    btn_autostart = tk.Button(auto_body, text="—", font=("Microsoft YaHei", 8), bg="#334155", fg=text_color,
+    btn_autostart = tk.Button(auto_body, text="—", font=FONTS["body"], bg=THEME["border"], fg=THEME["text"],
                               relief="flat", cursor="hand2", padx=8, pady=1, command=toggle_autostart)
     btn_autostart.pack(side="right")
 
 
     def do_refresh():
-        st_lbl.config(text="● 检测中…", fg="#f59e0b")
-        st_card.config(highlightbackground="#334155")
+        st_lbl.config(text="● 检测中…", fg=THEME["warning"])
+        st_card.config(highlightbackground=THEME["border"])
         update_autostart_ui()
         def _task():
             try:
@@ -1272,11 +1304,11 @@ def cmd_gui(args, cfg) -> int:
                 time_str = st.get("stime", "")
                 def _ui():
                     if online:
-                        st_lbl.config(text="● 已在线 (认证通过)", fg=success_color)
-                        st_card.config(highlightbackground="#059669")
+                        st_lbl.config(text="● 已在线 (认证通过)", fg=THEME["success"])
+                        st_card.config(highlightbackground=THEME["success_border"])
                     else:
-                        st_lbl.config(text="○ 未在线 (需要认证)", fg=danger_color)
-                        st_card.config(highlightbackground="#ef4444")
+                        st_lbl.config(text="○ 未在线 (需要认证)", fg=THEME["danger"])
+                        st_card.config(highlightbackground=THEME["danger"])
                     ip_lbl.config(text="本机 IP: %s" % (ip or "—"))
                     dur_text = _calculate_duration(st)
                     dur_display = ("时长: %s" % dur_text) if dur_text else ("上线: %s" % time_str if time_str else "时长: —")
@@ -1288,16 +1320,16 @@ def cmd_gui(args, cfg) -> int:
                 # 内层 def 闭包引用 e 时回调会抛 NameError，界面就永远停在「检测中…」。
                 err_msg = "%s" % e
                 def _err():
-                    st_lbl.config(text="! 网络连接失败", fg=danger_color)
-                    st_card.config(highlightbackground="#ef4444")
+                    st_lbl.config(text="! 网络连接失败", fg=THEME["danger"])
+                    st_card.config(highlightbackground=THEME["danger"])
                     ip_lbl.config(text="错误: %s" % err_msg)
                     meta_lbl.config(text="已用流量: —  |  时长: —  |  更新: %s" % time.strftime("%H:%M:%S"))
                 safe_ui(_err)
         run_async(_task, 'refresh')
 
     def do_test():
-        st_lbl.config(text="→ 正在运行网络自检…", fg="#3b82f6")
-        st_card.config(highlightbackground="#2563eb")
+        st_lbl.config(text="→ 正在运行网络自检…", fg=THEME["info"])
+        st_card.config(highlightbackground=THEME["accent"])
         def _task():
             try:
                 portal = Portal(cfg)
@@ -1343,10 +1375,10 @@ def cmd_gui(args, cfg) -> int:
             btn_login.config(state=st)
             btn_logout.config(state=st)
             if not busy:
-                login_bg = "#1d4ed8" if _is_btn_hovered(btn_login) else accent
-                btn_login.config(bg=login_bg, fg="#fff")
-                logout_bg = "#7f1d1d" if _is_btn_hovered(btn_logout) else "#1e293b"
-                logout_fg = "#fca5a5" if _is_btn_hovered(btn_logout) else "#f87171"
+                login_bg = THEME["accent_hover"] if _is_btn_hovered(btn_login) else THEME["accent"]
+                btn_login.config(bg=login_bg, fg=THEME["white"])
+                logout_bg = THEME["danger_hover_bg"] if _is_btn_hovered(btn_logout) else THEME["card"]
+                logout_fg = THEME["danger_hover_fg"] if _is_btn_hovered(btn_logout) else THEME["danger_text"]
                 btn_logout.config(bg=logout_bg, fg=logout_fg)
         except Exception:
             pass
@@ -1374,8 +1406,8 @@ def cmd_gui(args, cfg) -> int:
                 def _ui():
                     set_auth_busy(False)
                     if res.get("ok"):
-                        st_lbl.config(text="● 登录成功，已确认在线！", fg=success_color)
-                        st_card.config(highlightbackground="#059669")
+                        st_lbl.config(text="● 登录成功，已确认在线！", fg=THEME["success"])
+                        st_card.config(highlightbackground=THEME["success_border"])
                     else:
                         messagebox.showerror("失败", "登录失败: " + str(res.get("message", "未知错误")))
                     do_refresh()
@@ -1385,11 +1417,11 @@ def cmd_gui(args, cfg) -> int:
                 err_msg = str(e)
                 safe_ui(lambda m=err_msg: [set_auth_busy(False), messagebox.showerror("错误", m)])
         if not run_async(_task, 'auth'):
-            st_lbl.config(text="⏳ 认证操作进行中，请稍候…", fg="#f59e0b")
+            st_lbl.config(text="⏳ 认证操作进行中，请稍候…", fg=THEME["warning"])
             return
         set_auth_busy(True)
-        st_lbl.config(text="→ 正在登录…", fg="#3b82f6")
-        st_card.config(highlightbackground="#2563eb")
+        st_lbl.config(text="→ 正在登录…", fg=THEME["info"])
+        st_card.config(highlightbackground=THEME["accent"])
 
     def do_logout():
         if not messagebox.askyesno("注销确认", "确定要注销下线当前校园网会话吗？\n注销后电脑将断开互联网连接。"):
@@ -1401,8 +1433,8 @@ def cmd_gui(args, cfg) -> int:
                 def _ui():
                     set_auth_busy(False)
                     if res.get("offline"):
-                        st_lbl.config(text="○ 已注销下线", fg=text_muted)
-                        st_card.config(highlightbackground="#334155")
+                        st_lbl.config(text="○ 已注销下线", fg=THEME["text_muted"])
+                        st_card.config(highlightbackground=THEME["border"])
                     elif res.get("ok"):
                         messagebox.showwarning("注销", "注销请求已被接受，但会话仍在。\n部分网关不支持客户端自助注销，请到门户页面手动注销。")
                     else:
@@ -1414,11 +1446,11 @@ def cmd_gui(args, cfg) -> int:
                 err_msg = str(e)
                 safe_ui(lambda m=err_msg: [set_auth_busy(False), messagebox.showerror("错误", m)])
         if not run_async(_task, 'auth'):
-            st_lbl.config(text="⏳ 认证操作进行中，请稍候…", fg="#f59e0b")
+            st_lbl.config(text="⏳ 认证操作进行中，请稍候…", fg=THEME["warning"])
             return
         set_auth_busy(True)
-        st_lbl.config(text="→ 正在注销…", fg="#f59e0b")
-        st_card.config(highlightbackground="#f59e0b")
+        st_lbl.config(text="→ 正在注销…", fg=THEME["warning"])
+        st_card.config(highlightbackground=THEME["warning"])
 
     def do_save():
         # 仅持久化合法配置字段，避免命令行临时参数（如 --user, --timeout）污染配置文件
@@ -1449,9 +1481,9 @@ def cmd_gui(args, cfg) -> int:
             if pass_ent.get() != saved_cfg["password"]:
                 pass_ent.delete(0, tk.END)
                 pass_ent.insert(0, saved_cfg["password"])
-            btn_save.config(text="已保存 ✓", fg=success_color)
-            root.after(1500, lambda: btn_save.config(text="保存账号", fg=text_color))
-            st_lbl.config(text="● 配置已成功保存至 config.json", fg=success_color)
+            btn_save.config(text="已保存 ✓", fg=THEME["success"])
+            root.after(1500, lambda: btn_save.config(text="保存", fg=THEME["text"]))
+            st_lbl.config(text="● 配置已成功保存至 config.json", fg=THEME["success"])
         except Exception as e:
             messagebox.showerror("保存失败", str(e))
 
@@ -1459,19 +1491,19 @@ def cmd_gui(args, cfg) -> int:
     user_ent.bind("<Return>", lambda e: do_login())
     pass_ent.bind("<Return>", lambda e: do_login())
 
-    btn_login = tk.Button(btn_frame, text="立即登录", font=("Microsoft YaHei", 10, "bold"), bg=accent, fg="#fff", activebackground="#1d4ed8", activeforeground="#ffffff", relief="flat", cursor="hand2", command=do_login)
+    btn_login = tk.Button(btn_frame, text="登录", font=FONTS["button_bold"], bg=THEME["accent"], fg=THEME["white"], activebackground=THEME["accent_hover"], activeforeground=THEME["white"], relief="flat", cursor="hand2", command=do_login)
     btn_login.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
 
-    btn_test = tk.Button(btn_frame, text="自检", font=("Microsoft YaHei", 10), bg="#334155", fg="#f8fafc", activebackground="#475569", activeforeground="#ffffff", relief="flat", cursor="hand2", command=do_test)
+    btn_test = tk.Button(btn_frame, text="自检", font=FONTS["button"], bg=THEME["border"], fg=THEME["text"], activebackground=THEME["hover"], activeforeground=THEME["white"], relief="flat", cursor="hand2", command=do_test)
     btn_test.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
 
-    btn_refresh = tk.Button(btn_frame, text="刷新", font=("Microsoft YaHei", 10), bg="#1e293b", fg=text_color, activebackground="#334155", activeforeground=text_color, relief="flat", cursor="hand2", command=do_refresh)
+    btn_refresh = tk.Button(btn_frame, text="刷新", font=FONTS["button"], bg=THEME["card"], fg=THEME["text"], activebackground=THEME["border"], activeforeground=THEME["text"], relief="flat", cursor="hand2", command=do_refresh)
     btn_refresh.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
 
-    btn_save = tk.Button(btn_frame, text="保存账号", font=("Microsoft YaHei", 10), bg="#1e293b", fg=text_color, activebackground="#334155", activeforeground=text_color, relief="flat", cursor="hand2", command=do_save)
+    btn_save = tk.Button(btn_frame, text="保存", font=FONTS["button"], bg=THEME["card"], fg=THEME["text"], activebackground=THEME["border"], activeforeground=THEME["text"], relief="flat", cursor="hand2", command=do_save)
     btn_save.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
 
-    btn_logout = tk.Button(btn_frame, text="注销", font=("Microsoft YaHei", 10), bg="#1e293b", fg="#f87171", activebackground="#475569", activeforeground="#fca5a5", relief="flat", cursor="hand2", command=do_logout)
+    btn_logout = tk.Button(btn_frame, text="注销", font=FONTS["button"], bg=THEME["card"], fg=THEME["danger_text"], activebackground=THEME["hover"], activeforeground=THEME["danger_hover_fg"], relief="flat", cursor="hand2", command=do_logout)
     btn_logout.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
 
     def bind_hover(btn, normal_bg, hover_bg, normal_fg=None, hover_fg=None):
@@ -1499,13 +1531,13 @@ def cmd_gui(args, cfg) -> int:
         btn.bind("<Enter>", on_enter)
         btn.bind("<Leave>", on_leave)
 
-    bind_hover(btn_login, accent, "#1d4ed8")
-    bind_hover(btn_test, "#334155", "#475569")
-    bind_hover(btn_refresh, "#1e293b", "#334155")
-    bind_hover(btn_save, "#1e293b", "#334155")
-    bind_hover(btn_logout, "#1e293b", "#7f1d1d", normal_fg="#f87171", hover_fg="#fca5a5")
-    bind_hover(btn_copy_ip, "#334155", "#475569")
-    bind_hover(btn_pwd_toggle, "#1e293b", "#334155")
+    bind_hover(btn_login, THEME["accent"], THEME["accent_hover"])
+    bind_hover(btn_test, THEME["border"], THEME["hover"])
+    bind_hover(btn_refresh, THEME["card"], THEME["border"])
+    bind_hover(btn_save, THEME["card"], THEME["border"])
+    bind_hover(btn_logout, THEME["card"], THEME["danger_hover_bg"], normal_fg=THEME["danger_text"], hover_fg=THEME["danger_hover_fg"])
+    bind_hover(btn_copy_ip, THEME["border"], THEME["hover"])
+    bind_hover(btn_pwd_toggle, THEME["card"], THEME["border"])
 
     # 周期性后台状态心跳检测 (每 30 秒，自动刷新在线状态与流量，避免遥测数据停滞)
     _heartbeat_timer = [None]
