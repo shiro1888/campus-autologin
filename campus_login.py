@@ -39,6 +39,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -650,26 +651,54 @@ def cmd_status(args, cfg) -> int:
     if args.json:
         emit_json(info)
     else:
-        bar = "─" * 54
-        say("┌" + bar + "┐")
-        say(_card_line("        校园网自动登录 · Dr.COM ePortal"))
-        say("├" + bar + "┤")
-        if online:
-            say(_card_line("状态:      ● 已在线 (认证通过)"))
-            say(_card_line("账号:      %s" % str(info["account"])[:36]))
-            say(_card_line("本机 IP:   %s" % str(ip)[:36]))
-            if dur_text:
-                say(_card_line("在线时长:  %s" % dur_text[:36]))
-            say(_card_line("已用流量:  %s" % flow_detail[:36]))
-            if fee_text != "—":
-                say(_card_line("账户余额:  %s" % fee_text[:36]))
-            if info["stime"]:
-                say(_card_line("上线时间:  %s" % str(info["stime"])[:36]))
+        try:
+            cols = shutil.get_terminal_size((80, 24)).columns
+        except Exception:
+            cols = 80
+
+        if cols < 58:
+            # 窄终端（< 58 列，如分屏/窄视口）自动降级为紧凑无边框列表，防止 ASCII 边框换行破裂
+            div_len = max(20, min(cols - 1, 48))
+            div = "─" * div_len
+            say("校园网自动登录 · Dr.COM ePortal")
+            say(div)
+            if online:
+                say("状态:     ● 已在线 (认证通过)")
+                say("账号:     %s" % info["account"])
+                say("本机 IP:  %s" % (ip or "未连接"))
+                if dur_text:
+                    say("在线时长: %s" % dur_text)
+                say("已用流量: %s" % flow_detail)
+                if fee_text != "—":
+                    say("账户余额: %s" % fee_text)
+                if info["stime"]:
+                    say("上线时间: %s" % info["stime"])
+            else:
+                say("状态:     ○ 未在线 (需要认证)")
+                if ip:
+                    say("本机 IP:  %s" % ip)
+            say(div)
         else:
-            say(_card_line("状态:      ○ 未在线 (需要认证)"))
-            if ip:
+            bar = "─" * 54
+            say("┌" + bar + "┐")
+            say(_card_line("        校园网自动登录 · Dr.COM ePortal"))
+            say("├" + bar + "┤")
+            if online:
+                say(_card_line("状态:      ● 已在线 (认证通过)"))
+                say(_card_line("账号:      %s" % str(info["account"])[:36]))
                 say(_card_line("本机 IP:   %s" % str(ip)[:36]))
-        say("└" + bar + "┘")
+                if dur_text:
+                    say(_card_line("在线时长:  %s" % dur_text[:36]))
+                say(_card_line("已用流量:  %s" % flow_detail[:36]))
+                if fee_text != "—":
+                    say(_card_line("账户余额:  %s" % fee_text[:36]))
+                if info["stime"]:
+                    say(_card_line("上线时间:  %s" % str(info["stime"])[:36]))
+            else:
+                say(_card_line("状态:      ○ 未在线 (需要认证)"))
+                if ip:
+                    say(_card_line("本机 IP:   %s" % str(ip)[:36]))
+            say("└" + bar + "┘")
     return EXIT_OK if online else EXIT_FAIL
 
 
