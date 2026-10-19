@@ -1349,7 +1349,7 @@ def cmd_gui(args, cfg) -> int:
                     elif res.get("ok"):
                         messagebox.showwarning("注销", "注销请求已被接受，但会话仍在。\n部分网关不支持客户端自助注销，请到门户页面手动注销。")
                     else:
-                        messagebox.showwarning("注销", "注销请求已发出。")
+                        messagebox.showwarning("注销失败", "注销请求未被网关接受。\n请确认已连接校园网，或到门户页面手动注销。")
                     do_refresh()
                 safe_ui(_ui)
             except Exception as e:
