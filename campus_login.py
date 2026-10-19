@@ -998,16 +998,25 @@ def cmd_gui(args, cfg) -> int:
     head.pack(side="top", fill="x")
     title = tk.Label(head, text="校园网自动登录", font=("Microsoft YaHei", 15, "bold"), fg=text_color, bg=bg)
     title.pack(anchor="w")
-    sub = tk.Label(head, text="Dr.COM ePortal (172.30.100.2) 桌面控制台", font=("Microsoft YaHei", 9), fg=text_muted, bg=bg)
+    sub = tk.Label(head, text="Dr.COM ePortal · 实时自动刷新 (30s)", font=("Microsoft YaHei", 9), fg=text_muted, bg=bg)
     sub.pack(anchor="w", pady=(2, 0))
 
     # Actions Frame（提前固定在窗口底部，确保小屏或高 DPI 缩放下按钮绝不被裁切）
     btn_frame = tk.Frame(root, bg=bg, padx=18, pady=(4, 12))
     btn_frame.pack(side="bottom", fill="x")
 
-    # 中部可滚动视口 (Canvas + Frame)，适配小屏笔记本与 150%/200% 高 DPI
-    canvas = tk.Canvas(root, bg=bg, highlightthickness=0, bd=0)
-    canvas.pack(side="top", fill="both", expand=True)
+    # 中部可滚动视口 (Canvas + Scrollbar)，适配小屏笔记本与 150%/200% 高 DPI
+    scroll_wrap = tk.Frame(root, bg=bg)
+    scroll_wrap.pack(side="top", fill="both", expand=True)
+
+    scrollbar = tk.Scrollbar(scroll_wrap, orient="vertical", bg="#334155",
+                             activebackground="#475569", troughcolor="#0f172a",
+                             bd=0, highlightthickness=0, width=10, relief="flat")
+    canvas = tk.Canvas(scroll_wrap, bg=bg, highlightthickness=0, bd=0, yscrollcommand=scrollbar.set)
+    scrollbar.config(command=canvas.yview)
+
+    scrollbar.pack(side="right", fill="y")
+    canvas.pack(side="left", fill="both", expand=True)
 
     body_frame = tk.Frame(canvas, bg=bg)
     canvas_window = canvas.create_window((0, 0), window=body_frame, anchor="nw")
@@ -1025,8 +1034,7 @@ def cmd_gui(args, cfg) -> int:
         try:
             if not root.winfo_exists():
                 return
-            if body_frame.winfo_reqheight() > canvas.winfo_height():
-                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
         except Exception:
             pass
 
@@ -1249,7 +1257,8 @@ def cmd_gui(args, cfg) -> int:
                     ip_lbl.config(text="本机 IP: %s" % (ip or "—"))
                     dur_text = _calculate_duration(st)
                     dur_display = ("时长: %s" % dur_text) if dur_text else ("上线: %s" % time_str if time_str else "时长: —")
-                    meta_lbl.config(text="流量: %s  |  %s  |  延迟: %d ms" % (flow, dur_display, ping_ms))
+                    refreshed_at = time.strftime("%H:%M:%S")
+                    meta_lbl.config(text="流量: %s  |  %s  |  延迟: %d ms  |  更新: %s" % (flow, dur_display, ping_ms, refreshed_at))
                 safe_ui(_ui)
             except Exception as e:
                 # 同样必须在 except 块内先取出消息：Python 会在块结束时删除 e，
@@ -1259,7 +1268,7 @@ def cmd_gui(args, cfg) -> int:
                     st_lbl.config(text="! 网络连接失败", fg=danger_color)
                     st_card.config(highlightbackground="#ef4444")
                     ip_lbl.config(text="错误: %s" % err_msg)
-                    meta_lbl.config(text="已用流量: —  |  时长: —")
+                    meta_lbl.config(text="已用流量: —  |  时长: —  |  更新: %s" % time.strftime("%H:%M:%S"))
                 safe_ui(_err)
         run_async(_task, 'refresh')
 

@@ -70,11 +70,22 @@ function dismissToast(toast) {
   if (toast._timer) clearTimeout(toast._timer);
   toast.classList.remove('show');
   toast.classList.add('hide');
-  setTimeout(() => {
+
+  let finished = false;
+  const onEnd = () => {
+    if (finished) return;
+    finished = true;
+    toast.removeEventListener('transitionend', onEnd);
     if (toast.id !== 'toastBar') {
       toast.remove();
+    } else {
+      toast.classList.remove('hide');
+      toast._dismissing = false;
     }
-  }, 260);
+  };
+
+  toast.addEventListener('transitionend', onEnd, { once: true });
+  setTimeout(onEnd, 300);
 }
 
 // 点击默认静态 Toast 胶囊立即关闭
@@ -856,13 +867,21 @@ $('form').addEventListener('submit', (e) => {
     showToast('请先填写上网账号和密码，再点「保存并立即测试」。', 'err');
     const s = readForm();
     if (!s.account) {
-      $('account').classList.add('field-invalid');
-      $('account').setAttribute('aria-invalid', 'true');
-      $('account').focus();
+      const acc = $('account');
+      acc.classList.add('field-invalid');
+      acc.setAttribute('aria-invalid', 'true');
+      acc.setAttribute('aria-describedby', 'accountError');
+      const errEl = $('accountError');
+      if (errEl) errEl.textContent = '上网账号不能为空，请填写手机号或学号';
+      acc.focus();
     } else if (!s.password) {
-      $('password').classList.add('field-invalid');
-      $('password').setAttribute('aria-invalid', 'true');
-      $('password').focus();
+      const pwd = $('password');
+      pwd.classList.add('field-invalid');
+      pwd.setAttribute('aria-invalid', 'true');
+      pwd.setAttribute('aria-describedby', 'passwordError');
+      const errEl = $('passwordError');
+      if (errEl) errEl.textContent = '认证密码不能为空，请填写校园网密码';
+      pwd.focus();
     }
     return;
   }
@@ -1259,14 +1278,20 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
-// 输入时即刻清除表单校验失败高亮
+// 输入时即刻清除表单校验失败高亮与错误提示
 $('account')?.addEventListener('input', () => {
   $('account').classList.remove('field-invalid');
   $('account').removeAttribute('aria-invalid');
+  $('account').removeAttribute('aria-describedby');
+  const err = $('accountError');
+  if (err) err.textContent = '';
 });
 $('password')?.addEventListener('input', () => {
   $('password').classList.remove('field-invalid');
   $('password').removeAttribute('aria-invalid');
+  $('password').removeAttribute('aria-describedby');
+  const err = $('passwordError');
+  if (err) err.textContent = '';
 });
 
 // --- 即时保存的切换项 ---
