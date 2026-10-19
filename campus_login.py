@@ -1074,8 +1074,8 @@ def cmd_gui(args, cfg) -> int:
     # 记录从磁盘加载的原始凭据与配置快照，作为未保存修改检测的权威基准
     raw_init_isp = str(cfg.get("isp", "1")).strip()
     _saved_snapshot = {
-        "username": str(cfg.get("username", "")),
-        "password": str(cfg.get("password", "")),
+        "username": str(cfg.get("username", "")).strip(),
+        "password": str(cfg.get("password", "")).strip(),
         "isp": raw_init_isp if raw_init_isp in ISP_CHOICES else "1",
     }
 
@@ -1443,6 +1443,12 @@ def cmd_gui(args, cfg) -> int:
             _saved_snapshot["username"] = str(saved_cfg.get("username", ""))
             _saved_snapshot["password"] = str(saved_cfg.get("password", ""))
             _saved_snapshot["isp"] = str(saved_cfg.get("isp", "1"))
+            if user_ent.get() != saved_cfg["username"]:
+                user_ent.delete(0, tk.END)
+                user_ent.insert(0, saved_cfg["username"])
+            if pass_ent.get() != saved_cfg["password"]:
+                pass_ent.delete(0, tk.END)
+                pass_ent.insert(0, saved_cfg["password"])
             btn_save.config(text="已保存 ✓", fg=success_color)
             root.after(1500, lambda: btn_save.config(text="保存账号", fg=text_color))
             st_lbl.config(text="● 配置已成功保存至 config.json", fg=success_color)
@@ -1531,7 +1537,7 @@ def cmd_gui(args, cfg) -> int:
 
     def _handle_escape(e=None):
         u = user_ent.get().strip()
-        p = pass_ent.get()
+        p = pass_ent.get().strip()
         raw_isp = str(isp_var.get() or "1").strip()
         current_isp = raw_isp if raw_isp in ISP_CHOICES else "1"
         is_dirty = (
