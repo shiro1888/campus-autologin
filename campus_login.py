@@ -163,6 +163,9 @@ def load_config() -> dict:
                             if v is not None and not str(k).startswith("_")})
         except (OSError, ValueError) as exc:
             raise ConfigError("配置文件 %s 无法解析: %s" % (os.path.basename(config_file), exc))
+    # 归一化运营商配置，避免脏数据导致 R3 非法透传或 GUI 单选框全部失选
+    raw_isp = str(cfg.get("isp") or "1").strip()
+    cfg["isp"] = raw_isp if raw_isp in ISP_CHOICES else "1"
     return cfg
 
 
@@ -343,7 +346,7 @@ class Portal:
             "0MKKey": "123456",
             "R1": "0",
             "R2": "",
-            "R3": str(self.cfg.get("isp", "1")),
+            "R3": str(self.cfg.get("isp", "1") if str(self.cfg.get("isp", "1")) in ISP_CHOICES else "1"),
             "R6": "0",
             "para": "00",
             "v6ip": "",
@@ -1070,7 +1073,8 @@ def cmd_gui(args, cfg) -> int:
              fg=text_color, bg=card_bg).pack(anchor="w", pady=(2, 2))
     isp_frame = tk.Frame(form_card, bg=card_bg)
     isp_frame.pack(fill="x", pady=(2, 4))
-    isp_var = tk.StringVar(value=str(cfg.get("isp", "1")))
+    raw_cfg_isp = str(cfg.get("isp", "1")).strip()
+    isp_var = tk.StringVar(value=raw_cfg_isp if raw_cfg_isp in ISP_CHOICES else "1")
     for isp_k, isp_name in [("1", "校园用户"), ("2", "校园电信"), ("3", "校园联通"), ("4", "校园其他")]:
         r = tk.Radiobutton(isp_frame, text=isp_name, value=isp_k, variable=isp_var,
                            font=("Microsoft YaHei", 8), fg=text_color, bg=card_bg,
@@ -1279,7 +1283,8 @@ def cmd_gui(args, cfg) -> int:
             return
         cfg["username"] = u
         cfg["password"] = p
-        cfg["isp"] = isp_var.get()
+        raw_isp = str(isp_var.get() or "1").strip()
+        cfg["isp"] = raw_isp if raw_isp in ISP_CHOICES else "1"
         def _task():
             try:
                 portal = Portal(cfg)
@@ -1295,9 +1300,11 @@ def cmd_gui(args, cfg) -> int:
                 # 同上：先取值再交给延迟回调，避免 NameError
                 err_msg = str(e)
                 safe_ui(lambda m=err_msg: messagebox.showerror("错误", m))
-        if run_async(_task, 'login'):
-            st_lbl.config(text="→ 正在登录…", fg="#3b82f6")
-            st_card.config(highlightbackground="#2563eb")
+        if not run_async(_task, 'auth'):
+            messagebox.showinfo("提示", "正在处理网络认证操作，请稍候…")
+            return
+        st_lbl.config(text="→ 正在登录…", fg="#3b82f6")
+        st_card.config(highlightbackground="#2563eb")
 
     def do_logout():
         if not messagebox.askyesno("注销确认", "确定要注销下线当前校园网会话吗？\n注销后电脑将断开互联网连接。"):
@@ -1307,8 +1314,10 @@ def cmd_gui(args, cfg) -> int:
                 portal = Portal(cfg)
                 res = portal.logout()
                 def _ui():
-                    if res.get("offline") or res.get("ok"):
+                    if res.get("offline"):
                         messagebox.showinfo("注销", "已注销下线。")
+                    elif res.get("ok"):
+                        messagebox.showwarning("注销", "注销请求已被接受，但会话仍在。\n部分网关不支持客户端自助注销，请到门户页面手动注销。")
                     else:
                         messagebox.showwarning("注销", "注销请求已发出。")
                     do_refresh()
@@ -1317,9 +1326,11 @@ def cmd_gui(args, cfg) -> int:
                 # 同上：先取值再交给延迟回调，避免 NameError
                 err_msg = str(e)
                 safe_ui(lambda m=err_msg: messagebox.showerror("错误", m))
-        if run_async(_task, 'logout'):
-            st_lbl.config(text="→ 正在注销…", fg="#f59e0b")
-            st_card.config(highlightbackground="#f59e0b")
+        if not run_async(_task, 'auth'):
+            messagebox.showinfo("提示", "正在处理网络认证操作，请稍候…")
+            return
+        st_lbl.config(text="→ 正在注销…", fg="#f59e0b")
+        st_card.config(highlightbackground="#f59e0b")
 
     def do_save():
         # 仅持久化合法配置字段，避免命令行临时参数（如 --user, --timeout）污染配置文件
@@ -1332,7 +1343,8 @@ def cmd_gui(args, cfg) -> int:
                 saved_cfg = {}
         saved_cfg["username"] = user_ent.get().strip()
         saved_cfg["password"] = pass_ent.get().strip()
-        saved_cfg["isp"] = isp_var.get()
+        raw_isp = str(isp_var.get() or "1").strip()
+        saved_cfg["isp"] = raw_isp if raw_isp in ISP_CHOICES else "1"
         for k in DEFAULT_CONFIG:
             if k not in saved_cfg and k in cfg:
                 saved_cfg[k] = cfg[k]
