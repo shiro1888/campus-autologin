@@ -1120,7 +1120,7 @@ def cmd_gui(args, cfg) -> int:
     user_ent = tk.Entry(form_card, font=FONTS["button"], bg=THEME["input_bg"], fg=THEME["text"],
                         insertbackground=THEME["text"], relief="flat", highlightthickness=1,
                         highlightbackground=THEME["border"], highlightcolor=THEME["accent"])
-    user_ent.insert(0, cfg.get("username", ""))
+    user_ent.insert(0, str(cfg.get("username", "")).strip())
     user_ent.pack(fill="x", pady=(3, 10), ipady=4)
 
     # 登录密码（带显示/隐藏切换小眼睛）
@@ -1132,7 +1132,7 @@ def cmd_gui(args, cfg) -> int:
                         insertbackground=THEME["text"], relief="flat", bd=0)
     pass_ent.bind("<FocusIn>", lambda e: pwd_wrap.config(highlightbackground=THEME["accent"]))
     pass_ent.bind("<FocusOut>", lambda e: pwd_wrap.config(highlightbackground=THEME["border"]))
-    pass_ent.insert(0, cfg.get("password", ""))
+    pass_ent.insert(0, str(cfg.get("password", "")).strip())
     pass_ent.pack(side="left", fill="x", expand=True, padx=6, ipady=4)
 
     pwd_visible = [False]

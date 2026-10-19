@@ -105,6 +105,7 @@ function updateAccountMaskDisplay() {
   if (isMasked) {
     accInput.classList.add('account-masked');
     if (maskBtn) {
+      maskBtn.classList.add('active');
       maskBtn.title = '当前：自习室防窥（点击显示明文）';
       maskBtn.setAttribute('aria-label', '当前：自习室防窥（点击显示明文）');
     }
@@ -114,6 +115,7 @@ function updateAccountMaskDisplay() {
   } else {
     accInput.classList.remove('account-masked');
     if (maskBtn) {
+      maskBtn.classList.remove('active');
       maskBtn.title = '当前：明文显示（点击开启自习室防窥）';
       maskBtn.setAttribute('aria-label', '当前：明文显示（点击开启自习室防窥）');
     }

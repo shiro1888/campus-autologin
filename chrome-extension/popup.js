@@ -87,7 +87,10 @@ function updateAccountDisplay() {
     accEl.textContent = maskAccount(currentAccount);
     accEl.classList.add('masked');
     accEl.title = '自习室防窥模式（点击切换明文显示）';
-    if (maskBtn) maskBtn.title = '当前：自习室防窥（点击显示明文）';
+    if (maskBtn) {
+      maskBtn.classList.add('active');
+      maskBtn.title = '当前：自习室防窥（点击显示明文）';
+    }
     if (maskIcon) {
       maskIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
     }
@@ -95,7 +98,10 @@ function updateAccountDisplay() {
     accEl.textContent = currentAccount || '未设置';
     accEl.classList.remove('masked');
     accEl.title = currentAccount ? `点击开启自习室防窥: ${currentAccount}` : '尚未设置认证账号';
-    if (maskBtn) maskBtn.title = '当前：明文显示（点击开启自习室防窥）';
+    if (maskBtn) {
+      maskBtn.classList.remove('active');
+      maskBtn.title = '当前：明文显示（点击开启自习室防窥）';
+    }
     if (maskIcon) {
       maskIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
     }
