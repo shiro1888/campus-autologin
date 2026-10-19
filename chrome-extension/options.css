@@ -1796,6 +1796,8 @@ input[type="text"]:focus,
 input[type="password"]:focus,
 select:focus {
   border-color: var(--primary);
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
   box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--primary) 18%, transparent), 0 2px 8px -2px color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
@@ -1803,6 +1805,8 @@ select:focus {
 [data-theme="dark"] input[type="password"]:focus,
 [data-theme="dark"] select:focus {
   border-color: var(--primary);
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
   box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--primary) 22%, transparent), 0 0 16px -2px color-mix(in srgb, var(--primary) 28%, transparent);
 }
 
@@ -2652,6 +2656,7 @@ input[aria-invalid="true"] {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+  transition: opacity 0s;
 }
 
 .btn-spinner {
