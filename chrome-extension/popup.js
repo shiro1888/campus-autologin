@@ -81,9 +81,44 @@ function updateAccountDisplay() {
   const accEl = $('account');
   const maskBtn = $('btnToggleMask');
   const maskIcon = $('maskIcon');
+  const copyBtn = $('btnCopyAccount');
   if (!accEl) return;
 
-  if (isMasked && currentAccount) {
+  if (!currentAccount) {
+    accEl.textContent = '未设置账号';
+    accEl.classList.remove('masked');
+    accEl.classList.add('unset');
+    accEl.title = '尚未设置认证账号，点击前往「偏好设置」填写';
+    if (maskBtn) {
+      maskBtn.classList.remove('active');
+      maskBtn.disabled = true;
+      maskBtn.title = '未设置账号，无需防窥';
+      maskBtn.style.opacity = '0.35';
+      maskBtn.style.pointerEvents = 'none';
+    }
+    if (copyBtn) {
+      copyBtn.disabled = true;
+      copyBtn.title = '未设置账号，无法复制';
+      copyBtn.style.opacity = '0.35';
+      copyBtn.style.pointerEvents = 'none';
+    }
+    return;
+  }
+
+  // 恢复按钮正常可交互状态
+  if (maskBtn) {
+    maskBtn.disabled = false;
+    maskBtn.style.opacity = '';
+    maskBtn.style.pointerEvents = '';
+  }
+  if (copyBtn) {
+    copyBtn.disabled = false;
+    copyBtn.style.opacity = '';
+    copyBtn.style.pointerEvents = '';
+  }
+  accEl.classList.remove('unset');
+
+  if (isMasked) {
     accEl.textContent = maskAccount(currentAccount);
     accEl.classList.add('masked');
     accEl.title = '自习室防窥模式（点击切换明文显示）';
@@ -95,9 +130,9 @@ function updateAccountDisplay() {
       maskIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
     }
   } else {
-    accEl.textContent = currentAccount || '未设置';
+    accEl.textContent = currentAccount;
     accEl.classList.remove('masked');
-    accEl.title = currentAccount ? `点击开启自习室防窥: ${currentAccount}` : '尚未设置认证账号';
+    accEl.title = `点击开启自习室防窥: ${currentAccount}`;
     if (maskBtn) {
       maskBtn.classList.remove('active');
       maskBtn.title = '当前：明文显示（点击开启自习室防窥）';
@@ -526,12 +561,18 @@ const accEl = $('account');
 if (accEl) {
   accEl.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (currentAccount) {
-      isMasked = !isMasked;
-      chrome.storage.local.set({ privacyMask: isMasked });
-      updateAccountDisplay();
-      setMsg(isMasked ? '已开启自习室防窥模式' : '已恢复明文显示', 'info', 1600);
+    if (!currentAccount) {
+      if (chrome.runtime && chrome.runtime.openOptionsPage) {
+        chrome.runtime.openOptionsPage();
+      } else {
+        window.open(chrome.runtime.getURL('options.html'));
+      }
+      return;
     }
+    isMasked = !isMasked;
+    chrome.storage.local.set({ privacyMask: isMasked });
+    updateAccountDisplay();
+    setMsg(isMasked ? '已开启自习室防窥模式' : '已恢复明文显示', 'info', 1600);
   });
 }
 

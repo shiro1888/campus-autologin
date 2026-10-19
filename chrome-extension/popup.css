@@ -259,7 +259,7 @@ body {
 
 .brand-name {
   font-weight: 700;
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.25;
   color: var(--text-main);
   letter-spacing: -0.015em;
@@ -284,7 +284,7 @@ body {
   color: var(--text-muted);
   background: var(--bg-card-subtle);
   border: 1px solid var(--border-hairline);
-  padding: 2.5px 8px;
+  padding: 2px 8px;
   border-radius: var(--radius-pill);
   cursor: pointer;
   transition: all 0.2s var(--ease-spring);
@@ -344,8 +344,8 @@ body {
 /* Header Quick Theme Toggle */
 .theme-btn .icon-sun,
 .theme-btn .icon-moon {
-  width: 13.5px;
-  height: 13.5px;
+  width: 14px;
+  height: 14px;
   display: block;
   transition: transform 0.35s var(--ease-spring), opacity 0.2s ease;
 }
@@ -397,8 +397,8 @@ body {
 }
 
 .icon-refresh {
-  width: 13.5px;
-  height: 13.5px;
+  width: 14px;
+  height: 14px;
   display: block;
   transform-origin: center center;
 }
@@ -432,6 +432,10 @@ body {
   position: relative;
   overflow: hidden;
   transition: all 0.35s var(--ease-smooth);
+}
+
+[data-theme="dark"] .card {
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 /* Specular Top Rim Highlight */
@@ -679,7 +683,7 @@ body {
 }
 
 .status-title {
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text-main);
   line-height: 1.25;
@@ -687,7 +691,7 @@ body {
 }
 
 .status-desc {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-muted);
   line-height: 1.35;
   white-space: nowrap;
@@ -740,7 +744,7 @@ body {
 .ip-prefix {
   display: flex;
   align-items: center;
-  gap: 3.5px;
+  gap: 4px;
   font-size: 10px;
   font-weight: 600;
   color: var(--text-light);
@@ -749,8 +753,8 @@ body {
 }
 
 .ip-prefix svg {
-  width: 11px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
   opacity: 0.8;
 }
 
@@ -777,8 +781,8 @@ body {
 }
 
 .copy-svg {
-  width: 12.5px;
-  height: 12.5px;
+  width: 12px;
+  height: 12px;
 }
 
 /* ==========================================================================
@@ -794,7 +798,7 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-lg);
-  padding: 9.5px 11.5px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -849,7 +853,7 @@ body {
 .dock-head {
   display: flex;
   align-items: center;
-  gap: 6.5px;
+  gap: 6px;
   font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
@@ -858,7 +862,7 @@ body {
 .isp-badge {
   font-size: 10px;
   font-weight: 600;
-  padding: 1.5px 6.5px;
+  padding: 2px 6px;
   border-radius: var(--radius-pill);
   background: rgba(59, 130, 246, 0.12);
   color: #1d4ed8;
@@ -943,7 +947,7 @@ body {
 [data-theme="dark"] .dock-icon.blue { background: rgba(59, 130, 246, 0.18); }
 
 .dock-value {
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text-main);
   line-height: 1.25;
@@ -971,9 +975,9 @@ body {
 /* Micro Dual-color Traffic Ratio Bar */
 .flow-bar-wrap {
   display: flex;
-  gap: 1.5px;
+  gap: 2px;
   width: 100%;
-  height: 4.5px;
+  height: 4px;
   border-radius: 99px;
   background: var(--border-hairline);
   overflow: hidden;
@@ -1144,13 +1148,25 @@ body {
 }
 
 .dock-value.mono {
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 .dock-value.ellipsis {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dock-value.unset {
+  color: var(--text-light);
+  font-style: italic;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dock-value.unset:hover {
+  color: var(--primary);
+  text-decoration: underline;
 }
 
 .dock-value-row {
@@ -1169,11 +1185,11 @@ body {
 .dock-btn-group {
   display: inline-flex;
   align-items: center;
-  gap: 1.5px;
+  gap: 2px;
   flex-shrink: 0;
   background: var(--bg-card-subtle);
   border: 1px solid var(--border-hairline);
-  padding: 1.5px;
+  padding: 2px;
   border-radius: var(--radius-pill);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -1207,8 +1223,8 @@ body {
 }
 
 .dock-copy-btn svg {
-  width: 12.5px;
-  height: 12.5px;
+  width: 12px;
+  height: 12px;
   transition: transform 0.2s var(--ease-spring);
 }
 
@@ -1291,8 +1307,8 @@ body {
 }
 
 .meta-icon {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
   color: var(--text-muted);
   flex-shrink: 0;
 }
@@ -1374,8 +1390,8 @@ body {
 }
 
 .msg-icon svg {
-  width: 11px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
 }
 
 .msg-text {
@@ -1566,7 +1582,7 @@ body {
   padding: 0 15px;
   height: 42px;
   box-sizing: border-box;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   display: flex;
   align-items: center;
@@ -1580,8 +1596,8 @@ body {
 }
 
 .btn-secondary svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
 }
 
 .btn-secondary:hover {
@@ -1624,15 +1640,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 16px;
   padding-top: 3px;
 }
 
 .foot-link {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 11.5px;
+  gap: 6px;
+  font-size: 12px;
   color: var(--text-muted);
   text-decoration: none;
   transition: all 0.2s ease;
@@ -1641,8 +1657,8 @@ body {
 }
 
 .foot-link svg {
-  width: 12.5px;
-  height: 12.5px;
+  width: 12px;
+  height: 12px;
   opacity: 0.8;
 }
 
@@ -1660,7 +1676,7 @@ body {
   height: 3px;
   background: var(--text-light);
   border-radius: 50%;
-  opacity: 0.4;
+  opacity: 0.2;
 }
 
 /* ==========================================================================
