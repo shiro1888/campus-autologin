@@ -1246,19 +1246,40 @@ if ($('btnImportConfig') && $('importFileInput')) {
   });
 }
 
-// --- 显示/隐藏密码 ---
-$('togglePwd').addEventListener('click', () => {
+// --- 显示/隐藏密码（带 10 秒无操作自动回隐，防止公共自习室遗忘暴露）---
+let pwdRehideTimer = null;
+$('togglePwd')?.addEventListener('click', () => {
   const el = $('password');
+  if (!el) return;
   const isPwd = el.type === 'password';
   el.type = isPwd ? 'text' : 'password';
+
+  if (pwdRehideTimer) {
+    clearTimeout(pwdRehideTimer);
+    pwdRehideTimer = null;
+  }
 
   const eyeIcon = $('eyeIcon');
   if (isPwd) {
     // 隐藏状态图标 (带有斜线)
-    eyeIcon.innerHTML = '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>';
+    if (eyeIcon) {
+      eyeIcon.innerHTML = '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>';
+    }
+    // 10 秒后自动回隐为密文
+    pwdRehideTimer = setTimeout(() => {
+      if (el.type === 'text') {
+        el.type = 'password';
+        if (eyeIcon) {
+          eyeIcon.innerHTML = '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>';
+        }
+      }
+      pwdRehideTimer = null;
+    }, 10000);
   } else {
     // 正常眼睛图标
-    eyeIcon.innerHTML = '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>';
+    if (eyeIcon) {
+      eyeIcon.innerHTML = '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>';
+    }
   }
 });
 

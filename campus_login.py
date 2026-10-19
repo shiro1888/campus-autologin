@@ -1096,11 +1096,26 @@ def cmd_gui(args, cfg) -> int:
     pass_ent.pack(side="left", fill="x", expand=True, padx=6, ipady=4)
 
     pwd_visible = [False]
+    pwd_timer = [None]
+
+    def _auto_rehide_pwd():
+        if pwd_visible[0]:
+            pwd_visible[0] = False
+            pass_ent.config(show="●")
+            btn_pwd_toggle.config(text="👁 显示")
 
     def toggle_pwd():
+        if pwd_timer[0]:
+            try:
+                root.after_cancel(pwd_timer[0])
+            except Exception:
+                pass
+            pwd_timer[0] = None
         pwd_visible[0] = not pwd_visible[0]
         pass_ent.config(show="" if pwd_visible[0] else "●")
         btn_pwd_toggle.config(text="🙈 隐藏" if pwd_visible[0] else "👁 显示")
+        if pwd_visible[0]:
+            pwd_timer[0] = root.after(10000, _auto_rehide_pwd)
 
     btn_pwd_toggle = tk.Button(pwd_wrap, text="👁 显示", font=("Microsoft YaHei", 8), bg="#1e293b",
                                fg=text_muted, activebackground="#334155", activeforeground=text_color,
@@ -1210,7 +1225,7 @@ def cmd_gui(args, cfg) -> int:
                 return
             bat_path = os.path.join(BASE_DIR, "uninstall_autostart.bat")
             if not os.path.isfile(bat_path):
-                messagebox.showerror("错误", "未找到卸载脚本:\n%s" % bat_path)
+                st_lbl.config(text="✗ 未找到 uninstall_autostart.bat，请检查项目完整性", fg=danger_color)
                 return
             try:
                 os.startfile(bat_path)
@@ -1219,7 +1234,7 @@ def cmd_gui(args, cfg) -> int:
         else:
             bat_path = os.path.join(BASE_DIR, "install_autostart.bat")
             if not os.path.isfile(bat_path):
-                messagebox.showerror("错误", "未找到安装脚本:\n%s" % bat_path)
+                st_lbl.config(text="✗ 未找到 install_autostart.bat，请检查项目完整性", fg=danger_color)
                 return
             try:
                 os.startfile(bat_path)
@@ -1308,6 +1323,17 @@ def cmd_gui(args, cfg) -> int:
                 safe_ui(lambda m=err_msg: [messagebox.showerror("自检异常", m), do_refresh()])
         run_async(_task, 'selftest')
 
+    def set_auth_busy(busy):
+        st = "disabled" if busy else "normal"
+        try:
+            btn_login.config(state=st)
+            btn_logout.config(state=st)
+            if not busy:
+                btn_login.config(bg=accent, fg="#fff")
+                btn_logout.config(bg="#1e293b", fg="#f87171")
+        except Exception:
+            pass
+
     def do_login():
         u = user_ent.get().strip()
         p = pass_ent.get().strip()
@@ -1327,6 +1353,7 @@ def cmd_gui(args, cfg) -> int:
                 portal = Portal(cfg)
                 res = portal.login(cfg["username"], cfg["password"])
                 def _ui():
+                    set_auth_busy(False)
                     if res.get("ok"):
                         st_lbl.config(text="● 登录成功，已确认在线！", fg=success_color)
                         st_card.config(highlightbackground="#059669")
@@ -1337,10 +1364,11 @@ def cmd_gui(args, cfg) -> int:
             except Exception as e:
                 # 同上：先取值再交给延迟回调，避免 NameError
                 err_msg = str(e)
-                safe_ui(lambda m=err_msg: messagebox.showerror("错误", m))
+                safe_ui(lambda m=err_msg: [set_auth_busy(False), messagebox.showerror("错误", m)])
         if not run_async(_task, 'auth'):
             st_lbl.config(text="⏳ 认证操作进行中，请稍候…", fg="#f59e0b")
             return
+        set_auth_busy(True)
         st_lbl.config(text="→ 正在登录…", fg="#3b82f6")
         st_card.config(highlightbackground="#2563eb")
 
@@ -1352,6 +1380,7 @@ def cmd_gui(args, cfg) -> int:
                 portal = Portal(cfg)
                 res = portal.logout()
                 def _ui():
+                    set_auth_busy(False)
                     if res.get("offline"):
                         st_lbl.config(text="○ 已注销下线", fg=text_muted)
                         st_card.config(highlightbackground="#334155")
@@ -1364,10 +1393,11 @@ def cmd_gui(args, cfg) -> int:
             except Exception as e:
                 # 同上：先取值再交给延迟回调，避免 NameError
                 err_msg = str(e)
-                safe_ui(lambda m=err_msg: messagebox.showerror("错误", m))
+                safe_ui(lambda m=err_msg: [set_auth_busy(False), messagebox.showerror("错误", m)])
         if not run_async(_task, 'auth'):
             st_lbl.config(text="⏳ 认证操作进行中，请稍候…", fg="#f59e0b")
             return
+        set_auth_busy(True)
         st_lbl.config(text="→ 正在注销…", fg="#f59e0b")
         st_card.config(highlightbackground="#f59e0b")
 
@@ -1418,10 +1448,20 @@ def cmd_gui(args, cfg) -> int:
 
     def bind_hover(btn, normal_bg, hover_bg, normal_fg=None, hover_fg=None):
         def on_enter(e):
+            try:
+                if str(btn.cget("state")) == "disabled":
+                    return
+            except Exception:
+                pass
             d = {"bg": hover_bg}
             if hover_fg: d["fg"] = hover_fg
             btn.config(**d)
         def on_leave(e):
+            try:
+                if str(btn.cget("state")) == "disabled":
+                    return
+            except Exception:
+                pass
             d = {"bg": normal_bg}
             if normal_fg: d["fg"] = normal_fg
             btn.config(**d)
@@ -1449,6 +1489,11 @@ def cmd_gui(args, cfg) -> int:
 
     def _on_close():
         try:
+            if pwd_timer[0]:
+                root.after_cancel(pwd_timer[0])
+        except Exception:
+            pass
+        try:
             if _heartbeat_timer[0]:
                 root.after_cancel(_heartbeat_timer[0])
         except Exception:
@@ -1459,15 +1504,28 @@ def cmd_gui(args, cfg) -> int:
             pass
         root.destroy()
 
+    def _handle_escape(e=None):
+        u = user_ent.get().strip()
+        p = pass_ent.get()
+        saved_u = cfg.get("username", "")
+        saved_p = cfg.get("password", "")
+        if (u != saved_u or p != saved_p) and (u or p):
+            if messagebox.askyesno("退出确认", "检测到账号或密码有未保存的修改，确定要退出吗？"):
+                _on_close()
+        else:
+            _on_close()
+
     root.protocol("WM_DELETE_WINDOW", _on_close)
 
-    # 快捷键绑定 (Ctrl+R / F5 刷新, Ctrl+S 保存, Esc 退出)
+    # 快捷键绑定 (Ctrl+R / F5 刷新, Ctrl+S 保存, Ctrl+Q 退出, Esc 退出防误触)
     root.bind("<Control-r>", lambda e: do_refresh())
     root.bind("<Control-R>", lambda e: do_refresh())
     root.bind("<F5>", lambda e: do_refresh())
     root.bind("<Control-s>", lambda e: do_save())
     root.bind("<Control-S>", lambda e: do_save())
-    root.bind("<Escape>", lambda e: _on_close())
+    root.bind("<Control-q>", lambda e: _on_close())
+    root.bind("<Control-Q>", lambda e: _on_close())
+    root.bind("<Escape>", _handle_escape)
 
     do_refresh()
     _heartbeat_timer[0] = root.after(30000, _heartbeat)
