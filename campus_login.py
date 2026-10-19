@@ -1071,6 +1071,14 @@ def cmd_gui(args, cfg) -> int:
     meta_lbl = tk.Label(st_card, text="已用流量: —  |  时长: —", font=("Microsoft YaHei", 9), fg=text_muted, bg=card_bg)
     meta_lbl.pack(anchor="w", pady=(2, 0))
 
+    # 记录从磁盘加载的原始凭据与配置快照，作为未保存修改检测的权威基准
+    raw_init_isp = str(cfg.get("isp", "1")).strip()
+    _saved_snapshot = {
+        "username": str(cfg.get("username", "")),
+        "password": str(cfg.get("password", "")),
+        "isp": raw_init_isp if raw_init_isp in ISP_CHOICES else "1",
+    }
+
     # Form Card
     form_card = tk.Frame(body_frame, bg=card_bg, padx=16, pady=12, highlightthickness=1, highlightbackground="#334155")
     form_card.pack(fill="x", padx=18, pady=(4, 6))
@@ -1323,14 +1331,23 @@ def cmd_gui(args, cfg) -> int:
                 safe_ui(lambda m=err_msg: [messagebox.showerror("自检异常", m), do_refresh()])
         run_async(_task, 'selftest')
 
+    def _is_btn_hovered(btn):
+        try:
+            return root.winfo_containing(root.winfo_pointerx(), root.winfo_pointery()) == btn
+        except Exception:
+            return getattr(btn, "_is_hovered", False)
+
     def set_auth_busy(busy):
         st = "disabled" if busy else "normal"
         try:
             btn_login.config(state=st)
             btn_logout.config(state=st)
             if not busy:
-                btn_login.config(bg=accent, fg="#fff")
-                btn_logout.config(bg="#1e293b", fg="#f87171")
+                login_bg = "#1d4ed8" if _is_btn_hovered(btn_login) else accent
+                btn_login.config(bg=login_bg, fg="#fff")
+                logout_bg = "#7f1d1d" if _is_btn_hovered(btn_logout) else "#1e293b"
+                logout_fg = "#fca5a5" if _is_btn_hovered(btn_logout) else "#f87171"
+                btn_logout.config(bg=logout_bg, fg=logout_fg)
         except Exception:
             pass
 
@@ -1344,14 +1361,16 @@ def cmd_gui(args, cfg) -> int:
             else:
                 pass_ent.focus()
             return
-        cfg["username"] = u
-        cfg["password"] = p
         raw_isp = str(isp_var.get() or "1").strip()
-        cfg["isp"] = raw_isp if raw_isp in ISP_CHOICES else "1"
+        current_isp = raw_isp if raw_isp in ISP_CHOICES else "1"
+        login_cfg = dict(cfg)
+        login_cfg["username"] = u
+        login_cfg["password"] = p
+        login_cfg["isp"] = current_isp
         def _task():
             try:
-                portal = Portal(cfg)
-                res = portal.login(cfg["username"], cfg["password"])
+                portal = Portal(login_cfg)
+                res = portal.login(u, p)
                 def _ui():
                     set_auth_busy(False)
                     if res.get("ok"):
@@ -1421,6 +1440,9 @@ def cmd_gui(args, cfg) -> int:
             with open(CONFIG_PATH, "w", encoding="utf-8") as fh:
                 json.dump(saved_cfg, fh, indent=2, ensure_ascii=False)
             cfg.update(saved_cfg)
+            _saved_snapshot["username"] = str(saved_cfg.get("username", ""))
+            _saved_snapshot["password"] = str(saved_cfg.get("password", ""))
+            _saved_snapshot["isp"] = str(saved_cfg.get("isp", "1"))
             btn_save.config(text="已保存 ✓", fg=success_color)
             root.after(1500, lambda: btn_save.config(text="保存账号", fg=text_color))
             st_lbl.config(text="● 配置已成功保存至 config.json", fg=success_color)
@@ -1447,7 +1469,9 @@ def cmd_gui(args, cfg) -> int:
     btn_logout.pack(side="left", expand=True, fill="x", padx=2, ipady=6)
 
     def bind_hover(btn, normal_bg, hover_bg, normal_fg=None, hover_fg=None):
+        btn._is_hovered = False
         def on_enter(e):
+            btn._is_hovered = True
             try:
                 if str(btn.cget("state")) == "disabled":
                     return
@@ -1457,6 +1481,7 @@ def cmd_gui(args, cfg) -> int:
             if hover_fg: d["fg"] = hover_fg
             btn.config(**d)
         def on_leave(e):
+            btn._is_hovered = False
             try:
                 if str(btn.cget("state")) == "disabled":
                     return
@@ -1507,10 +1532,15 @@ def cmd_gui(args, cfg) -> int:
     def _handle_escape(e=None):
         u = user_ent.get().strip()
         p = pass_ent.get()
-        saved_u = cfg.get("username", "")
-        saved_p = cfg.get("password", "")
-        if (u != saved_u or p != saved_p) and (u or p):
-            if messagebox.askyesno("退出确认", "检测到账号或密码有未保存的修改，确定要退出吗？"):
+        raw_isp = str(isp_var.get() or "1").strip()
+        current_isp = raw_isp if raw_isp in ISP_CHOICES else "1"
+        is_dirty = (
+            u != _saved_snapshot["username"] or
+            p != _saved_snapshot["password"] or
+            current_isp != _saved_snapshot["isp"]
+        )
+        if is_dirty and (u or p or current_isp != _saved_snapshot["isp"]):
+            if messagebox.askyesno("退出确认", "检测到账号、密码或运营商有未保存的修改，确定要退出吗？"):
                 _on_close()
         else:
             _on_close()
