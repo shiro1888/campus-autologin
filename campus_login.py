@@ -994,16 +994,47 @@ def cmd_gui(args, cfg) -> int:
     danger_color = "#ef4444"
 
     # Header
-    head = tk.Frame(root, bg=bg, pady=12, padx=18)
-    head.pack(fill="x")
+    head = tk.Frame(root, bg=bg, pady=10, padx=18)
+    head.pack(side="top", fill="x")
     title = tk.Label(head, text="校园网自动登录", font=("Microsoft YaHei", 15, "bold"), fg=text_color, bg=bg)
     title.pack(anchor="w")
     sub = tk.Label(head, text="Dr.COM ePortal (172.30.100.2) 桌面控制台", font=("Microsoft YaHei", 9), fg=text_muted, bg=bg)
     sub.pack(anchor="w", pady=(2, 0))
 
+    # Actions Frame（提前固定在窗口底部，确保小屏或高 DPI 缩放下按钮绝不被裁切）
+    btn_frame = tk.Frame(root, bg=bg, padx=18, pady=(4, 12))
+    btn_frame.pack(side="bottom", fill="x")
+
+    # 中部可滚动视口 (Canvas + Frame)，适配小屏笔记本与 150%/200% 高 DPI
+    canvas = tk.Canvas(root, bg=bg, highlightthickness=0, bd=0)
+    canvas.pack(side="top", fill="both", expand=True)
+
+    body_frame = tk.Frame(canvas, bg=bg)
+    canvas_window = canvas.create_window((0, 0), window=body_frame, anchor="nw")
+
+    def _on_canvas_configure(event):
+        canvas.itemconfig(canvas_window, width=event.width)
+
+    def _on_frame_configure(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    canvas.bind("<Configure>", _on_canvas_configure)
+    body_frame.bind("<Configure>", _on_frame_configure)
+
+    def _on_mousewheel(event):
+        try:
+            if not root.winfo_exists():
+                return
+            if body_frame.winfo_reqheight() > canvas.winfo_height():
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        except Exception:
+            pass
+
+    root.bind_all("<MouseWheel>", _on_mousewheel)
+
     # Status Card
-    st_card = tk.Frame(root, bg=card_bg, padx=16, pady=14, highlightthickness=1, highlightbackground="#334155")
-    st_card.pack(fill="x", padx=18, pady=6)
+    st_card = tk.Frame(body_frame, bg=card_bg, padx=16, pady=12, highlightthickness=1, highlightbackground="#334155")
+    st_card.pack(fill="x", padx=18, pady=(2, 6))
 
     st_lbl = tk.Label(st_card, text="● 检测状态中…", font=("Microsoft YaHei", 13, "bold"), fg="#f59e0b", bg=card_bg)
     st_lbl.pack(anchor="w")
@@ -1033,8 +1064,8 @@ def cmd_gui(args, cfg) -> int:
     meta_lbl.pack(anchor="w", pady=(2, 0))
 
     # Form Card
-    form_card = tk.Frame(root, bg=card_bg, padx=16, pady=14, highlightthickness=1, highlightbackground="#334155")
-    form_card.pack(fill="x", padx=18, pady=(8, 8))
+    form_card = tk.Frame(body_frame, bg=card_bg, padx=16, pady=12, highlightthickness=1, highlightbackground="#334155")
+    form_card.pack(fill="x", padx=18, pady=(4, 6))
 
     # 上网账号
     tk.Label(form_card, text="上网账号", font=("Microsoft YaHei", 9, "bold"), fg=text_color, bg=card_bg).pack(anchor="w")
@@ -1114,8 +1145,8 @@ def cmd_gui(args, cfg) -> int:
             pass
 
     # Autostart Card (Windows 计划任务开机自启)
-    auto_card = tk.Frame(root, bg=card_bg, padx=16, pady=10, highlightthickness=1, highlightbackground="#334155")
-    auto_card.pack(fill="x", padx=18, pady=(0, 8))
+    auto_card = tk.Frame(body_frame, bg=card_bg, padx=16, pady=10, highlightthickness=1, highlightbackground="#334155")
+    auto_card.pack(fill="x", padx=18, pady=(4, 8))
 
     auto_head = tk.Frame(auto_card, bg=card_bg)
     auto_head.pack(fill="x")
@@ -1192,9 +1223,6 @@ def cmd_gui(args, cfg) -> int:
                               relief="flat", cursor="hand2", padx=8, pady=1, command=toggle_autostart)
     btn_autostart.pack(side="right")
 
-    # Actions Frame
-    btn_frame = tk.Frame(root, bg=bg, padx=18, pady=6)
-    btn_frame.pack(fill="x")
 
     def do_refresh():
         st_lbl.config(text="● 检测中…", fg="#f59e0b")
@@ -1291,7 +1319,8 @@ def cmd_gui(args, cfg) -> int:
                 res = portal.login(cfg["username"], cfg["password"])
                 def _ui():
                     if res.get("ok"):
-                        messagebox.showinfo("成功", "登录成功！已确认在线。")
+                        st_lbl.config(text="● 登录成功，已确认在线！", fg=success_color)
+                        st_card.config(highlightbackground="#059669")
                     else:
                         messagebox.showerror("失败", "登录失败: " + str(res.get("message", "未知错误")))
                     do_refresh()
@@ -1301,7 +1330,7 @@ def cmd_gui(args, cfg) -> int:
                 err_msg = str(e)
                 safe_ui(lambda m=err_msg: messagebox.showerror("错误", m))
         if not run_async(_task, 'auth'):
-            messagebox.showinfo("提示", "正在处理网络认证操作，请稍候…")
+            st_lbl.config(text="⏳ 认证操作进行中，请稍候…", fg="#f59e0b")
             return
         st_lbl.config(text="→ 正在登录…", fg="#3b82f6")
         st_card.config(highlightbackground="#2563eb")
@@ -1315,7 +1344,8 @@ def cmd_gui(args, cfg) -> int:
                 res = portal.logout()
                 def _ui():
                     if res.get("offline"):
-                        messagebox.showinfo("注销", "已注销下线。")
+                        st_lbl.config(text="○ 已注销下线", fg=text_muted)
+                        st_card.config(highlightbackground="#334155")
                     elif res.get("ok"):
                         messagebox.showwarning("注销", "注销请求已被接受，但会话仍在。\n部分网关不支持客户端自助注销，请到门户页面手动注销。")
                     else:
@@ -1327,7 +1357,7 @@ def cmd_gui(args, cfg) -> int:
                 err_msg = str(e)
                 safe_ui(lambda m=err_msg: messagebox.showerror("错误", m))
         if not run_async(_task, 'auth'):
-            messagebox.showinfo("提示", "正在处理网络认证操作，请稍候…")
+            st_lbl.config(text="⏳ 认证操作进行中，请稍候…", fg="#f59e0b")
             return
         st_lbl.config(text="→ 正在注销…", fg="#f59e0b")
         st_card.config(highlightbackground="#f59e0b")
@@ -1352,7 +1382,9 @@ def cmd_gui(args, cfg) -> int:
             with open(CONFIG_PATH, "w", encoding="utf-8") as fh:
                 json.dump(saved_cfg, fh, indent=2, ensure_ascii=False)
             cfg.update(saved_cfg)
-            messagebox.showinfo("提示", "配置已成功保存至 config.json")
+            btn_save.config(text="已保存 ✓", fg=success_color)
+            root.after(1500, lambda: btn_save.config(text="保存账号", fg=text_color))
+            st_lbl.config(text="● 配置已成功保存至 config.json", fg=success_color)
         except Exception as e:
             messagebox.showerror("保存失败", str(e))
 
@@ -1395,7 +1427,41 @@ def cmd_gui(args, cfg) -> int:
     bind_hover(btn_copy_ip, "#334155", "#475569")
     bind_hover(btn_pwd_toggle, "#1e293b", "#334155")
 
+    # 周期性后台状态心跳检测 (每 30 秒，自动刷新在线状态与流量，避免遥测数据停滞)
+    _heartbeat_timer = [None]
+
+    def _heartbeat():
+        try:
+            if root.winfo_exists():
+                do_refresh()
+                _heartbeat_timer[0] = root.after(30000, _heartbeat)
+        except Exception:
+            pass
+
+    def _on_close():
+        try:
+            if _heartbeat_timer[0]:
+                root.after_cancel(_heartbeat_timer[0])
+        except Exception:
+            pass
+        try:
+            root.unbind_all("<MouseWheel>")
+        except Exception:
+            pass
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", _on_close)
+
+    # 快捷键绑定 (Ctrl+R / F5 刷新, Ctrl+S 保存, Esc 退出)
+    root.bind("<Control-r>", lambda e: do_refresh())
+    root.bind("<Control-R>", lambda e: do_refresh())
+    root.bind("<F5>", lambda e: do_refresh())
+    root.bind("<Control-s>", lambda e: do_save())
+    root.bind("<Control-S>", lambda e: do_save())
+    root.bind("<Escape>", lambda e: _on_close())
+
     do_refresh()
+    _heartbeat_timer[0] = root.after(30000, _heartbeat)
     root.mainloop()
     return EXIT_OK
 

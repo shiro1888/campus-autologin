@@ -16,37 +16,101 @@ const DEFAULTS = {
   instantTrigger: true
 };
 
-let toastTimer = null;
+/** 顶部浮动消息通知 (支持多条轻量级堆叠与独立自动隐退) */
+function showToast(text, kind = 'info', duration = 4000) {
+  const container = $('toastContainer') || $('toastBar')?.parentElement;
+  if (!container) return;
 
-/** 顶部浮动消息通知 */
-function showToast(text, kind) {
-  const bar = $('toastBar');
-  const msgEl = $('toastMsg');
-  const iconEl = $('toastIcon');
+  const toast = document.createElement('div');
+  toast.className = `toast-bar show ${kind}`;
 
-  if (toastTimer) clearTimeout(toastTimer);
-
-  bar.className = 'toast-bar show ' + (kind || 'info');
-  msgEl.textContent = text;
-
+  const iconSpan = document.createElement('span');
+  iconSpan.className = 'toast-icon';
   if (kind === 'ok') {
-    iconEl.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+    iconSpan.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
   } else if (kind === 'err') {
-    iconEl.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    iconSpan.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
   } else {
-    iconEl.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+    iconSpan.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
   }
 
-  toastTimer = setTimeout(() => {
-    bar.className = 'toast-bar';
-  }, 4500);
+  const msgSpan = document.createElement('span');
+  msgSpan.className = 'toast-msg';
+  msgSpan.textContent = text;
+
+  toast.appendChild(iconSpan);
+  toast.appendChild(msgSpan);
+
+  // 点击悬浮 Toast 胶囊即可立即快速关闭
+  toast.addEventListener('click', () => {
+    dismissToast(toast);
+  });
+
+  // 最多保持 3 条并存，超出时自动顶替最早的一条
+  const activeToasts = container.querySelectorAll('.toast-bar.show');
+  if (activeToasts.length >= 3) {
+    dismissToast(activeToasts[0]);
+  }
+
+  container.appendChild(toast);
+
+  // 自动倒计时退出
+  toast._timer = setTimeout(() => {
+    dismissToast(toast);
+  }, duration);
+
+  // 保持对静态 DOM 元素的向后兼容
+  const staticMsg = $('toastMsg');
+  if (staticMsg) staticMsg.textContent = text;
 }
 
-// 点击悬浮 Toast 胶囊即可立即快速关闭
+function dismissToast(toast) {
+  if (!toast || toast._dismissing) return;
+  toast._dismissing = true;
+  if (toast._timer) clearTimeout(toast._timer);
+  toast.classList.remove('show');
+  toast.classList.add('hide');
+  setTimeout(() => {
+    if (toast.id !== 'toastBar') {
+      toast.remove();
+    }
+  }, 260);
+}
+
+// 点击默认静态 Toast 胶囊立即关闭
 $('toastBar')?.addEventListener('click', () => {
-  $('toastBar').className = 'toast-bar';
-  if (toastTimer) clearTimeout(toastTimer);
+  dismissToast($('toastBar'));
 });
+
+/** 自习室防窥遮罩管理 */
+let isMasked = false;
+
+function updateAccountMaskDisplay() {
+  const accInput = $('account');
+  const maskBtn = $('btnToggleMask');
+  const maskIcon = $('maskIcon');
+  if (!accInput) return;
+
+  if (isMasked) {
+    accInput.classList.add('account-masked');
+    if (maskBtn) {
+      maskBtn.title = '当前：自习室防窥（点击显示明文）';
+      maskBtn.setAttribute('aria-label', '当前：自习室防窥（点击显示明文）');
+    }
+    if (maskIcon) {
+      maskIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+    }
+  } else {
+    accInput.classList.remove('account-masked');
+    if (maskBtn) {
+      maskBtn.title = '当前：明文显示（点击开启自习室防窥）';
+      maskBtn.setAttribute('aria-label', '当前：明文显示（点击开启自习室防窥）');
+    }
+    if (maskIcon) {
+      maskIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    }
+  }
+}
 
 /** 动态在线计时器 (秒表实时跳动) */
 const durationTicker = createTicker((text) => {
@@ -434,7 +498,9 @@ function load() {
     }
   }
 
-  chrome.storage.local.get(DEFAULTS, (s) => {
+  chrome.storage.local.get(Object.assign({}, DEFAULTS, { privacyMask: false }), (s) => {
+    isMasked = !!s.privacyMask;
+    updateAccountMaskDisplay();
     // 只接受字符串：storage 里的值可能被手改或来自旧版本。
     // 注意不能只用 String() —— String({}) 会得到字面量 "[object Object]"，照样显示难看。
     // 非字符串一律当作空值处理（下面 isp 也用同样的思路）。
@@ -789,8 +855,15 @@ $('form').addEventListener('submit', (e) => {
   if (!hasCredentials()) {
     showToast('请先填写上网账号和密码，再点「保存并立即测试」。', 'err');
     const s = readForm();
-    if (!s.account) $('account').focus();
-    else if (!s.password) $('password').focus();
+    if (!s.account) {
+      $('account').classList.add('field-invalid');
+      $('account').setAttribute('aria-invalid', 'true');
+      $('account').focus();
+    } else if (!s.password) {
+      $('password').classList.add('field-invalid');
+      $('password').setAttribute('aria-invalid', 'true');
+      $('password').focus();
+    }
     return;
   }
 
@@ -1168,6 +1241,32 @@ $('togglePwd').addEventListener('click', () => {
     // 正常眼睛图标
     eyeIcon.innerHTML = '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>';
   }
+});
+
+// --- 自习室防窥模式切换 ---
+$('btnToggleMask')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  isMasked = !isMasked;
+  chrome.storage.local.set({ privacyMask: isMasked });
+  updateAccountMaskDisplay();
+  showToast(isMasked ? '已开启自习室防窥模式' : '已恢复明文显示', 'info', 2000);
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.privacyMask) {
+    isMasked = !!changes.privacyMask.newValue;
+    updateAccountMaskDisplay();
+  }
+});
+
+// 输入时即刻清除表单校验失败高亮
+$('account')?.addEventListener('input', () => {
+  $('account').classList.remove('field-invalid');
+  $('account').removeAttribute('aria-invalid');
+});
+$('password')?.addEventListener('input', () => {
+  $('password').classList.remove('field-invalid');
+  $('password').removeAttribute('aria-invalid');
 });
 
 // --- 即时保存的切换项 ---

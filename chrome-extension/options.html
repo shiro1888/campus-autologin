@@ -222,10 +222,12 @@
     </div>
   </section>
 
-  <!-- Notification Toast Bar -->
-  <div class="toast-bar" id="toastBar">
-    <span class="toast-icon" id="toastIcon"></span>
-    <span class="toast-msg" id="toastMsg"></span>
+  <!-- Notification Toast Container -->
+  <div class="toast-container" id="toastContainer">
+    <div class="toast-bar" id="toastBar">
+      <span class="toast-icon" id="toastIcon"></span>
+      <span class="toast-msg" id="toastMsg"></span>
+    </div>
   </div>
 
   <!-- Dashboard Body: Balanced 2-Column Dashboard (双列 2:2 黄金对称仪表盘) -->
@@ -255,6 +257,9 @@
               <div class="input-wrap">
                 <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 <input type="text" id="account" placeholder="手机号 / 学号 / 认证账号" spellcheck="false" required>
+                <button type="button" id="btnToggleMask" class="field-mask-btn" title="自习室防窥模式开关" aria-label="自习室防窥模式开关">
+                  <svg id="maskIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
                 <button type="button" id="clearAccount" class="field-clear-btn" title="清空账号" aria-label="清空账号">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
