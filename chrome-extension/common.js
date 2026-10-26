@@ -113,27 +113,6 @@ function createTicker(onTick) {
 }
 
 /**
- * 弹出触感复制反馈微气泡
- * @param {MouseEvent} e 点击事件对象
- * @param {string} text 气泡文案
- */
-function showFloatingBubble(e, text = '已复制 ✓') {
-  try {
-    const bubble = document.createElement('div');
-    bubble.className = 'floating-copy-bubble';
-    bubble.textContent = text;
-    const rawX = e && e.clientX ? e.clientX : (window.innerWidth / 2);
-    const rawY = e && e.clientY ? e.clientY : (window.innerHeight / 2);
-    const clampedX = Math.max(55, Math.min(window.innerWidth - 55, rawX));
-    const clampedY = Math.max(25, rawY);
-    bubble.style.left = `${clampedX}px`;
-    bubble.style.top = `${clampedY}px`;
-    document.body.appendChild(bubble);
-    setTimeout(() => bubble.remove(), 900);
-  } catch (err) {}
-}
-
-/**
  * 创建心跳延迟波动小柱图渲染器
  * @param {string} containerId 容器元素ID
  * @param {number} maxBars 最多保留的历史条数
