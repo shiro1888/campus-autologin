@@ -951,7 +951,7 @@ $('btnLoginNow').addEventListener('click', () => {
 $('btnCopyReport').addEventListener('click', (e) => {
   const btn = $('btnCopyReport');
   const span = $('btnCopyReportText');
-  const originalText = span.textContent;
+  if (span && span.textContent.includes('已复制')) return;
 
   chrome.storage.local.get(null, (settings) => {
     const rawIp = $('stIp').textContent;
@@ -960,7 +960,12 @@ $('btnCopyReport').addEventListener('click', (e) => {
     const rawPing = $('stPing').textContent;
     const rawFlow = $('stFlow').textContent;
     const isOnline = $('stOnline').textContent;
-    const account = (settings && settings.account) || '未设置';
+    let account = (settings && settings.account) || '未设置';
+    if (settings && settings.privacyMask && account !== '未设置' && account.length > 4) {
+      account = account.length > 7
+        ? account.slice(0, 3) + '****' + account.slice(-4)
+        : account.slice(0, 2) + '****' + account.slice(-2);
+    }
     const ispMap = { '1': '校园用户', '2': '校园电信(@dx)', '3': '校园联通(@lt)', '4': '校园其他' };
     const ispName = ispMap[(settings && settings.isp) || '1'] || '校园用户';
 
@@ -982,7 +987,7 @@ $('btnCopyReport').addEventListener('click', (e) => {
       span.textContent = '已复制 ✓';
       showToast('诊断报告已成功复制到剪贴板', 'ok');
       setTimeout(() => {
-        span.textContent = originalText;
+        span.textContent = '复制连接诊断报告';
       }, 2000);
     }).catch(() => {
       showToast('复制失败，请手动记录', 'err');
@@ -994,11 +999,12 @@ $('btnCopyReport').addEventListener('click', (e) => {
 const cardStatIp = $('cardStatIp');
 if (cardStatIp) {
   cardStatIp.addEventListener('click', (e) => {
+    const pill = $('ipCopyPill');
+    if (pill && pill.classList.contains('copied')) return;
     const ip = $('stIp').textContent.trim();
     if (ip && ip !== '—' && ip !== '正在获取…' && ip !== '未获取到') {
       navigator.clipboard.writeText(ip).then(() => {
         showToast('已复制本机 IP: ' + ip, 'ok');
-        const pill = $('ipCopyPill');
         if (pill) {
           pill.textContent = '已复制 ✓';
           pill.classList.add('copied');

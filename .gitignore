@@ -17,6 +17,7 @@ _h1/
 # 如果你 fork 了这个项目，请复制 config.example.json 为 config.json 并填入自己的账号密码
 config.json
 config.local.json
+.python_path
 
 # 编辑器与工具
 .vscode/

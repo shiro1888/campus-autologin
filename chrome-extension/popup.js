@@ -441,7 +441,7 @@ $('btnLogin').addEventListener('click', () => {
   chrome.runtime.sendMessage({ type: 'login' }, (res) => {
     btn.disabled = false;
     btn.classList.remove('loading');
-    $('btnLoginText').textContent = '立即登录';
+    $('btnLoginText').textContent = (res && res.online) ? '重新验证' : '立即登录';
 
     if (chrome.runtime.lastError || !res) {
       setMsg('后台未响应，请刷新插件', 'err');
@@ -487,20 +487,22 @@ $('btnLogout').addEventListener('click', () => {
   });
 });
 
+const CLIPBOARD_ICON_HTML = '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>';
+
 // --- 一键复制 IP ---
 $('ipChip').addEventListener('click', (e) => {
+  const chip = $('ipChip');
+  if (chip && chip.classList.contains('copied')) return;
   if (!currentIp || currentIp === '未检测到' || currentIp === '未连接') return;
 
   navigator.clipboard.writeText(currentIp).then(() => {
-    const chip = $('ipChip');
     const copyIcon = $('copyIcon');
-    const oldHtml = copyIcon.innerHTML;
     chip.classList.add('copied');
     copyIcon.innerHTML = '<polyline points="20 6 9 17 4 12" stroke="#10b981" stroke-width="2.5" fill="none"/>';
     setMsg('已复制 IP 到剪贴板', 'ok', 1600);
 
     setTimeout(() => {
-      copyIcon.innerHTML = oldHtml;
+      copyIcon.innerHTML = CLIPBOARD_ICON_HTML;
       chip.classList.remove('copied');
     }, 1500);
   }).catch(() => {
@@ -510,13 +512,14 @@ $('ipChip').addEventListener('click', (e) => {
 
 // --- 一键复制账号 ---
 function copyAccount(e) {
+  const btn = $('btnCopyAccount');
+  if (btn && btn.classList.contains('copied')) return;
   if (!currentAccount || currentAccount === '未设置') {
     setMsg('当前未设置认证账号', 'info', 2000);
     return;
   }
 
   navigator.clipboard.writeText(currentAccount).then(() => {
-    const btn = $('btnCopyAccount');
     const icon = $('copyAccountIcon');
     const card = $('accountDockItem');
     if (card) {
@@ -525,10 +528,9 @@ function copyAccount(e) {
     }
     if (btn) btn.classList.add('copied');
     if (icon) {
-      const oldHtml = icon.innerHTML;
       icon.innerHTML = '<polyline points="20 6 9 17 4 12" stroke="#10b981" stroke-width="2.5" fill="none"/>';
       setTimeout(() => {
-        icon.innerHTML = oldHtml;
+        icon.innerHTML = CLIPBOARD_ICON_HTML;
         if (btn) btn.classList.remove('copied');
       }, 1500);
     }

@@ -605,7 +605,7 @@ def _calculate_duration(st: dict) -> str:
 
 def _card_line(text: str, width: int = 51) -> str:
     """计算 CJK 全角与半角字符在控制台中的视觉显示宽度，保证卡片右边框 100% 垂直对齐。"""
-    dw = sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in text)
+    dw = sum(2 if unicodedata.east_asian_width(c) in ("W", "F", "A") else 1 for c in text)
     pad = max(0, width - dw)
     return "│  " + text + (" " * pad) + " │"
 
@@ -940,7 +940,14 @@ def cmd_auto(args, cfg) -> int:
         if args.json:
             emit_json({"action": "auto", "success": False, "error": str(exc)})
         return EXIT_FAIL
-    if int(st.get("result", 0)) == 1:
+    force = bool(getattr(args, "force", False))
+    is_online = False
+    try:
+        is_online = int(st.get("result", 0)) == 1
+    except (ValueError, TypeError):
+        is_online = str(st.get("result", "")).strip().lower() in ("1", "ok")
+
+    if not force and is_online:
         if args.json:
             emit_json({"action": "auto", "success": True, "already_online": True,
                        "account": cfg.get("username", "")})
@@ -998,7 +1005,9 @@ def cmd_gui(args, cfg) -> int:
     try:
         from ctypes import byref, c_int, sizeof
         DWMWA_USE_IMMERSIVE_DARK_MODE = 20
-        hwnd = ctypes.windll.user32.GetParent(root.winfo_id()) or root.winfo_id()
+        root.update_idletasks()
+        inner_hwnd = root.winfo_id()
+        hwnd = ctypes.windll.user32.GetAncestor(inner_hwnd, 2) or int(root.wm_frame(), 16)
         ctypes.windll.dwmapi.DwmSetWindowAttribute(
             hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, byref(c_int(1)), sizeof(c_int)
         )

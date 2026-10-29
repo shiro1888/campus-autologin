@@ -10,6 +10,10 @@ if exist "%LOGFILE%" for %%A in ("%LOGFILE%") do if %%~zA gtr 1048576 (
 )
 
 set "PYEXE="
+if exist "%~dp0.python_path" (
+    set /p PYEXE=<"%~dp0.python_path"
+    if exist "%PYEXE%" goto :run
+)
 where py >nul 2>nul
 if not errorlevel 1 set "PYEXE=py"
 if defined PYEXE goto :run
