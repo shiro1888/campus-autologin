@@ -100,11 +100,13 @@
 html {
   width: 375px;
   min-width: 375px;
+  max-width: 375px;
 }
 
 body {
   width: 375px;
   min-width: 375px;
+  max-width: 375px;
   min-height: auto;
   overflow-x: hidden;
   background-color: var(--bg-page);
@@ -150,6 +152,9 @@ body {
 }
 
 .popup-wrapper {
+  width: 375px;
+  max-width: 375px;
+  box-sizing: border-box;
   padding: 14px 14px 12px;
   display: flex;
   flex-direction: column;
@@ -1335,7 +1340,7 @@ body {
   transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease, visibility 0.22s;
   white-space: normal;
   word-break: break-word;
-  max-width: calc(100vw - 32px);
+  max-width: calc(100% - 32px);
   max-height: 80px;
   overflow-y: auto;
   cursor: pointer;

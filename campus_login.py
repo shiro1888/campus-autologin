@@ -605,7 +605,22 @@ def _calculate_duration(st: dict) -> str:
 
 def _card_line(text: str, width: int = 51) -> str:
     """计算 CJK 全角与半角字符在控制台中的视觉显示宽度，保证卡片右边框 100% 垂直对齐。"""
-    dw = sum(2 if unicodedata.east_asian_width(c) in ("W", "F", "A") else 1 for c in text)
+    dw = 0
+    for c in text:
+        cp = ord(c)
+        eaw = unicodedata.east_asian_width(c)
+        if eaw in ("W", "F"):
+            dw += 2
+        elif 0x2500 <= cp <= 0x257F:          # Box Drawing 字符
+            dw += 1
+        elif 0x2190 <= cp <= 0x21FF:          # 箭头 (↓, ↑ 等)
+            dw += 1
+        elif cp in (0x00B7, 0x00B0, 0x00B1):  # · ° ± 等常渲染为半角
+            dw += 1
+        elif cp in (0x25CF, 0x25CB, 0x25A0):  # ● ○ ■ 终端中常渲染为全角 2 列
+            dw += 2
+        else:
+            dw += 1
     pad = max(0, width - dw)
     return "│  " + text + (" " * pad) + " │"
 
