@@ -2859,6 +2859,8 @@ input[aria-invalid="true"] {
 }
 
 .toast-msg {
+  flex: 1 1 auto;
+  min-width: 0;
   line-height: 1.4;
   letter-spacing: -0.01em;
 }
