@@ -121,7 +121,7 @@ if ([string]::IsNullOrWhiteSpace($Account) -and [string]::IsNullOrWhiteSpace($Pa
 }
 
 # 3. 前置存在性检查：确保输入的凭据真实存在于 Git 历史中，杜绝空转与误报
-Write-Host "  [1/4] 执行前置定位检查（确认凭据真实存在于历史提交中）..." -ForegroundColor Green
+Write-Host "  [1/5] 执行前置定位检查（确认凭据真实存在于历史提交中）..." -ForegroundColor Green
 if (-not [string]::IsNullOrWhiteSpace($Password)) {
     $prePass = Invoke-Git @('log', '--all', '--oneline', "-S$Password") -AllowFail
     if (-not $prePass) {
@@ -145,7 +145,7 @@ if (-not [string]::IsNullOrWhiteSpace($Account)) {
 }
 
 # 4. 动态生成临时脱敏规则文件并执行重写
-Write-Host "  [2/4] 开始重写 Git 历史对象（脱敏账号密码并移除历史 config.json）..." -ForegroundColor Green
+Write-Host "  [2/5] 开始重写 Git 历史对象（脱敏账号密码并移除历史 config.json）..." -ForegroundColor Green
 $rules = [System.Collections.Generic.List[string]]::new()
 if (-not [string]::IsNullOrWhiteSpace($Password)) {
     $rules.Add("${Password}==>REDACTED_CAMPUS_PASSWORD")
@@ -157,6 +157,10 @@ if (-not [string]::IsNullOrWhiteSpace($Account)) {
 $rulesFile = Join-Path $env:TEMP ("campus_filter_rules_" + [System.Guid]::NewGuid().ToString("N") + ".txt")
 $rules | Set-Content -Path $rulesFile -Encoding ASCII
 
+# 记录重写前的 HEAD，供事后验证「含凭据的旧对象」是否已被物理回收
+$preRewriteHead = (Invoke-Git @('rev-parse', 'HEAD') -AllowFail)
+if ($preRewriteHead) { $preRewriteHead = ($preRewriteHead | Select-Object -First 1).Trim() }
+
 try {
     Invoke-Git @('filter-repo', '--replace-text', $rulesFile, '--path', 'config.json', '--invert-paths', '--force')
     Write-Host "  [OK] 历史对象重写完成。" -ForegroundColor Green
@@ -165,7 +169,7 @@ try {
 }
 
 # 5. 清洗后自检：多层校验确保目标彻底归零且无遗留明文凭据
-Write-Host "  [3/4] 执行清洗后多维度自检..." -ForegroundColor Green
+Write-Host "  [3/5] 执行清洗后多维度自检..." -ForegroundColor Green
 
 # 5.1 目标凭据归零校验
 foreach ($secret in @($Password, $Account)) {
@@ -230,7 +234,7 @@ if ($leak.Count -gt 0) {
 Write-Host "  [OK] 自检全部通过：全历史目标归零、config.json 已抹除、无凭据字面量残留。" -ForegroundColor Green
 
 # 6. 幂等恢复远程 origin（避免 git remote remove origin 在不存在时报错）
-Write-Host "  [4/4] 重新绑定远程仓库 origin 并准备推送..." -ForegroundColor Green
+Write-Host "  [4/5] 重新绑定远程仓库 origin 并准备推送..." -ForegroundColor Green
 $originUrl = "https://github.com/shiro1888/campus-autologin.git"
 $remotes = Invoke-Git @('remote') -AllowFail
 if ($remotes -contains 'origin') {
@@ -252,5 +256,38 @@ if ($ForcePush) {
     Write-Host "      git push origin --force --tags" -ForegroundColor White
     Write-Host ""
     Write-Host "  （提示: 下次可直接带 -ForcePush 参数一键推送）" -ForegroundColor Gray
+}
+
+# 8. 清理本地备份与缓存残留：确保含凭据的旧对象在本地被物理清除
+Write-Host "  [5/5] 清理本地备份与缓存残留（reflog / ORIG_HEAD / 悬空对象 / filter-repo 元数据）..." -ForegroundColor Green
+try {
+    $gitDirOut = Invoke-Git @('rev-parse', '--absolute-git-dir') -AllowFail
+    $gitDir = if ($gitDirOut) { ($gitDirOut | Select-Object -First 1).Trim() } else { '' }
+    if ($gitDir -and (Test-Path $gitDir)) {
+        # reflog 会引用重写前的旧提交，过期后旧对象才可能被真正回收
+        Invoke-Git @('reflog', 'expire', '--expire=now', '--all') -AllowFail | Out-Null
+        # ORIG_HEAD 可能指向重写前的 HEAD，会"钉住"含凭据的旧提交
+        $origHeadPath = Join-Path $gitDir 'ORIG_HEAD'
+        if (Test-Path $origHeadPath) { Remove-Item $origHeadPath -Force -ErrorAction SilentlyContinue }
+        # filter-repo 遗留的 commit-map / ref-map 等映射元数据
+        $frDir = Join-Path $gitDir 'filter-repo'
+        if (Test-Path $frDir) { Remove-Item $frDir -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+    # 物理回收不可达对象（含旧凭据的历史提交）
+    Invoke-Git @('gc', '--prune=now', '--quiet') -AllowFail | Out-Null
+
+    # 验证：重写前的提交对象已不可达（cat-file -e 对已回收对象返回非 0）
+    if ($preRewriteHead) {
+        Invoke-Git @('cat-file', '-e', $preRewriteHead) -AllowFail | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  [警告] 重写前的提交对象仍可访问，请手动执行：" -ForegroundColor Yellow
+            Write-Host "         git reflog expire --expire=now --all" -ForegroundColor Gray
+            Write-Host "         git gc --prune=now" -ForegroundColor Gray
+        } else {
+            Write-Host "  [OK] 本地备份与缓存已清理：reflog 已过期、ORIG_HEAD 已移除、旧对象已物理回收。" -ForegroundColor Green
+        }
+    }
+} catch {
+    Write-Host "  [警告] 清理本地残留时出现异常（不影响已完成的清洗与推送）: $($_.Exception.Message)" -ForegroundColor Yellow
 }
 Write-Host ""
