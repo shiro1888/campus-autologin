@@ -519,7 +519,7 @@ class Portal:
                             "message": "网络异常，无法确认注销结果，请稍后复查",
                         }
                 return {"ok": True, "detail": detail, "offline": False, "state": "online"}
-        return {"ok": False, "detail": detail, "offline": False, "state": "offline"}
+        return {"ok": False, "detail": detail, "offline": False, "state": "unknown"}
 
 
 ERROR_HINTS = {
@@ -862,14 +862,14 @@ def cmd_logout(args, cfg) -> int:
     else:
         if success:
             say("✓ 已注销下线。")
+        elif not resp.get("ok"):
+            say_err("✗ 注销失败。")
+            say("  如需下线，请到门户页面手动操作: %s/" % portal.web_base)
         elif state == "unknown":
             say_err("✗ 网络异常，无法确认注销结果，请稍后复查。")
             say("  若网线或 Wi-Fi 已断开，可能无需额外注销；如需确认请访问: %s/" % portal.web_base)
-        elif resp.get("ok"):
-            say_err("✗ 注销请求已被接受，但会话仍在(部分 AC 不支持自助注销)。")
-            say("  如需下线，请到门户页面手动操作: %s/" % portal.web_base)
         else:
-            say_err("✗ 注销失败。")
+            say_err("✗ 注销请求已被接受，但会话仍在(部分 AC 不支持自助注销)。")
             say("  如需下线，请到门户页面手动操作: %s/" % portal.web_base)
     return EXIT_OK if success else EXIT_FAIL
 
@@ -1537,8 +1537,8 @@ def cmd_gui(args, cfg) -> int:
                             )
                             ev.set()
                         safe_ui(_prompt)
-                        ev.wait()
-                        if not confirm[0]:
+                        # 增加 120s 超时兜底，防止弹窗未弹或主循环异常退出导致工作线程永久挂起
+                        if not ev.wait(timeout=120) or not confirm[0]:
                             safe_ui(lambda: [
                                 set_auth_busy(False),
                                 st_lbl.config(text="● 已保持在线", fg=THEME["success"]),

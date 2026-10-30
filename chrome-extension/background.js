@@ -552,9 +552,6 @@ async function _doLogoutInternal() {
   // 避免注销过程中（网络请求 + 600ms 延迟）后台定时器触发 autoLogin 看到掉线后把人静默登回。
   await setState({ manualLogout: true, unreachableStreak: 0 });
   unreachableStreak = 0;
-  if (running) {
-    console.log('[logout] 检测到登录进行中，先记录注销意图');
-  }
 
   try {
     await fetchText(PORTAL_ORIGIN + '/drcom/logout?' + p1.toString());
