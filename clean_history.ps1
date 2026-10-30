@@ -186,8 +186,19 @@ if ($cfgHits) {
     exit 1
 }
 
-# 5.3 全历史代码凭据模式扫描（动态收集合法占位符，支持 PCRE/ERE 双引擎容错）
-$benignTokens = [System.Collections.Generic.List[string]]::new(@('123', '你的密码', '校园网密码', 'REDACTED', 'example'))
+# 5.3 全历史代码凭据模式扫描（动态收集合法占位符，强制要求 PCRE 环视引擎）
+$pcreCheck = Invoke-Git @('grep', '-P', '-q', '^$', 'HEAD') -AllowFail
+if ($LASTEXITCODE -ne 0 -and ($pcreCheck -match "cannot use Perl-compatible regexes" -or $pcreCheck -match "PCRE")) {
+    Write-Host "  [错误] 当前 Git 环境不支持 PCRE (-P)，无法执行精确的历史凭据扫描。" -ForegroundColor Red
+    Write-Host "         请安装或升级官方 Git for Windows 后重试（自检宁可失败也不放过疑似泄露）。" -ForegroundColor Yellow
+    Write-Host ""
+    exit 1
+}
+
+$benignTokens = [System.Collections.Generic.List[string]]::new()
+foreach ($item in @('123', '你的密码', '校园网密码', 'REDACTED', 'example')) {
+    $benignTokens.Add($item)
+}
 $exampleCfg = Join-Path $here "config.example.json"
 if (Test-Path $exampleCfg) {
     try {
@@ -197,24 +208,11 @@ if (Test-Path $exampleCfg) {
     } catch {}
 }
 $tokenPattern = ($benignTokens | Sort-Object -Unique | Where-Object { $_ } | ForEach-Object { [regex]::Escape($_) }) -join '|'
-
-# 检测 Git 是否支持 -P (PCRE) 正则
-$usePcre = $true
-$pcreCheck = Invoke-Git @('grep', '-P', 'test', 'HEAD') -AllowFail
-if ($pcreCheck -and ($pcreCheck | Out-String) -match "cannot use Perl-compatible regexes") {
-    $usePcre = $false
-}
-
-$credPat = if ($usePcre) {
-    "(?<![a-zA-Z0-9_])password[`"']?[[:space:]]*[:=][[:space:]]*[`"'](?!$tokenPattern)[^`"']{3,}[`"']"
-} else {
-    "password[`"']?[[:space:]]*[:=][[:space:]]*[`"'][^`"']{3,}[`"']"
-}
-$grepEngine = if ($usePcre) { '-P' } else { '-E' }
+$credPat = "(?<![a-zA-Z0-9_])password[`"']?[[:space:]]*[:=][[:space:]]*[`"'](?!$tokenPattern)[^`"']{3,}[`"']"
 
 $leak = @()
 foreach ($rev in (Invoke-Git @('rev-list', '--all'))) {
-    $hit = Invoke-Git @('grep', '-i', '-l', $grepEngine, $credPat, $rev) -AllowFail
+    $hit = Invoke-Git @('grep', '-i', '-l', '-P', $credPat, $rev) -AllowFail
     if ($hit) { $leak += $hit }
 }
 $leak = $leak | Sort-Object -Unique

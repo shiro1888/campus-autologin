@@ -222,13 +222,17 @@ dr1002({"result":1,"uid":"13800000000","v4ip":"10.0.0.100",...});
 
 ## 自动化测试
 
-项目内置完整的标准单元测试套件（基于 Python `unittest`，零第三方依赖）：
+项目内置完整的标准单元测试与端到端脱敏回归套件：
 
 ```powershell
+# 1. 核心功能与扩展契约单元测试（基于 Python unittest，零依赖）
 python -m unittest discover tests -v
+
+# 2. clean_history.ps1 历史脱敏端到端回归测试（在隔离临时克隆中验证双分支逻辑）
+powershell -File tests/test_clean_history_e2e.ps1
 ```
 
-包含状态机三态容错解析、CLI 56 显示列垂直对齐、代理直连隔离保护、命令行边界钳位以及 Chrome 扩展 DOM 契约测试。
+包含状态机三态容错解析、CLI 56 显示列垂直对齐、代理直连隔离保护、命令行边界钳位、Chrome 扩展 DOM 契约，以及历史清洗脚本在「错误密码拦截」与「真实旧凭据全流程脱敏自检」双路径下的端到端自动化验证。
 
 ---
 
