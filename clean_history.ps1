@@ -103,7 +103,7 @@ if (-not $Password) {
     if ($secPass) {
         $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secPass)
         try {
-            $Password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr).Trim()
+            $Password = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr).Trim()
         } finally {
             [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
         }
@@ -186,11 +186,35 @@ if ($cfgHits) {
     exit 1
 }
 
-# 5.3 全历史代码凭据模式扫描（排除常量与占位符）
-$credPat = '(?<![a-zA-Z0-9_])password["'']?[[:space:]]*[:=][[:space:]]*["''](?!123|你的密码|REDACTED)[^"'']{3,}["'']'
+# 5.3 全历史代码凭据模式扫描（动态收集合法占位符，支持 PCRE/ERE 双引擎容错）
+$benignTokens = [System.Collections.Generic.List[string]]::new(@('123', '你的密码', '校园网密码', 'REDACTED', 'example'))
+$exampleCfg = Join-Path $here "config.example.json"
+if (Test-Path $exampleCfg) {
+    try {
+        $exJson = Get-Content $exampleCfg -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($exJson._password) { $benignTokens.Add([string]$exJson._password) }
+        if ($exJson.password)  { $benignTokens.Add([string]$exJson.password) }
+    } catch {}
+}
+$tokenPattern = ($benignTokens | Sort-Object -Unique | Where-Object { $_ } | ForEach-Object { [regex]::Escape($_) }) -join '|'
+
+# 检测 Git 是否支持 -P (PCRE) 正则
+$usePcre = $true
+$pcreCheck = Invoke-Git @('grep', '-P', 'test', 'HEAD') -AllowFail
+if ($pcreCheck -and ($pcreCheck | Out-String) -match "cannot use Perl-compatible regexes") {
+    $usePcre = $false
+}
+
+$credPat = if ($usePcre) {
+    "(?<![a-zA-Z0-9_])password[`"']?[[:space:]]*[:=][[:space:]]*[`"'](?!$tokenPattern)[^`"']{3,}[`"']"
+} else {
+    "password[`"']?[[:space:]]*[:=][[:space:]]*[`"'][^`"']{3,}[`"']"
+}
+$grepEngine = if ($usePcre) { '-P' } else { '-E' }
+
 $leak = @()
 foreach ($rev in (Invoke-Git @('rev-list', '--all'))) {
-    $hit = git grep -i -l -P $credPat $rev 2>$null
+    $hit = Invoke-Git @('grep', '-i', '-l', $grepEngine, $credPat, $rev) -AllowFail
     if ($hit) { $leak += $hit }
 }
 $leak = $leak | Sort-Object -Unique
