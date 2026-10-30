@@ -1320,7 +1320,7 @@ body {
    ========================================================================== */
 .msg-box {
   position: fixed;
-  top: 14px;
+  top: 56px;
   left: 50%;
   transform: translateX(-50%) translateY(-28px) scale(0.92);
   z-index: 99999;

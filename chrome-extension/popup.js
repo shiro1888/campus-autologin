@@ -230,7 +230,8 @@ function refresh() {
         }
       }
       if (rMsg && (!r.ok || rMsg.indexOf('无需登录') === -1)) {
-        setMsg(rMsg, r.ok === false ? 'err' : 'ok');
+        const msgType = r.state === 'submitted' ? 'info' : (r.ok === false ? 'err' : 'ok');
+        setMsg(rMsg, msgType);
       }
     }
   );
@@ -328,7 +329,7 @@ function refresh() {
     } else if (res.online) {
       setStatus('已在线 · 认证通过', '', 'on');
       $('btnLogin').classList.add('online-mode');
-      $('btnLoginText').textContent = '重新验证';
+      $('btnLoginText').textContent = '刷新状态';
       $('btnLogout').disabled = false;
 
       const ip = [rawData.v4ip, rawData.ss5].find((v) => v && v !== '0.0.0.0') || '';
@@ -441,7 +442,7 @@ $('btnLogin').addEventListener('click', () => {
   chrome.runtime.sendMessage({ type: 'login' }, (res) => {
     btn.disabled = false;
     btn.classList.remove('loading');
-    $('btnLoginText').textContent = (res && res.online) ? '重新验证' : '立即登录';
+    $('btnLoginText').textContent = (res && res.online) ? '刷新状态' : '立即登录';
 
     if (chrome.runtime.lastError || !res) {
       setMsg('后台未响应，请刷新插件', 'err');
@@ -589,13 +590,28 @@ if (msgBoxEl) {
   });
 }
 
-// --- 点击版本号胶囊快速打开设置页 ---
+// --- 点击版本号胶囊或应用头像快速打开设置页 ---
 const verEl = $('ver');
 if (verEl) {
   verEl.addEventListener('click', (e) => {
     e.preventDefault();
     chrome.runtime.openOptionsPage();
     window.close();
+  });
+}
+const brandAvatarEl = $('brandAvatar');
+if (brandAvatarEl) {
+  brandAvatarEl.addEventListener('click', (e) => {
+    e.preventDefault();
+    chrome.runtime.openOptionsPage();
+    window.close();
+  });
+  brandAvatarEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      chrome.runtime.openOptionsPage();
+      window.close();
+    }
   });
 }
 

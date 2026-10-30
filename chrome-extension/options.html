@@ -44,7 +44,7 @@
         <span class="theme-label" id="themeLabel">自动</span>
       </button>
 
-      <a href="http://172.30.100.2/" target="_blank" class="portal-link-btn" title="访问校园网登录门户">
+      <a href="http://172.30.100.2/" target="_blank" rel="noopener noreferrer" class="portal-link-btn" title="访问校园网登录门户">
         <span class="portal-dot" id="portalDot"></span>
         <span class="portal-ip">172.30.100.2</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -224,7 +224,7 @@
 
   <!-- Notification Toast Container -->
   <div class="toast-container" id="toastContainer">
-    <div class="toast-bar" id="toastBar">
+    <div class="toast-bar" id="toastBar" role="status" aria-live="polite">
       <span class="toast-icon" id="toastIcon"></span>
       <span class="toast-msg" id="toastMsg"></span>
     </div>

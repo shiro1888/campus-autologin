@@ -394,18 +394,50 @@
    */
   var LOCK_NAME = 'campus-auto-login';
 
-  /** 尝试在跨标签互斥下执行 fn；拿不到锁则安静跳过（fn 不执行） */
+  /** 页面上是否已显示明确的认证拒绝或错误文案（避免盲目重试导致账号被锁定） */
+  function detectPageError() {
+    try {
+      const text = (document.body && document.body.innerText) || '';
+      const patterns = [
+        /账号不存在/i,
+        /密码错误/i,
+        /账号或密码错误/i,
+        /已被锁定/i,
+        /账号已欠费/i,
+        /停机/i,
+        /异常/i,
+        /userid error/i,
+        /password error/i
+      ];
+      for (let i = 0; i < patterns.length; i++) {
+        if (patterns[i].test(text)) {
+          return true;
+        }
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  /**
+   * 跨标签互斥协调机制：
+   * 原生 Web Locks 在 HTTP (非安全上下文) 下不可用。
+   * 此处统一向 background service worker 请求互斥锁，彻底保证跨标签串行化。
+   */
   function withLock(fn) {
     try {
-      if (!navigator || !navigator.locks || !navigator.locks.request) {
-        fn();   // 无 Web Locks：不做协调，保持原行为
-        return;
-      }
-      navigator.locks.request(LOCK_NAME, { ifAvailable: true }, function (lock) {
-        if (!lock) return undefined;   // 已有标签在认证，安静退出
-        return fn();                   // 返回 Promise 时锁会持续到其结束
-      }).catch(function () {
-        /* 忽略：取锁失败不影响主流程 */
+      chrome.runtime.sendMessage({ type: 'acquireAuthLock' }, function (res) {
+        if (chrome.runtime.lastError || !res || !res.ok) {
+          // 另一个标签或后台正在处理认证，安静退出，避免并发竞态
+          return;
+        }
+        var p = fn();
+        if (p && typeof p.then === 'function') {
+          p.finally(function () {
+            try { chrome.runtime.sendMessage({ type: 'releaseAuthLock' }); } catch (e) {}
+          });
+        } else {
+          try { chrome.runtime.sendMessage({ type: 'releaseAuthLock' }); } catch (e) {}
+        }
       });
     } catch (e) {
       fn();
@@ -477,16 +509,30 @@
                 return;
               }
 
-              report({ ok: true, online: false, message: '已自动填写并提交登录表单' });
+              report({ ok: false, state: 'submitted', online: false, message: '已自动填写并提交登录表单，等待网关响应…' });
 
-              // 兜底：3.5 秒后仍未上线，用同源 fetch 再试一次
+              // 兜底：5.0 秒后仍未上线且无明确错误，再用同源 fetch 尝试一次
               setTimeout(function () {
                 if (done) { resolveFlow(); return; }
+                if (detectPageError()) {
+                  done = true;
+                  showHud('登录失败：网关返回错误提示', 'error');
+                  report({ ok: false, online: false, message: '登录失败：网关返回错误提示' });
+                  resolveFlow();
+                  return;
+                }
                 checkStatus().then(function (ok) {
                   if (ok) {
                     done = true;
                     showHud('校园网认证成功！已在线', 'success');
                     report({ ok: true, online: true, message: '登录成功，已确认在线' });
+                    resolveFlow();
+                    return;
+                  }
+                  if (detectPageError()) {
+                    done = true;
+                    showHud('登录失败：网关返回错误提示', 'error');
+                    report({ ok: false, online: false, message: '登录失败：网关返回错误提示' });
                     resolveFlow();
                     return;
                   }
@@ -514,7 +560,7 @@
                 }).catch(function () {
                   resolveFlow();
                 });
-              }, 3500);
+              }, 5000);
             });
           });
         });

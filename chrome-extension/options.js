@@ -181,7 +181,7 @@ function updateTopology(res) {
   } else if (res.online) {
     if (authVal) authVal.textContent = '已认证 ✓';
     if (authChip) authChip.className = 'topo-chip-badge on';
-    if (internetVal) internetVal.textContent = '全网通畅 ✓';
+    if (internetVal) internetVal.textContent = '认证放行 ✓';
     if (linkAuth) linkAuth.className = 'topo-link on';
   } else {
     if (authVal) authVal.textContent = res.manualLogout ? '已暂停' : '待认证';
@@ -311,12 +311,16 @@ function initCustomSelects() {
     const oldArrow = wrap.querySelector('.select-arrow');
     if (oldArrow) oldArrow.remove();
 
+    const menuId = 'menu-' + (select.id || 'select-' + Math.floor(Math.random() * 10000));
+
     // 创建触发按钮
     const trigger = document.createElement('button');
     trigger.type = 'button';
     trigger.className = 'custom-select-trigger';
+    trigger.setAttribute('role', 'combobox');
     trigger.setAttribute('aria-haspopup', 'listbox');
     trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-controls', menuId);
 
     const labelWrap = document.createElement('div');
     labelWrap.className = 'custom-select-label';
@@ -335,12 +339,14 @@ function initCustomSelects() {
 
     // 创建浮层菜单
     const menu = document.createElement('div');
+    menu.id = menuId;
     menu.className = 'custom-select-menu';
     menu.setAttribute('role', 'listbox');
 
     // 生成选项
     Array.from(select.options).forEach((opt, idx) => {
       const item = document.createElement('div');
+      item.id = `${menuId}-opt-${idx}`;
       item.className = 'custom-select-option' + (idx === select.selectedIndex ? ' active' : '');
       item.setAttribute('role', 'option');
       item.setAttribute('data-value', opt.value);
@@ -377,6 +383,7 @@ function initCustomSelects() {
       if (curOpt) {
         labelWrap.innerHTML = formatOptionContent(curOpt.textContent);
       }
+      trigger.setAttribute('aria-activedescendant', `${menuId}-opt-${select.selectedIndex}`);
       const allItems = menu.querySelectorAll('.custom-select-option');
       allItems.forEach((it, idx) => {
         const isMatch = idx === select.selectedIndex;
@@ -864,9 +871,11 @@ function hasCredentials() {
 $('form').addEventListener('submit', (e) => {
   e.preventDefault();
 
-  // 只有「测试登录」才需要凭据；设置本身先保存下来
+  // 只有「测试登录」才需要凭据；非凭据设置先保存下来（U6）
   if (!hasCredentials()) {
-    showToast('请先填写上网账号和密码，再点「保存并连接」。', 'err');
+    save(() => {
+      showToast('设置已保存（提示：账号或密码为空，未发起登录连接）。', 'warn');
+    });
     const s = readForm();
     if (!s.account) {
       const acc = $('account');
@@ -947,6 +956,21 @@ $('btnLoginNow').addEventListener('click', () => {
   });
 });
 
+// --- U7: 输入框内回车仅保存设置，不触发登录连接 ---
+['account', 'password'].forEach((id) => {
+  const el = $(id);
+  if (el) {
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        save(() => {
+          showToast('设置已自动保存', 'ok');
+        });
+      }
+    });
+  }
+});
+
 // --- 顶部快捷：一键复制完整诊断报告 ---
 $('btnCopyReport').addEventListener('click', (e) => {
   const btn = $('btnCopyReport');
@@ -987,7 +1011,7 @@ $('btnCopyReport').addEventListener('click', (e) => {
       span.textContent = '已复制 ✓';
       showToast('诊断报告已成功复制到剪贴板', 'ok');
       setTimeout(() => {
-        span.textContent = '复制连接诊断报告';
+        span.textContent = '复制诊断';
       }, 2000);
     }).catch(() => {
       showToast('复制失败，请手动记录', 'err');

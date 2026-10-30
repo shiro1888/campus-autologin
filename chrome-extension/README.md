@@ -37,7 +37,7 @@
    C:\Project\campus-autologin\chrome-extension
    ```
 
-5. 插件出现在列表里即安装成功。点击工具栏的插件图标 → **⚙ 设置**，确认账号密码后点 **保存并立即测试**。
+5. 插件出现在列表里即安装成功。点击工具栏的插件图标 → **⚙ 设置**，确认账号密码后点 **保存并连接**。
 
 > 如果工具栏看不到图标，点一下地址栏右侧的「拼图」图标，把「Campus AutoLogin」固定住。
 
@@ -150,7 +150,7 @@ chrome-extension/
 ├── common.js         公共模块：时间格式化、流量换算、状态秒表
 ├── content.js        登录页自动填写与 HUD 状态胶囊提示脚本
 ├── popup.html/js/css 工具栏弹出面板（Bento 网格、毛玻璃动态流光）
-├── options.html/js/css 控制中心设置页（吸顶导航、返回顶部、数据遥测）
+├── options.html/js/css 控制中心设置页（吸顶导航、数据遥测与连接诊断）
 ├── icons/            已生成的各尺寸图标 (icon16/32/48/128.png)
 └── README.md         本说明文件
 ```

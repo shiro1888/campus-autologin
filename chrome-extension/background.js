@@ -101,8 +101,10 @@ const ERROR_MAP = {
 // 连接状态机的全部取值（用于校验从 storage 恢复的值是否合法）
 const CONN_STATES = ['unknown', 'online', 'offline', 'unreachable', 'unparseable'];
 
-// 并发保护：防止定时器与手动点击同时发起登录
+// 并发保护：防止定时器与手动点击同时发起登录，并互斥串行化
 let running = false;
+let activeAuthOp = null; // 'login' | 'logout' | 'content' | null
+let contentLockTimer = null;
 
 // 连接状态机与退避计数（详见 updateConnState 注释）
 let connState = 'unknown';
@@ -505,6 +507,20 @@ async function doLogin(settings) {
  * （掉线间隔默认 1 秒）会立刻把用户重新认证上网，「注销」形同虚设。
  */
 async function doLogout() {
+  if (activeAuthOp && activeAuthOp !== 'logout') {
+    return fail(`正在进行${activeAuthOp === 'login' ? '登录认证' : '网络操作'}，已跳过本次注销`, false);
+  }
+  activeAuthOp = 'logout';
+  running = true;
+  try {
+    return await _doLogoutInternal();
+  } finally {
+    activeAuthOp = null;
+    running = false;
+  }
+}
+
+async function _doLogoutInternal() {
   const st = await checkStatus();
   if (!st.reachable) {
     return fail('网络连接失败，请检查 Wi-Fi 或网线', false);
@@ -551,12 +567,25 @@ async function doLogout() {
   await new Promise((r) => setTimeout(r, 600));
   const stAfter = await checkStatus();
 
+  if (!stAfter.reachable) {
+    // 网关不可达，无法确认是否下线（C11：区分确认离线与无法确认）
+    onlineSince = null;
+    await setState({ manualLogout: true, unreachableStreak: 0, onlineSince: null });
+    connState = 'unreachable';
+    const res = fail('注销请求已提交，但当前网关不可达，无法确认是否成功下线', false);
+    res.state = 'unknown';
+    await saveResult(res);
+    await ensureAlarm();
+    console.log('[logout] 网关不可达，无法确认注销结果');
+    return res;
+  }
+
   if (!stAfter.online) {
     // 注销成功 -> 置上抑制标志，暂停自动登录，并清空本地在线会话计时
     onlineSince = null;
     await setState({ manualLogout: true, unreachableStreak: 0, onlineSince: null });
     unreachableStreak = 0;
-    connState = stAfter.reachable ? 'offline' : 'unreachable';
+    connState = 'offline';
     const res = ok('已注销下线（自动登录已暂停，点「立即登录」可恢复）', false);
     await saveResult(res);
     // 需先落盘 manualLogout=true，ensureAlarm 才会按暂停态选空闲间隔
@@ -673,9 +702,10 @@ async function updateConnState(st) {
  */
 async function autoLogin(trigger, manual) {
   const tag = trigger ? '[' + trigger + '] ' : '';
-  if (running) {
-    return { ok: false, online: false, skipped: true, message: '正在登录中，已跳过本次请求', time: nowText() };
+  if (running || activeAuthOp) {
+    return { ok: false, online: false, skipped: true, message: '正在处理认证中，已跳过本次请求', time: nowText() };
   }
+  activeAuthOp = 'login';
   running = true;
   try {
     await hydrateState();
@@ -815,6 +845,7 @@ async function autoLogin(trigger, manual) {
     }
     return r;
   } finally {
+    activeAuthOp = null;
     running = false;
   }
 }
@@ -1046,11 +1077,40 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === 'acquireAuthLock') {
+    if (activeAuthOp || running) {
+      sendResponse({ ok: false, busy: true, reason: activeAuthOp || 'running' });
+    } else {
+      activeAuthOp = 'content';
+      running = true;
+      if (contentLockTimer) clearTimeout(contentLockTimer);
+      contentLockTimer = setTimeout(() => {
+        if (activeAuthOp === 'content') {
+          activeAuthOp = null;
+          running = false;
+        }
+      }, 8000);
+      sendResponse({ ok: true });
+    }
+    return true;
+  }
+
+  if (msg.type === 'releaseAuthLock') {
+    if (activeAuthOp === 'content') {
+      activeAuthOp = null;
+      running = false;
+      if (contentLockTimer) clearTimeout(contentLockTimer);
+    }
+    sendResponse({ ok: true });
+    return true;
+  }
+
   // 内容脚本上报的填写/登录结果，仅记录，不重复登录
   if (msg.type === 'contentResult') {
     const r = msg.result || {};
     saveResult({
       ok: !!r.ok,
+      state: r.state || (r.ok ? 'success' : (r.online ? 'success' : 'fail')),
       online: !!r.online,
       message: String(r.message || '页面自动填写完成'),
       time: nowText(),

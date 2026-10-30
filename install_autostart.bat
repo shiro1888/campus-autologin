@@ -23,9 +23,10 @@ if %errorlevel% neq 0 (
 
 :: Run installer with elevated rights
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0install_autostart.ps1"
+set "EXIT_CODE=%errorlevel%"
 echo.
 echo ------------------------------------------------------------
 echo   Press any key to exit...
 echo ------------------------------------------------------------
 pause >nul
-exit /b 0
+exit /b %EXIT_CODE%

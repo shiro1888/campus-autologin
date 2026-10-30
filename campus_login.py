@@ -44,6 +44,7 @@ import socket
 import subprocess
 import sys
 import time
+import traceback
 import unicodedata
 import urllib.error
 import urllib.parse
@@ -268,6 +269,25 @@ def detect_local_ip(host: str) -> str:
         sock.close()
 
 
+def _parse_result(val) -> int:
+    """安全解析门户返回的 result 状态值，返回 1 (在线/成功) 或 0 (离线/失败)。
+    容错处理 1, "1", "ok", True, 空串, None 及异常 HTML，避免抛出 ValueError。
+    """
+    if val is None:
+        return 0
+    if isinstance(val, bool):
+        return 1 if val else 0
+    if isinstance(val, (int, float)):
+        try:
+            return 1 if int(val) == 1 else 0
+        except (ValueError, OverflowError):
+            return 0
+    s = str(val).strip().lower()
+    if s in ("1", "ok", "true", "success"):
+        return 1
+    return 0
+
+
 # --------------------------------------------------------------------------
 # 门户操作
 # --------------------------------------------------------------------------
@@ -325,11 +345,17 @@ class Portal:
         data["_http"] = code
         return data
 
-    def is_online(self) -> bool:
+    def check_online_state(self) -> str:
+        """检测在线三态: 'online' (确认在线), 'offline' (确认未在线), 'unknown' (网络异常无法确认)。"""
         try:
-            return int(self.status().get("result", 0)) == 1
+            st = self.status()
+            return "online" if _parse_result(st.get("result", 0)) == 1 else "offline"
         except (NetworkError, TypeError, ValueError):
-            return False
+            return "unknown"
+
+    def is_online(self) -> bool:
+        """是否确认在线。网络异常时不会误判为在线。"""
+        return self.check_online_state() == "online"
 
     # -- 登录 ------------------------------------------------------------
     def login(self, username: str, password: str) -> dict:
@@ -477,16 +503,23 @@ class Portal:
                 resp = {"snippet": " ".join(text.split())[:120]}
             detail.append({"url": url, "http": code, "ok": ok, "raw": resp})
             if ok:
-                # 内核异步处理，给它一点时间
+                # 内核异步处理，给它一点时间确认下线
                 for _ in range(5):
                     time.sleep(1)
-                    try:
-                        if not self.is_online():
-                            return {"ok": True, "detail": detail, "offline": True}
-                    except NetworkError:
-                        break
-                return {"ok": True, "detail": detail, "offline": False}
-        return {"ok": False, "detail": detail, "offline": False}
+                    state = self.check_online_state()
+                    if state == "offline":
+                        return {"ok": True, "detail": detail, "offline": True, "state": "offline"}
+                    elif state == "unknown":
+                        # 网络异常，无法确认真实下线状态（避免假成功误报）
+                        return {
+                            "ok": True,
+                            "detail": detail,
+                            "offline": False,
+                            "state": "unknown",
+                            "message": "网络异常，无法确认注销结果，请稍后复查",
+                        }
+                return {"ok": True, "detail": detail, "offline": False, "state": "online"}
+        return {"ok": False, "detail": detail, "offline": False, "state": "offline"}
 
 
 ERROR_HINTS = {
@@ -629,7 +662,7 @@ def cmd_status(args, cfg) -> int:
     # 只查状态，不需要账号密码
     portal = _make_portal(args, cfg, require_credentials=False)
     st = portal.status()
-    online = int(st.get("result", 0)) == 1
+    online = _parse_result(st.get("result", 0)) == 1
     ip = next((v for v in [st.get("v4ip"), st.get("ss5")] if v and v != "0.0.0.0"), None) or detect_local_ip(portal.host_only)
     flow_text = _format_flow(st.get("flow", 0))
     # fee 由门户返回，可能是空串/非数字。此处必须容错，
@@ -728,12 +761,16 @@ def cmd_login(args, cfg) -> int:
             say("● 当前已在线，无需重复登录。")
         return EXIT_OK
 
-    # 这两个值来自用户手写的 config.json，类型不对时给配置错误而不是裸 traceback
+    # 这两个值来自用户手写的 config.json，类型不对或超界时规范化，避免负数延时崩溃或无限挂起
     try:
-        retry = max(1, int(cfg.get("retry", 3)))
-        delay = float(cfg.get("retry_delay", 3))
+        retry = max(1, min(10, int(cfg.get("retry", 3))))
+        delay = max(0.0, min(3600.0, float(cfg.get("retry_delay", 3))))
     except (TypeError, ValueError):
         raise ConfigError("retry / retry_delay 必须是数字，请检查 config.json")
+    if args.retry is not None:
+        if args.retry < 0 or args.retry > 10:
+            raise ConfigError("--retry 必须在 0 到 10 之间")
+        retry = max(1, args.retry)
     last = {}
     for attempt in range(1, retry + 1):
         if retry > 1:
@@ -818,12 +855,16 @@ def cmd_logout(args, cfg) -> int:
         return EXIT_FAIL
 
     success = bool(resp.get("offline"))
+    state = resp.get("state", "offline" if success else "online")
     if args.json:
-        emit_json({"action": "logout", "success": success,
+        emit_json({"action": "logout", "success": success, "state": state,
                    "still_online": not success, "raw": resp.get("detail", [])})
     else:
         if success:
             say("✓ 已注销下线。")
+        elif state == "unknown":
+            say_err("✗ 网络异常，无法确认注销结果，请稍后复查。")
+            say("  若网线或 Wi-Fi 已断开，可能无需额外注销；如需确认请访问: %s/" % portal.web_base)
         elif resp.get("ok"):
             say_err("✗ 注销请求已被接受，但会话仍在(部分 AC 不支持自助注销)。")
             say("  如需下线，请到门户页面手动操作: %s/" % portal.web_base)
@@ -851,7 +892,7 @@ def cmd_wait(args, cfg) -> int:
     waited = False
     while True:
         try:
-            if int(portal.status().get("result", 0)) == 1:
+            if _parse_result(portal.status().get("result", 0)) == 1:
                 if args.json:
                     emit_json({"action": "wait", "success": True, "online": True, "message": "已在线"})
                 else:
@@ -911,9 +952,13 @@ def cmd_test(args, cfg) -> int:
     online = False
     try:
         st = portal.status()
-        online = int(st.get("result", 0)) == 1
-        checks["认证接口"] = 200
-        say("  [OK] 认证接口 -> HTTP 200 (result=%s)" % st.get("result"))
+        online = _parse_result(st.get("result", 0)) == 1
+        http_code = int(st.get("_http", 200))
+        checks["认证接口"] = http_code
+        if http_code == 200:
+            say("  [OK] 认证接口 -> HTTP 200 (result=%s)" % st.get("result"))
+        else:
+            say_err("  [!!] 认证接口 -> HTTP %s (result=%s)" % (http_code, st.get("result")))
     except NetworkError as exc:
         checks["认证接口"] = 0
         say_err("  [!!] 认证接口 -> %s" % exc)
@@ -1019,13 +1064,13 @@ def cmd_gui(args, cfg) -> int:
     # 启用 Windows 10/11 原生沉浸式深色标题栏 (DWM Immersive Dark Titlebar)
     try:
         from ctypes import byref, c_int, sizeof
-        DWMWA_USE_IMMERSIVE_DARK_MODE = 20
         root.update_idletasks()
         inner_hwnd = root.winfo_id()
         hwnd = ctypes.windll.user32.GetAncestor(inner_hwnd, 2) or int(root.wm_frame(), 16)
-        ctypes.windll.dwmapi.DwmSetWindowAttribute(
-            hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, byref(c_int(1)), sizeof(c_int)
-        )
+        val = c_int(1)
+        for attr in (20, 19):
+            if ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, attr, byref(val), sizeof(val)) == 0:
+                break
     except Exception:
         pass
 
@@ -1195,7 +1240,7 @@ def cmd_gui(args, cfg) -> int:
         if pwd_visible[0]:
             pwd_visible[0] = False
             pass_ent.config(show="●")
-            btn_pwd_toggle.config(text="👁 显示")
+            btn_pwd_toggle.config(text="显示")
 
     def toggle_pwd():
         if pwd_timer[0]:
@@ -1206,11 +1251,11 @@ def cmd_gui(args, cfg) -> int:
             pwd_timer[0] = None
         pwd_visible[0] = not pwd_visible[0]
         pass_ent.config(show="" if pwd_visible[0] else "●")
-        btn_pwd_toggle.config(text="🙈 隐藏" if pwd_visible[0] else "👁 显示")
+        btn_pwd_toggle.config(text="隐藏" if pwd_visible[0] else "显示")
         if pwd_visible[0]:
             pwd_timer[0] = root.after(10000, _auto_rehide_pwd)
 
-    btn_pwd_toggle = tk.Button(pwd_wrap, text="👁 显示", font=FONTS["body"], bg=THEME["card"],
+    btn_pwd_toggle = tk.Button(pwd_wrap, text="显示", font=FONTS["body"], bg=THEME["card"],
                                fg=THEME["text_muted"], activebackground=THEME["border"], activeforeground=THEME["text"],
                                relief="flat", bd=0, cursor="hand2", padx=6, command=toggle_pwd)
     btn_pwd_toggle.pack(side="right", padx=4, pady=2)
@@ -1253,12 +1298,27 @@ def cmd_gui(args, cfg) -> int:
         threading.Thread(target=fn, daemon=True).start()
         return True
 
+    import queue
+    _ui_queue = queue.Queue()
+
     def safe_ui(fn):
-        """将 UI 更新调度到主线程。线程安全：不直接查询控件状态。"""
+        """将 UI 更新投递到线程安全队列，由主线程消费，避免 Tkinter 跨线程卡顿与异常。"""
+        _ui_queue.put(fn)
+
+    def _process_ui_queue():
+        while not _ui_queue.empty():
+            try:
+                cb = _ui_queue.get_nowait()
+                cb()
+            except Exception:
+                pass
         try:
-            root.after(0, fn)
-        except (tk.TclError, RuntimeError):
+            if root.winfo_exists():
+                root.after(40, _process_ui_queue)
+        except Exception:
             pass
+
+    root.after(40, _process_ui_queue)
 
     # Autostart Card (Windows 计划任务开机自启)
     auto_card = tk.Frame(body_frame, bg=THEME["card"], padx=16, pady=10, highlightthickness=1, highlightbackground=THEME["border"])
@@ -1290,9 +1350,17 @@ def cmd_gui(args, cfg) -> int:
         except Exception:
             return False
 
-    def update_autostart_ui():
+    _autostart_cache = {"time": 0.0, "active": False}
+
+    def update_autostart_ui(force: bool = False):
         def _task():
-            is_active = check_autostart()
+            now = time.time()
+            if not force and (now - _autostart_cache["time"] < 300):
+                is_active = _autostart_cache["active"]
+            else:
+                is_active = check_autostart()
+                _autostart_cache["time"] = now
+                _autostart_cache["active"] = is_active
             autostart_active[0] = is_active
             def _ui():
                 if is_active:
@@ -1333,7 +1401,7 @@ def cmd_gui(args, cfg) -> int:
                 os.startfile(bat_path)
             except Exception as e:
                 messagebox.showerror("启动失败", str(e))
-        root.after(3000, update_autostart_ui)
+        root.after(3000, lambda: update_autostart_ui(force=True))
 
     btn_autostart = tk.Button(auto_body, text="—", font=FONTS["body"], bg=THEME["border"], fg=THEME["text"],
                               relief="flat", cursor="hand2", padx=8, pady=1, command=toggle_autostart)
@@ -1350,7 +1418,7 @@ def cmd_gui(args, cfg) -> int:
                 portal = Portal(cfg)
                 st = portal.status()
                 ping_ms = int((time.time() - t0) * 1000)
-                online = int(st.get("result", 0)) == 1
+                online = _parse_result(st.get("result", 0)) == 1
                 ip = next((v for v in [st.get("v4ip"), st.get("ss5")] if v and v != "0.0.0.0"), None) or detect_local_ip(portal.host_only)
                 current_detected_ip[0] = ip
                 flow = _format_flow(st.get("flow", 0))
@@ -1390,7 +1458,7 @@ def cmd_gui(args, cfg) -> int:
                 c_ep, _ = http_request(portal.ep_base + "/", portal.timeout)
                 st = portal.status()
                 c_auth = st.get("_http", 200)
-                online = int(st.get("result", 0)) == 1
+                online = _parse_result(st.get("result", 0)) == 1
                 ip = next((v for v in [st.get("v4ip"), st.get("ss5")] if v and v != "0.0.0.0"), None) or detect_local_ip(portal.host_only)
                 diag = (
                     "【校园网连接自检结果】\n\n"
@@ -1405,7 +1473,7 @@ def cmd_gui(args, cfg) -> int:
                         c_auth, "✓ 正常" if c_auth == 200 else "✗ 异常",
                         ip or "未探测到",
                         "已在线 (网络畅通)" if online else "未登录认证",
-                        "校园网网关与认证服务全部连通正常！" if (c_home == 200 and c_auth == 200) else "部分接口响应异常，请检查网线或 Wi-Fi 连接。"
+                        "校园网网关与认证服务全部连通正常！" if (c_home == 200 and c_auth == 200 and c_ep == 200) else "部分接口响应异常，请检查网线或 Wi-Fi 连接。"
                     )
                 )
                 safe_ui(lambda: [messagebox.showinfo("网络自检诊断", diag), do_refresh()])
@@ -1455,6 +1523,31 @@ def cmd_gui(args, cfg) -> int:
         def _task():
             try:
                 portal = Portal(login_cfg)
+                # C1: 先查在线状态，若已在线则弹窗确认，默认不重登
+                try:
+                    curr_st = portal.status()
+                    if _parse_result(curr_st.get("result", 0)) == 1:
+                        confirm = [False]
+                        ev = threading.Event()
+                        def _prompt():
+                            confirm[0] = messagebox.askyesno(
+                                "提示",
+                                "当前网络已处于在线认证状态，确定要重新登录吗？\n（重新登录可能踢掉现有会话）",
+                                default="no",
+                            )
+                            ev.set()
+                        safe_ui(_prompt)
+                        ev.wait()
+                        if not confirm[0]:
+                            safe_ui(lambda: [
+                                set_auth_busy(False),
+                                st_lbl.config(text="● 已保持在线", fg=THEME["success"]),
+                                do_refresh(),
+                            ])
+                            return
+                except NetworkError:
+                    pass
+
                 res = portal.login(u, p)
                 def _ui():
                     set_auth_busy(False)
@@ -1506,12 +1599,15 @@ def cmd_gui(args, cfg) -> int:
         st_card.config(highlightbackground=THEME["warning"])
 
     def do_save():
-        # 仅持久化合法配置字段，避免命令行临时参数（如 --user, --timeout）污染配置文件
+        # 仅持久化合法配置字段，避免命令行临时参数（如 --user, --timeout）污染配置文件，
+        # 并显式校验 dict 类型与剔除 _ 前缀的注释键
         saved_cfg = {}
         if os.path.exists(CONFIG_PATH):
             try:
                 with open(CONFIG_PATH, "r", encoding="utf-8-sig") as rf:
-                    saved_cfg = json.load(rf)
+                    loaded = json.load(rf)
+                    if isinstance(loaded, dict):
+                        saved_cfg = {k: v for k, v in loaded.items() if not str(k).startswith("_")}
             except Exception:
                 saved_cfg = {}
         saved_cfg["username"] = user_ent.get().strip()
@@ -1603,7 +1699,7 @@ def cmd_gui(args, cfg) -> int:
         except Exception:
             pass
 
-    def _on_close():
+    def _destroy_window():
         try:
             if pwd_timer[0]:
                 root.after_cancel(pwd_timer[0])
@@ -1620,6 +1716,9 @@ def cmd_gui(args, cfg) -> int:
             pass
         root.destroy()
 
+    def _on_close():
+        _handle_escape()
+
     def _handle_escape(e=None):
         u = user_ent.get().strip()
         p = pass_ent.get().strip()
@@ -1632,9 +1731,9 @@ def cmd_gui(args, cfg) -> int:
         )
         if is_dirty and (u or p or current_isp != _saved_snapshot["isp"]):
             if messagebox.askyesno("退出确认", "检测到账号、密码或运营商有未保存的修改，确定要退出吗？"):
-                _on_close()
+                _destroy_window()
         else:
-            _on_close()
+            _destroy_window()
 
     root.protocol("WM_DELETE_WINDOW", _on_close)
 
@@ -1686,6 +1785,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     global _QUIET, _JSON_MODE
     args = build_parser().parse_args(argv)
+    # 严格校验命令行参数边界，避免负数延时或异常高频请求
+    if args.retry is not None and not (0 <= args.retry <= 10):
+        say_err("✗ 参数错误: --retry 必须在 0 到 10 之间")
+        return EXIT_CONFIG
+    if args.timeout is not None and not (0.5 <= args.timeout <= 3600.0):
+        say_err("✗ 参数错误: --timeout 必须在 0.5 到 3600 秒之间")
+        return EXIT_CONFIG
+
     # --json 时一律静默：JSON 是给程序消费的，stdout 必须只有一行 JSON。
     # 原先写成 `quiet and not json`，等于「带 --json 就强制不静默」，
     # 于是所有在 emit_json 之前的进度输出都会混进 stdout，
@@ -1716,6 +1823,25 @@ def main(argv: list[str] | None = None) -> int:
         say_err("✗ %s" % exc)
         if args.json:
             emit_json({"success": False, "error": str(exc)})
+        return EXIT_FAIL
+    except Exception as exc:
+        say_err("✗ 未预期的错误: %s" % exc)
+        try:
+            log_dir = os.path.join(BASE_DIR, "logs")
+            os.makedirs(log_dir, exist_ok=True)
+            with open(os.path.join(log_dir, "crash.log"), "a", encoding="utf-8") as f:
+                f.write("%s [%s] %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), type(exc).__name__, exc))
+                traceback.print_exc(file=f)
+        except Exception:
+            pass
+        if args.command == "gui":
+            try:
+                from tkinter import messagebox as mb
+                mb.showerror("系统异常", "桌面控制中心运行遇到未捕获的错误:\n%s\n\n详情已写入 logs/crash.log" % exc)
+            except Exception:
+                pass
+        if args.json:
+            emit_json({"success": False, "error": str(exc), "type": type(exc).__name__})
         return EXIT_FAIL
 
 

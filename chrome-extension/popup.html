@@ -11,7 +11,7 @@
     <!-- Header -->
     <header class="header">
       <div class="brand">
-        <div class="brand-avatar-box">
+        <div class="brand-avatar-box" id="brandAvatar" title="点击打开偏好设置" role="button" tabindex="0">
           <img src="icons/icon32.png" alt="Logo" class="brand-img">
           <span class="avatar-beacon" id="avatarBeacon"></span>
         </div>
@@ -161,7 +161,7 @@
     </div>
 
     <!-- Alert / Toast Capsule (操作或异常时灵动滑入) -->
-    <div class="msg-box" id="msgBox">
+    <div class="msg-box" id="msgBox" role="status" aria-live="polite">
       <span class="msg-icon" id="msgIcon"></span>
       <span class="msg-text" id="msg"></span>
     </div>
@@ -194,7 +194,7 @@
         <span>偏好设置</span>
       </a>
       <span class="foot-sep"></span>
-      <a href="http://172.30.100.2/" target="_blank" class="foot-link">
+      <a href="http://172.30.100.2/" target="_blank" rel="noopener noreferrer" class="foot-link">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         <span>网页门户</span>
       </a>
