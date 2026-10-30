@@ -19,6 +19,7 @@ config.json
 config.local.json
 campus-autologin-config-*.json
 .python_path
+.task_name
 
 # 编辑器与工具
 .vscode/

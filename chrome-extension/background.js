@@ -506,25 +506,29 @@ async function doLogin(settings) {
  * 重要：注销成功后必须置上 manualLogout 抑制标志。否则下一次后台巡检
  * （掉线间隔默认 1 秒）会立刻把用户重新认证上网，「注销」形同虚设。
  */
-async function doLogout(force = false) {
-  // 用户明确注销：第一时间落盘 manualLogout=true，令在途的 autoLogin 及时止步并尊重注销意图
+async function doLogout() {
+  // 用户明确注销：第一时间落盘 manualLogout=true，令在途的 autoLogin 主动让出
   await setState({ manualLogout: true, unreachableStreak: 0 });
   unreachableStreak = 0;
 
-  if (!force && activeAuthOp && activeAuthOp !== 'logout') {
-    // 稍等正在处理中的请求完成（最多 1.5 秒）
+  // 若当前有登录认证在进行中，等待登录检测到 manualLogout 后主动让出退出（最多等待 3 秒）
+  if (activeAuthOp === 'login') {
     const t0 = Date.now();
-    while (activeAuthOp && activeAuthOp !== 'logout' && Date.now() - t0 < 1500) {
-      await new Promise((r) => setTimeout(r, 100));
+    while (activeAuthOp === 'login' && Date.now() - t0 < 3000) {
+      await new Promise((r) => setTimeout(r, 50));
     }
   }
-  const prevOp = activeAuthOp;
+
+  if (activeAuthOp && activeAuthOp !== 'logout') {
+    return fail(`正在进行${activeAuthOp === 'login' ? '登录认证' : '网络操作'}，已跳过本次注销`, false);
+  }
+
   activeAuthOp = 'logout';
   running = true;
   try {
     return await _doLogoutInternal();
   } finally {
-    activeAuthOp = (force && prevOp === 'login') ? prevOp : null;
+    activeAuthOp = null;
     running = false;
   }
 }
@@ -790,6 +794,13 @@ async function autoLogin(trigger, manual) {
     }
 
     // 4) 登录（门户可达但未认证 -> 真·掉线，保持快速重连）
+    // 在发起登录前，检查检测期间用户是否发起注销：用户意图优先，主动中止让出
+    if ((await getSettings()).manualLogout) {
+      console.log(tag + '检测到用户已请求注销，主动中止本次自动登录');
+      return { ok: true, online: false, skipped: true, paused: true,
+               message: '已手动注销，自动登录已取消', time: nowText() };
+    }
+
     console.log(tag + '未在线，开始登录：' + settings.account);
     updateActionBadge(false, '...');
     await applyCadence();

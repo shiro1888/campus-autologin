@@ -83,6 +83,20 @@ class TestSecurityFeatures(unittest.TestCase):
         has_proxy = any(type(h).__name__ == "ProxyHandler" for h in _DIRECT_OPENER.handlers)
         self.assertFalse(has_proxy, "Direct opener should have no ProxyHandler to guarantee bypassing system proxies")
 
+    def test_safe_redirect_handler_allows_same_host_port_change(self):
+        from campus_login import SafeRedirectHandler
+        import urllib.request
+        handler = SafeRedirectHandler()
+        req = urllib.request.Request("http://172.30.100.2/drcom/login")
+        # 同主机 80 -> 801 必须放行
+        res = handler.redirect_request(req, None, 302, "Found", {}, "http://172.30.100.2:801/eportal/")
+        self.assertIsNotNone(res)
+        self.assertEqual(res.full_url, "http://172.30.100.2:801/eportal/")
+
+        # 跨主机跳往外部域名必须阻断
+        res_evil = handler.redirect_request(req, None, 302, "Found", {}, "http://evil.com/leak")
+        self.assertIsNone(res_evil)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -34,7 +34,14 @@ if (-not $isAdmin) {
     exit 1
 }
 
+$taskNameFile = Join-Path $here ".task_name"
 if ($Uninstall) {
+    if (-not $PSBoundParameters.ContainsKey('TaskName') -and (Test-Path $taskNameFile)) {
+        try {
+            $savedTask = (Get-Content $taskNameFile -Raw -Encoding UTF8).Trim()
+            if ($savedTask) { $TaskName = $savedTask }
+        } catch {}
+    }
     $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
     if ($existing) {
         Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
@@ -43,6 +50,7 @@ if ($Uninstall) {
         Write-Warn "计划任务不存在: $TaskName"
     }
     $pyPathFile = Join-Path $here ".python_path"
+    if (Test-Path $taskNameFile) { Remove-Item $taskNameFile -Force -ErrorAction SilentlyContinue }
     if (Test-Path $pyPathFile) { Remove-Item $pyPathFile -Force -ErrorAction SilentlyContinue }
     Write-Host ""
     exit 0
@@ -66,7 +74,7 @@ if (-not $py) {
     exit 1
 }
 Write-Ok "Python: $py"
-try { Set-Content -Path (Join-Path $here ".python_path") -Value $py -Encoding UTF8 -ErrorAction SilentlyContinue } catch {}
+try { $utf8NoBom = New-Object System.Text.UTF8Encoding($false); [System.IO.File]::WriteAllText((Join-Path $here ".python_path"), $py, $utf8NoBom) } catch {}
 
 # --- 2.5 先确认已填账号密码 ---
 # 计划任务开机跑的是 `campus_login.py wait`，未在线时会真的发起认证。
@@ -163,6 +171,7 @@ Register-ScheduledTask `
     -Description "开机自动登录校园网 http://$portalHost/ (Dr.COM ePortal)" | Out-Null
 
 Write-Ok "计划任务已创建: $TaskName"
+try { [System.IO.File]::WriteAllText((Join-Path $here ".task_name"), $TaskName, (New-Object System.Text.UTF8Encoding $false)) } catch {}
 
 Write-Host ""
 Write-Host "===== 安装完成 =====" -ForegroundColor Cyan

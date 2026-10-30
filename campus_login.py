@@ -78,7 +78,7 @@ DEFAULT_CONFIG = {
     "password": "",
     "isp": "1",
     "timeout": 8,
-    "retry": 3,
+    "retry": 2,
     "retry_delay": 3,
     "wait_seconds": 90,
     "js_version": "4.1.3",
@@ -218,11 +218,13 @@ def _declared_charset(headers) -> str | None:
 
 
 class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
-    """安全重定向处理器：绝不跟随跨域或跨主机的跳转，防止认证参数/密码被重定向泄露。"""
+    """安全重定向处理器：绝不跟随跨主机的跳转，防止认证参数/密码被重定向泄露。
+    允许同主机换端口跳转（如 80 -> 801 eportal 端口）。
+    """
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        orig_netloc = urllib.parse.urlparse(req.full_url).netloc
-        new_netloc = urllib.parse.urlparse(newurl).netloc
-        if orig_netloc and new_netloc and orig_netloc != new_netloc:
+        orig_host = urllib.parse.urlparse(req.full_url).hostname
+        new_host = urllib.parse.urlparse(newurl).hostname
+        if orig_host and new_host and orig_host.lower() != new_host.lower():
             return None
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
@@ -829,7 +831,7 @@ def cmd_login(args, cfg) -> int:
                 verified = portal.is_online()
                 if args.json:
                     emit_json({
-                        "action": "login", "success": True, "already_online": False,
+                        "action": "login", "success": verified, "already_online": False,
                         "verified": verified, "account": user, "raw": resp["raw"],
                     })
                 else:
@@ -838,8 +840,8 @@ def cmd_login(args, cfg) -> int:
                     if verified:
                         say("  状态复核: 已在线")
                     else:
-                        say("  状态复核: 未检测到在线(可能刚上线，稍后再试)")
-                return EXIT_OK
+                        say_err("✗ 状态复核: 门户已接受认证但复核未在线(可能存在延迟或已被踢出)")
+                return EXIT_OK if verified else EXIT_FAIL
 
             last = resp
             say_err("✗ 登录失败: %s" % resp["message"])
@@ -1369,9 +1371,19 @@ def cmd_gui(args, cfg) -> int:
 
     def check_autostart() -> bool:
         try:
+            task_name = "CampusNetAutoLogin"
+            task_file = os.path.join(BASE_DIR, ".task_name")
+            if os.path.isfile(task_file):
+                try:
+                    with open(task_file, "r", encoding="utf-8") as tf:
+                        saved = tf.read().strip()
+                        if saved:
+                            task_name = saved
+                except Exception:
+                    pass
             creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
             res = subprocess.run(
-                ["schtasks", "/query", "/tn", "CampusNetAutoLogin"],
+                ["schtasks", "/query", "/tn", task_name],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 creationflags=creationflags,

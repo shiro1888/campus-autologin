@@ -22,8 +22,8 @@
   "_timeout": "单次 HTTP 请求超时秒数",
   "timeout": 8,
 
-  "_retry": "登录失败重试次数",
-  "retry": 3,
+  "_retry": "登录失败重试次数(默认 2 次，即初次尝试 + 2 次重试，共 3 次尝试)",
+  "retry": 2,
 
   "_retry_delay": "重试间隔秒数",
   "retry_delay": 3,
