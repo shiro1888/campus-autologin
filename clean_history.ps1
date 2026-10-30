@@ -14,6 +14,31 @@ $ErrorActionPreference = "Stop"
 $here = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 Set-Location $here
 
+# ---------------------------------------------------------------------
+# Git 原生命令执行包装函数
+# 解决 PowerShell 5.1 下原生命令输出到 stderr 触发终止性异常的问题
+# ---------------------------------------------------------------------
+function Invoke-Git {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$GitArgs,
+        [switch]$AllowFail
+    )
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $out = & git @GitArgs 2>&1
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEAP
+    }
+    if ($code -ne 0 -and -not $AllowFail) {
+        $msg = if ($out) { ($out | Out-String).Trim() } else { "退出码 $code" }
+        throw "git $($GitArgs -join ' ') 执行失败 (退出码 $code): $msg"
+    }
+    return $out
+}
+
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Red
 Write-Host "  Campus AutoLogin - Git 历史敏感凭据清洗脚本" -ForegroundColor Yellow
@@ -25,7 +50,7 @@ Write-Host "  只有在网关端废弃旧密码，才能彻底消除泄露风险
 Write-Host ""
 
 # 0. 工作区干净性预检（放宽未跟踪文件，只检查已跟踪文件的修改/暂存）
-$dirty = git status --porcelain --untracked-files=no
+$dirty = Invoke-Git @('status', '--porcelain', '--untracked-files=no') -AllowFail
 if ($dirty) {
     Write-Host "  [错误] 检测到已跟踪文件有未提交的修改，git filter-repo 要求干净工作区。" -ForegroundColor Red
     Write-Host "         请先提交、暂存或放弃工作区修改后再运行本脚本。" -ForegroundColor Yellow
@@ -91,7 +116,32 @@ if ([string]::IsNullOrWhiteSpace($Account) -and [string]::IsNullOrWhiteSpace($Pa
     exit 1
 }
 
-# 3. 动态生成临时脱敏规则文件
+# 3. 前置存在性检查：确保输入的凭据真实存在于 Git 历史中，杜绝空转与误报
+Write-Host "  [1/4] 执行前置定位检查（确认凭据真实存在于历史提交中）..." -ForegroundColor Green
+if (-not [string]::IsNullOrWhiteSpace($Password)) {
+    $prePass = Invoke-Git @('log', '--all', '--oneline', "-S$Password") -AllowFail
+    if (-not $prePass) {
+        Write-Host "  [错误] 目标旧密码在 Git 全历史中未找到任何匹配记录！" -ForegroundColor Red
+        Write-Host "         可能原因：您输入的是新密码，或密码拼写有误。" -ForegroundColor Yellow
+        Write-Host "         脚本必须在历史中检索到泄露记录才可执行清洗。尚未改动任何历史，已安全终止。" -ForegroundColor Yellow
+        Write-Host ""
+        exit 1
+    }
+    Write-Host "  [OK] 已在 Git 历史中精确定位到旧密码记录。" -ForegroundColor Green
+}
+if (-not [string]::IsNullOrWhiteSpace($Account)) {
+    $preAcc = Invoke-Git @('log', '--all', '--oneline', "-S$Account") -AllowFail
+    if (-not $preAcc) {
+        Write-Host "  [错误] 目标旧账号在 Git 全历史中未找到任何匹配记录！" -ForegroundColor Red
+        Write-Host "         可能原因：账号拼写有误。尚未改动任何历史，已安全终止。" -ForegroundColor Yellow
+        Write-Host ""
+        exit 1
+    }
+    Write-Host "  [OK] 已在 Git 历史中精确定位到旧账号记录。" -ForegroundColor Green
+}
+
+# 4. 动态生成临时脱敏规则文件并执行重写
+Write-Host "  [2/4] 开始重写 Git 历史对象（脱敏账号密码并移除历史 config.json）..." -ForegroundColor Green
 $rules = [System.Collections.Generic.List[string]]::new()
 if (-not [string]::IsNullOrWhiteSpace($Password)) {
     $rules.Add("${Password}==>REDACTED_CAMPUS_PASSWORD")
@@ -103,67 +153,75 @@ if (-not [string]::IsNullOrWhiteSpace($Account)) {
 $rulesFile = Join-Path $env:TEMP ("campus_filter_rules_" + [System.Guid]::NewGuid().ToString("N") + ".txt")
 $rules | Set-Content -Path $rulesFile -Encoding ASCII
 
-Write-Host "  [1/4] 开始重写 Git 历史对象（脱敏账号密码并移除历史 config.json）..." -ForegroundColor Green
 try {
-    git filter-repo --replace-text $rulesFile --path config.json --invert-paths --force
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "  [错误] git filter-repo 重写历史失败，退出码: $LASTEXITCODE" -ForegroundColor Red
-        exit $LASTEXITCODE
-    }
+    Invoke-Git @('filter-repo', '--replace-text', $rulesFile, '--path', 'config.json', '--invert-paths', '--force')
     Write-Host "  [OK] 历史对象重写完成。" -ForegroundColor Green
 } finally {
     if (Test-Path $rulesFile) { Remove-Item $rulesFile -Force -ErrorAction SilentlyContinue }
 }
 
-# 4. 清洗后自检：确认目标凭据是否彻底从全部分支历史中抹除
-Write-Host "  [2/4] 执行清洗后自检（扫描全部分支历史 commit blob 残留）..." -ForegroundColor Green
-$remain = 0
+# 5. 清洗后自检：多层校验确保目标彻底归零且无遗留明文凭据
+Write-Host "  [3/4] 执行清洗后多维度自检..." -ForegroundColor Green
+
+# 5.1 目标凭据归零校验
 foreach ($secret in @($Password, $Account)) {
     if ([string]::IsNullOrWhiteSpace($secret)) { continue }
-    $hits = git log --all --oneline -S $secret
+    $hits = Invoke-Git @('log', '--all', '--oneline', "-S$secret") -AllowFail
     if ($hits) {
         $count = ($hits | Measure-Object).Count
-        $remain += $count
-        Write-Host "  [警告] 历史提交中仍检出 $count 处残留目标: '$secret'" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "  [严重错误] 清洗自检失败！历史中仍检出 $count 处凭据残留！" -ForegroundColor Red
+        Write-Host "             尚未推送到远端，本次清洗已终止。请排查后重试。" -ForegroundColor Yellow
+        Write-Host ""
+        exit 1
     }
 }
-if ($remain -gt 0) {
+
+# 5.2 config.json 历史移除校验
+$cfgHits = Invoke-Git @('log', '--all', '--oneline', '--', 'config.json') -AllowFail
+if ($cfgHits) {
     Write-Host ""
-    Write-Host "  [严重错误] 清洗自检失败！历史中仍检出 $remain 处残留目标。" -ForegroundColor Red
-    Write-Host "             可能原因：输入的密码并非历史中真实泄露的旧密码。" -ForegroundColor Yellow
-    Write-Host "             尚未推送到远端，本次清洗已终止。请排查后重试。" -ForegroundColor Yellow
+    Write-Host "  [严重错误] 清洗自检失败！历史中仍残留 config.json！已终止推送。" -ForegroundColor Red
     Write-Host ""
     exit 1
 }
-Write-Host "  [OK] 自检通过：全历史提交中目标凭据出现次数为 0。" -ForegroundColor Green
 
-# 5. 幂等恢复远程 origin
-Write-Host "  [3/4] 重新绑定远程仓库 origin..." -ForegroundColor Green
-git remote remove origin 2>$null
-git remote add origin https://github.com/shiro1888/campus-autologin.git
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "  [错误] 重新绑定远程仓库 origin 失败，退出码: $LASTEXITCODE" -ForegroundColor Red
-    exit $LASTEXITCODE
+# 5.3 全历史代码凭据模式扫描（排除常量与占位符）
+$credPat = '(?<![a-zA-Z0-9_])password["'']?[[:space:]]*[:=][[:space:]]*["''](?!123|你的密码|REDACTED)[^"'']{3,}["'']'
+$leak = @()
+foreach ($rev in (Invoke-Git @('rev-list', '--all'))) {
+    $hit = git grep -i -l -P $credPat $rev 2>$null
+    if ($hit) { $leak += $hit }
+}
+$leak = $leak | Sort-Object -Unique
+if ($leak.Count -gt 0) {
+    Write-Host ""
+    Write-Host "  [严重错误] 历史中仍检出 $($leak.Count) 处疑似凭据残留，尚未推送，已终止：" -ForegroundColor Red
+    $leak | Select-Object -First 5 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+    Write-Host ""
+    exit 1
+}
+Write-Host "  [OK] 自检全部通过：全历史目标归零、config.json 已抹除、无凭据字面量残留。" -ForegroundColor Green
+
+# 6. 幂等恢复远程 origin（避免 git remote remove origin 在不存在时报错）
+Write-Host "  [4/4] 重新绑定远程仓库 origin 并准备推送..." -ForegroundColor Green
+$originUrl = "https://github.com/shiro1888/campus-autologin.git"
+$remotes = Invoke-Git @('remote') -AllowFail
+if ($remotes -contains 'origin') {
+    Invoke-Git @('remote', 'set-url', 'origin', $originUrl)
+} else {
+    Invoke-Git @('remote', 'add', 'origin', $originUrl)
 }
 
-# 6. 远程推送
-Write-Host "  [4/4] 准备强制推送到远程 GitHub 仓库..." -ForegroundColor Green
+# 7. 远程推送
 if ($ForcePush) {
     Write-Host "  正在推送分支与标签..." -ForegroundColor Yellow
-    git push origin --force --all
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "  [错误] 强制推送分支失败，退出码: $LASTEXITCODE" -ForegroundColor Red
-        exit $LASTEXITCODE
-    }
-    git push origin --force --tags
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "  [错误] 强制推送标签失败，退出码: $LASTEXITCODE" -ForegroundColor Red
-        exit $LASTEXITCODE
-    }
+    Invoke-Git @('push', 'origin', '--force', '--all')
+    Invoke-Git @('push', 'origin', '--force', '--tags')
     Write-Host "  [完成] 远程 Git 历史已彻底更新并覆盖。" -ForegroundColor Green
 } else {
     Write-Host ""
-    Write-Host "  本地历史已完成清洗并通过自检！请执行以下命令完成强制推送:" -ForegroundColor Cyan
+    Write-Host "  本地历史已完成清洗并通过全量自检！请执行以下命令完成强制推送:" -ForegroundColor Cyan
     Write-Host "      git push origin --force --all" -ForegroundColor White
     Write-Host "      git push origin --force --tags" -ForegroundColor White
     Write-Host ""
