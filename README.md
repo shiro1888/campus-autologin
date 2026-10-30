@@ -10,7 +10,7 @@
 | **② Chrome 插件** | 日常用浏览器上网 | 后台定时检测，掉线自动重连 |
 
 > **首次使用请先填账号密码**：Python 脚本请复制 `config.example.json` 为 `config.json` 并填入自己的账号密码；
-> Chrome 插件请在插件设置页里填写。源码与模板中都**不含任何真实凭据**，请勿把自己的密码提交进仓库。
+> Chrome 插件请在插件设置页里填写。当前版本源码与模板中已剔除所有真实凭据，请勿把包含自己真实密码的配置文件提交进仓库。
 
 ---
 
@@ -27,6 +27,7 @@ campus-autologin/
 ├── uninstall_autostart.bat ← 双击自动提权卸载计划任务
 ├── install_autostart.ps1   ← PowerShell 计划任务配置脚本
 ├── reload_extension.bat    ← 改完插件代码后，一键打开扩展页刷新
+├── tests/                  ← 自动化单元测试套件（python -m unittest）
 ├── chrome-extension/       ← Chrome 浏览器插件
 │   ├── manifest.json
 │   ├── background.js
@@ -215,6 +216,18 @@ dr1002({"result":1,"uid":"13800000000","v4ip":"10.0.0.100",...});
 - `result: 0` → 失败，`msga` 字段给出原因（`userid error1` 账号不存在、`userid error2` 密码错误）
 
 脚本会**先查状态再决定是否登录**，避免把已经正常的网络踢下线。
+
+---
+
+## 自动化测试
+
+项目内置完整的标准单元测试套件（基于 Python `unittest`，零第三方依赖）：
+
+```powershell
+python -m unittest discover tests -v
+```
+
+包含状态机三态容错解析、CLI 56 显示列垂直对齐、代理直连隔离保护、命令行边界钳位以及 Chrome 扩展 DOM 契约测试。
 
 ---
 

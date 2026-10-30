@@ -11,6 +11,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+try {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    [Console]::InputEncoding = [System.Text.Encoding]::UTF8
+} catch {}
 $here = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $target = Join-Path $here "autostart.bat"
 
@@ -54,15 +58,15 @@ Write-Ok "找到启动脚本: $target"
 # --- 2. 检查 Python ---
 $py = $null
 foreach ($c in @("py", "python")) {
-    $cmd = Get-Command $c -ErrorAction SilentlyContinue
-    if ($cmd) { $py = $cmd.Source; break }
+    $cmds = Get-Command $c -All -ErrorAction SilentlyContinue
+    foreach ($m in $cmds) { if ($m.Source -and ($m.Source -notlike "*\WindowsApps\*") -and ((Get-Item $m.Source -ErrorAction SilentlyContinue).Length -gt 0)) { $py = $m.Source; break } }; if ($py) { break }
 }
 if (-not $py) {
     Write-Host "  [错误] 没有检测到 Python，请先安装 Python 3 并勾选 Add to PATH。" -ForegroundColor Red
     exit 1
 }
 Write-Ok "Python: $py"
-try { Set-Content -Path (Join-Path $here ".python_path") -Value $py -Encoding Ascii -ErrorAction SilentlyContinue } catch {}
+try { Set-Content -Path (Join-Path $here ".python_path") -Value $py -Encoding UTF8 -ErrorAction SilentlyContinue } catch {}
 
 # --- 2.5 先确认已填账号密码 ---
 # 计划任务开机跑的是 `campus_login.py wait`，未在线时会真的发起认证。

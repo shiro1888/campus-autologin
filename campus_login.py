@@ -217,6 +217,24 @@ def _declared_charset(headers) -> str | None:
         return None
 
 
+class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """安全重定向处理器：绝不跟随跨域或跨主机的跳转，防止认证参数/密码被重定向泄露。"""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        orig_netloc = urllib.parse.urlparse(req.full_url).netloc
+        new_netloc = urllib.parse.urlparse(newurl).netloc
+        if orig_netloc and new_netloc and orig_netloc != new_netloc:
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+# 校园网认证网关（172.30.100.2）属于内网私有地址，绝不走系统 HTTP/HTTPS 代理
+# ProxyHandler({}) 强制直连，防止 Clash 等系统代理误劫持内网请求
+_DIRECT_OPENER = urllib.request.build_opener(
+    urllib.request.ProxyHandler({}),
+    SafeRedirectHandler()
+)
+
+
 def http_request(url: str, timeout: float, data: dict | None = None) -> tuple[int, str]:
     """发起 HTTP 请求；data 不为空时使用 POST，否则 GET。返回 (状态码, 文本)。"""
     body = urllib.parse.urlencode(data).encode("utf-8") if data else None
@@ -226,7 +244,7 @@ def http_request(url: str, timeout: float, data: dict | None = None) -> tuple[in
     if body:
         req.add_header("Content-Type", "application/x-www-form-urlencoded")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _DIRECT_OPENER.open(req, timeout=timeout) as resp:
             return resp.getcode(), decode_body(resp.read(), _declared_charset(resp.headers))
     except urllib.error.HTTPError as exc:
         return exc.code, decode_body(exc.read() or b"", _declared_charset(getattr(exc, "headers", None)))
@@ -487,6 +505,7 @@ class Portal:
             "jsVersion": self.js_version,
         }
         detail = []
+        # 无条件依次向两个注销端点发起下线请求（与 JS 版扩展行为一致，确保 ePortal 兜底生效）
         for url in (
             self.web_base + "/drcom/logout",
             self.ep_base + "/eportal/?c=ACSetting&a=Logout&ver=1.0&url=drappal",
@@ -507,23 +526,25 @@ class Portal:
                 ok = "Logout success" in text
                 resp = {"snippet": " ".join(text.split())[:120]}
             detail.append({"url": url, "http": code, "ok": ok, "raw": resp})
-            if ok:
-                # 内核异步处理，给它一点时间确认下线
-                for _ in range(5):
-                    time.sleep(1)
-                    state = self.check_online_state()
-                    if state == "offline":
-                        return {"ok": True, "detail": detail, "offline": True, "state": "offline"}
-                    elif state == "unknown":
-                        # 网络异常，无法确认真实下线状态（避免假成功误报）
-                        return {
-                            "ok": True,
-                            "detail": detail,
-                            "offline": False,
-                            "state": "unknown",
-                            "message": "网络异常，无法确认注销结果，请稍后复查",
-                        }
-                return {"ok": True, "detail": detail, "offline": False, "state": "online"}
+
+        # 若至少有一个端点返回了注销成功标识，进入 5 秒复核循环确认是否真正下线
+        any_ok = any(d.get("ok") for d in detail)
+        if any_ok:
+            for _ in range(5):
+                time.sleep(1)
+                state = self.check_online_state()
+                if state == "offline":
+                    return {"ok": True, "detail": detail, "offline": True, "state": "offline"}
+                elif state == "unknown":
+                    # 网络异常，无法确认真实下线状态（避免假成功误报）
+                    return {
+                        "ok": True,
+                        "detail": detail,
+                        "offline": False,
+                        "state": "unknown",
+                        "message": "网络异常，无法确认注销结果，请稍后复查",
+                    }
+            return {"ok": True, "detail": detail, "offline": False, "state": "online"}
         return {"ok": False, "detail": detail, "offline": False, "state": "unknown"}
 
 
@@ -768,18 +789,19 @@ def cmd_login(args, cfg) -> int:
 
     # 这两个值来自用户手写的 config.json，类型不对或超界时规范化，避免负数延时崩溃或无限挂起
     try:
-        retry = max(1, min(10, int(cfg.get("retry", 3))))
+        retry = max(0, min(10, int(cfg.get("retry", 3))))
         delay = max(0.0, min(3600.0, float(cfg.get("retry_delay", 3))))
     except (TypeError, ValueError):
         raise ConfigError("retry / retry_delay 必须是数字，请检查 config.json")
     if args.retry is not None:
         if args.retry < 0 or args.retry > 10:
             raise ConfigError("--retry 必须在 0 到 10 之间")
-        retry = max(1, args.retry)
+        retry = args.retry
+    max_attempts = 1 + retry
     last = {}
-    for attempt in range(1, retry + 1):
-        if retry > 1:
-            say("→ 正在登录 (第 %d/%d 次)..." % (attempt, retry))
+    for attempt in range(1, max_attempts + 1):
+        if max_attempts > 1:
+            say("→ 正在登录 (第 %d/%d 次)..." % (attempt, max_attempts))
         else:
             say("→ 正在登录...")
         try:
@@ -827,7 +849,7 @@ def cmd_login(args, cfg) -> int:
             low_msg = resp["message"].lower()
             if any(k in resp["message"] or k in low_msg for k in ("账号", "密码", "锁定", "停机", "已经在线", "客户端版本过低", "禁止使用", "时段", "禁止上网", "password error", "userid error", "out of service")):
                 break
-        if attempt < retry:
+        if attempt < max_attempts:
             time.sleep(delay)
 
     if args.json:
@@ -841,7 +863,11 @@ def cmd_logout(args, cfg) -> int:
     portal = _make_portal(args, cfg, require_credentials=False)
 
     # 执行注销前进行二次确认，防止手滑断网（可用 -y 或 --yes 跳过）
-    if not getattr(args, "yes", False) and not args.json and not _QUIET:
+    has_yes = getattr(args, "yes", False)
+    if not has_yes and not args.json:
+        if _QUIET:
+            say_err("✗ 静默模式下注销必须携带 -y / --yes 参数确认注销。")
+            return EXIT_CONFIG
         try:
             ans = input("确定要注销下线当前校园网会话吗？(y/N): ").strip().lower()
             if ans not in ("y", "yes"):

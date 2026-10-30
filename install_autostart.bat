@@ -1,5 +1,5 @@
 @echo off
-chcp 936 >nul
+chcp 65001 >nul
 title Campus AutoLogin - Install AutoStart
 cd /d "%~dp0"
 
@@ -17,7 +17,7 @@ if %errorlevel% neq 0 (
     echo   Admin privileges required.
     echo   Requesting UAC elevation...
     echo.
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process cmd.exe -ArgumentList ('/c \"\"' + '%SAFE_BAT%' + '\"\"') -Verb RunAs"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Start-Process cmd.exe -ArgumentList ('/c \"\"' + '%SAFE_BAT%' + '\"\"') -Verb RunAs -Wait -PassThru; exit $p.ExitCode"
     exit /b
 )
 

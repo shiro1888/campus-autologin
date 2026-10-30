@@ -506,16 +506,25 @@ async function doLogin(settings) {
  * 重要：注销成功后必须置上 manualLogout 抑制标志。否则下一次后台巡检
  * （掉线间隔默认 1 秒）会立刻把用户重新认证上网，「注销」形同虚设。
  */
-async function doLogout() {
-  if (activeAuthOp && activeAuthOp !== 'logout') {
-    return fail(`正在进行${activeAuthOp === 'login' ? '登录认证' : '网络操作'}，已跳过本次注销`, false);
+async function doLogout(force = false) {
+  // 用户明确注销：第一时间落盘 manualLogout=true，令在途的 autoLogin 及时止步并尊重注销意图
+  await setState({ manualLogout: true, unreachableStreak: 0 });
+  unreachableStreak = 0;
+
+  if (!force && activeAuthOp && activeAuthOp !== 'logout') {
+    // 稍等正在处理中的请求完成（最多 1.5 秒）
+    const t0 = Date.now();
+    while (activeAuthOp && activeAuthOp !== 'logout' && Date.now() - t0 < 1500) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
   }
+  const prevOp = activeAuthOp;
   activeAuthOp = 'logout';
   running = true;
   try {
     return await _doLogoutInternal();
   } finally {
-    activeAuthOp = null;
+    activeAuthOp = (force && prevOp === 'login') ? prevOp : null;
     running = false;
   }
 }
@@ -794,7 +803,7 @@ async function autoLogin(trigger, manual) {
     //   其实还在计费上网，且插件自认为暂停、不会再纠正。
     if ((await getSettings()).manualLogout) {
       console.log(tag + '登录期间用户已注销，补发注销以尊重用户意图');
-      const lr = await doLogout();
+      const lr = await _doLogoutInternal();
       await saveResult(lr);
       return lr;
     }

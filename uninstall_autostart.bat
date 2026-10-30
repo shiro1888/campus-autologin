@@ -1,5 +1,5 @@
 @echo off
-chcp 936 >nul
+chcp 65001 >nul
 title Campus AutoLogin - Uninstall AutoStart
 cd /d "%~dp0"
 
@@ -11,7 +11,7 @@ net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo.
     echo   Admin privileges required to uninstall...
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process cmd.exe -ArgumentList ('/c \"\"' + '%SAFE_BAT%' + '\"\"') -Verb RunAs"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Start-Process cmd.exe -ArgumentList ('/c \"\"' + '%SAFE_BAT%' + '\"\"') -Verb RunAs -Wait -PassThru; exit $p.ExitCode"
     exit /b
 )
 
