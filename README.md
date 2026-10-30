@@ -27,6 +27,7 @@ campus-autologin/
 ├── uninstall_autostart.bat ← 双击自动提权卸载计划任务
 ├── install_autostart.ps1   ← PowerShell 计划任务配置脚本
 ├── reload_extension.bat    ← 改完插件代码后，一键打开扩展页刷新
+├── clean_history.ps1       ← Git 历史敏感凭据彻底脱敏与重写工具
 ├── tests/                  ← 自动化单元测试套件（python -m unittest）
 ├── chrome-extension/       ← Chrome 浏览器插件
 │   ├── manifest.json
@@ -256,7 +257,10 @@ python -m unittest discover tests -v
 `config.json`（本地配置）和 Chrome 插件里保存了你的校园网密码（明文）。请注意：
 
 - `config.json` 已被 `.gitignore` 忽略，请**切勿使用 `git add -f` 强制提交**到 Git 仓库。
-- **密码泄露应急处理**：若曾不慎将含密码的文件推送到 Git 远程仓库，最快、最彻底的消除隐患方式是**立即登录学校校园网自助服务网站修改一次密码**。新密码生效后旧密码立刻在网关端作废。
+- **历史凭据处置与安全公告**：
+  - 本项目早期提交历史中（commit `c4b665d` 至 `8c7d7c8` 期间）曾包含测试使用的真实账号与初始密码。虽然当前 HEAD 分支的全部工程文件与模板均已剔除并完成脱敏，但旧 commit 对象在 Git 历史中仍可索引。
+  - **根本防御措施**：请**立即前往学校校园网自助服务网站修改一次密码**，旧密码在网关端将永久作废。
+  - **Git 历史重写清洗**：项目根目录已附带清洗脚本 `clean_history.ps1`，安装 `pip install git-filter-repo` 后，运行 `powershell -File clean_history.ps1 -ForcePush` 即可利用 `--replace-text` 彻底抹去全部分支历史中的账号、密码文本与 `config.json`。
 - **请勿使用错误密码高频测试**：真实校园网 Dr.COM AC 网关普遍内置防暴力破解策略，短时间内若连续收到错误密码可能会触发 IP 或账号封禁（15~30 分钟），导致暂时断网。
 - 不要把本工程目录直接打包上传公共网盘或发给他人（Chrome 插件设置及本地配置均包含个人凭据）。
 - 公用电脑（如机房、实验室）使用完毕后，建议立即删除 `config.json` 并清空插件内保存的凭据。

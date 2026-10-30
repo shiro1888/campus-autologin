@@ -826,9 +826,13 @@ def cmd_login(args, cfg) -> int:
                 return EXIT_OK
 
             if resp["ok"]:
-                # 复核一次，确认真的上线
-                time.sleep(1)
-                verified = portal.is_online()
+                # 网关认证接口为异步处理，轮询最多 3 次（每次间隔 1 秒）复核是否真正上线，避免延迟假阴性
+                verified = False
+                for _ in range(3):
+                    time.sleep(1)
+                    if portal.is_online():
+                        verified = True
+                        break
                 if args.json:
                     emit_json({
                         "action": "login", "success": verified, "already_online": False,

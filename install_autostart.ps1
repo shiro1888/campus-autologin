@@ -35,13 +35,13 @@ if (-not $isAdmin) {
 }
 
 $taskNameFile = Join-Path $here ".task_name"
+if (-not $PSBoundParameters.ContainsKey('TaskName') -and (Test-Path $taskNameFile)) {
+    try {
+        $savedTask = (Get-Content $taskNameFile -Raw -Encoding UTF8).Trim()
+        if ($savedTask) { $TaskName = $savedTask }
+    } catch {}
+}
 if ($Uninstall) {
-    if (-not $PSBoundParameters.ContainsKey('TaskName') -and (Test-Path $taskNameFile)) {
-        try {
-            $savedTask = (Get-Content $taskNameFile -Raw -Encoding UTF8).Trim()
-            if ($savedTask) { $TaskName = $savedTask }
-        } catch {}
-    }
     $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
     if ($existing) {
         Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false

@@ -507,20 +507,25 @@ async function doLogin(settings) {
  * （掉线间隔默认 1 秒）会立刻把用户重新认证上网，「注销」形同虚设。
  */
 async function doLogout() {
+  const prevSettings = await getSettings();
+  const prevManualLogout = Boolean(prevSettings.manualLogout);
+
   // 用户明确注销：第一时间落盘 manualLogout=true，令在途的 autoLogin 主动让出
   await setState({ manualLogout: true, unreachableStreak: 0 });
   unreachableStreak = 0;
 
   // 若当前有登录认证在进行中，等待登录检测到 manualLogout 后主动让出退出（最多等待 3 秒）
-  if (activeAuthOp === 'login') {
+  if (activeAuthOp) {
     const t0 = Date.now();
-    while (activeAuthOp === 'login' && Date.now() - t0 < 3000) {
+    while (activeAuthOp && activeAuthOp !== 'logout' && Date.now() - t0 < 3000) {
       await new Promise((r) => setTimeout(r, 50));
     }
   }
 
   if (activeAuthOp && activeAuthOp !== 'logout') {
-    return fail(`正在进行${activeAuthOp === 'login' ? '登录认证' : '网络操作'}，已跳过本次注销`, false);
+    // 抢锁超时（例如内容脚本持续占用）：回滚 manualLogout，避免未注销时误将守护置为暂停态
+    await setState({ manualLogout: prevManualLogout });
+    return fail(`当前正在进行${activeAuthOp === 'content' ? '页面认证' : '网络操作'}，注销已跳过，请稍后重试`, false);
   }
 
   activeAuthOp = 'logout';

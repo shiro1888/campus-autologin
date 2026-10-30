@@ -54,7 +54,7 @@ class TestCardFormatting(unittest.TestCase):
             _card_line("        校园网自动登录 · Dr.COM ePortal"),
             "├" + bar + "┤",
             _card_line("状态:      ● 已在线 (认证通过)"),
-            _card_line("账号:      REDACTED_CAMPUS_ACCOUNT"),
+            _card_line("账号:      13800000000"),
             _card_line("本机 IP:   10.102.5.222"),
             _card_line("在线时长:  1小时 27分 05秒"),
             _card_line("已用流量:  3.11 GB (↓2.11 GB ↑1.16 GB)"),
