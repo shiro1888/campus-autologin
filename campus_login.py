@@ -283,8 +283,13 @@ def _parse_result(val) -> int:
         except (ValueError, OverflowError):
             return 0
     s = str(val).strip().lower()
-    if s in ("1", "ok", "true", "success"):
+    if s in ("1", "1.0", "ok", "true", "success"):
         return 1
+    try:
+        if float(s) == 1.0:
+            return 1
+    except (ValueError, OverflowError):
+        pass
     return 0
 
 
