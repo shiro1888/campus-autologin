@@ -19,6 +19,11 @@ function setStatus(title, desc, cls) {
     av.className = 'avatar-beacon ' + (cls === 'on' ? 'on' : (cls === 'wait' ? 'wait' : 'off'));
   }
 
+  const statePill = $('statusStatePill');
+  if (statePill) {
+    statePill.textContent = cls === 'on' ? '已认证 ✓' : (cls === 'wait' ? '待认证' : '离线');
+  }
+
   const titleEl = $('statusTitle');
   const descEl = $('statusDesc');
 
@@ -293,12 +298,26 @@ function refresh() {
     const flowWrap = $('flowBarWrap');
     const flowDl = $('flowBarDl');
     const flowUl = $('flowBarUl');
+    const flowSub = $('popFlowSub');
 
     if (rawData.flow !== undefined) {
       $('popFlow').textContent = fmtFlow(rawData.flow);
       const dl = parseFloat(rawData.actdf) || 0;
       const ul = parseFloat(rawData.actuf) || 0;
       const total = dl + ul;
+
+      if (flowSub) {
+        if (rawData.fee !== undefined && Number.isFinite(parseFloat(rawData.fee))) {
+          flowSub.textContent = '¥' + (parseFloat(rawData.fee) / 10000).toFixed(0);
+          flowSub.classList.add('visible');
+        } else if (total > 0) {
+          const dlPct = Math.round((dl / total) * 100);
+          flowSub.textContent = `↓${dlPct}%`;
+          flowSub.classList.add('visible');
+        } else {
+          flowSub.classList.remove('visible');
+        }
+      }
 
       if (total > 0 && flowDl && flowUl && flowWrap) {
         const dlPct = Math.max(6, Math.min(94, Math.round((dl / total) * 100)));
@@ -314,6 +333,7 @@ function refresh() {
     } else {
       $('popFlow').textContent = res.online ? '计量中' : '—';
       if (flowWrap) flowWrap.style.display = 'none';
+      if (flowSub) flowSub.classList.remove('visible');
     }
 
     if (!res.reachable) {
@@ -327,7 +347,7 @@ function refresh() {
       $('btnLoginText').textContent = paused ? '恢复登录' : '立即登录';
       $('btnLogout').disabled = true;
     } else if (res.online) {
-      setStatus('已在线 · 认证通过', '', 'on');
+      setStatus('已在线 · 认证通过', 'Dr.COM ePortal · 互联网已放行', 'on');
       $('btnLogin').classList.add('online-mode');
       $('btnLoginText').textContent = '刷新状态';
       $('btnLogout').disabled = false;
@@ -624,6 +644,74 @@ $('openOptions').addEventListener('click', (e) => {
   chrome.runtime.openOptionsPage();
   window.close();
 });
+
+// --- 点击运营商徽章快捷轮换 ISP (校园 -> 电信 -> 联通 -> 其他) ---
+const accountIspEl = $('accountIsp');
+if (accountIspEl) {
+  const cycleIsp = (e) => {
+    e.stopPropagation();
+    const order = ['1', '2', '3', '4'];
+    const shortMap = { '1': '校园', '2': '电信', '3': '联通', '4': '其他' };
+    const fullMap = { '1': '校园用户 (默认)', '2': '校园电信 (@dx)', '3': '校园联通 (@lt)', '4': '校园其他' };
+    chrome.storage.local.get({ isp: '1' }, (s) => {
+      const cur = (s && order.includes(String(s.isp))) ? String(s.isp) : '1';
+      const next = order[(order.indexOf(cur) + 1) % order.length];
+      chrome.storage.local.set({ isp: next, authError: false }, () => {
+        accountIspEl.textContent = shortMap[next];
+        accountIspEl.title = '认证运营商: ' + fullMap[next] + ' (点击可快捷切换)';
+        chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => {
+          void chrome.runtime.lastError;
+        });
+        setMsg('已切换运营商: ' + fullMap[next], 'ok', 2000);
+      });
+    });
+  };
+  accountIspEl.addEventListener('click', cycleIsp);
+  accountIspEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      cycleIsp(e);
+    }
+  });
+}
+
+// --- 底部栏：一键复制网络诊断报告 ---
+const btnPopDiag = $('btnPopCopyDiag');
+if (btnPopDiag) {
+  btnPopDiag.addEventListener('click', (e) => {
+    e.preventDefault();
+    const diagTextEl = $('popCopyDiagText');
+    const stTitle = $('statusTitle') ? $('statusTitle').textContent : '未知';
+    const ipVal = $('localIp') ? $('localIp').textContent : '—';
+    const durVal = $('onlineDuration') ? $('onlineDuration').textContent : '—';
+    const flowVal = $('popFlow') ? $('popFlow').textContent : '—';
+    const pingVal = $('popPing') ? $('popPing').textContent : '—';
+    const ispVal = $('accountIsp') ? $('accountIsp').textContent : '校园';
+    const accShown = currentAccount ? (isMasked ? maskAccount(currentAccount) : currentAccount) : '未设置';
+
+    const report = [
+      '=== 校园网自动登录 · 快速诊断 ===',
+      `时间: ${new Date().toLocaleString('zh-CN', { hour12: false })}`,
+      `状态: ${stTitle}`,
+      `本机 IP: ${ipVal}`,
+      `网关延迟: ${pingVal}`,
+      `在线时长: ${durVal}`,
+      `已用流量: ${flowVal}`,
+      `认证账号: ${accShown} (${ispVal})`,
+      '================================='
+    ].join('\n');
+
+    navigator.clipboard.writeText(report).then(() => {
+      if (diagTextEl) {
+        diagTextEl.textContent = '已复制 ✓';
+        setTimeout(() => { diagTextEl.textContent = '复制诊断'; }, 1800);
+      }
+      setMsg('诊断报告已复制到剪贴板', 'ok', 1800);
+    }).catch(() => {
+      setMsg('复制失败，请检查剪贴板权限', 'err', 2000);
+    });
+  });
+}
 
 // --- 同步设置页选择的主题 ---
 function applyPopupTheme(theme) {

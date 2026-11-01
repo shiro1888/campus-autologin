@@ -1198,6 +1198,30 @@ def cmd_gui(args, cfg) -> int:
     title.pack(side="left")
     ver_badge = tk.Label(head_top, text=" v1.0.0 ", font=FONTS["small"], fg=THEME["info"], bg=THEME["card"], padx=5, pady=1)
     ver_badge.pack(side="left", padx=(8, 0), pady=(3, 0))
+
+    def do_open_portal():
+        try:
+            import webbrowser
+            portal_host = str(cfg.get("portal_host", "172.30.100.2")).strip() or "172.30.100.2"
+            webbrowser.open("http://%s/" % portal_host)
+        except Exception:
+            pass
+
+    btn_open_portal = tk.Button(
+        head_top,
+        text="网页门户 ↗",
+        font=FONTS["small"],
+        bg=THEME["card"],
+        fg=THEME["text_muted"],
+        activebackground=THEME["border"],
+        activeforeground=THEME["text"],
+        relief="flat",
+        cursor="hand2",
+        padx=8,
+        pady=2,
+        command=do_open_portal,
+    )
+    btn_open_portal.pack(side="right", pady=(2, 0))
     sub = tk.Label(head, text="Dr.COM ePortal · 实时自动刷新 (30s) · F5 刷新 / Ctrl+S 保存", font=FONTS["body"], fg=THEME["text_muted"], bg=THEME["bg"])
     sub.pack(anchor="w", pady=(2, 0))
 

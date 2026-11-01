@@ -215,9 +215,12 @@
           <div class="stat-badge gray">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           </div>
-          <span>上次检查响应</span>
+          <span>上次检查响应与保活策略</span>
         </div>
-        <div class="stat-val note" id="stLast">—</div>
+        <div class="stat-log-group">
+          <div class="stat-val note" id="stLast">—</div>
+          <span class="stat-policy-pill" id="stPolicyPill" title="当前生效的后台保活巡检策略">⚡ 自适应保活 · 10秒 / 1秒</span>
+        </div>
       </div>
     </div>
   </section>
@@ -282,6 +285,24 @@
 
           <div class="field">
             <label for="isp">运营商选择 (R3 认证参数)</label>
+            <div class="isp-quick-pills" id="ispQuickPills" role="radiogroup" aria-label="运营商快捷选择">
+              <button type="button" class="isp-pill active" data-isp="1">
+                <span class="isp-pill-name">校园用户</span>
+                <span class="isp-pill-tag">默认</span>
+              </button>
+              <button type="button" class="isp-pill" data-isp="2">
+                <span class="isp-pill-name">校园电信</span>
+                <span class="isp-pill-tag mono">@dx</span>
+              </button>
+              <button type="button" class="isp-pill" data-isp="3">
+                <span class="isp-pill-name">校园联通</span>
+                <span class="isp-pill-tag mono">@lt</span>
+              </button>
+              <button type="button" class="isp-pill" data-isp="4">
+                <span class="isp-pill-name">校园其他</span>
+                <span class="isp-pill-tag">无后缀</span>
+              </button>
+            </div>
             <div class="select-wrap">
               <select id="isp">
                 <option value="1">校园用户（默认，无后缀）</option>
@@ -319,6 +340,7 @@
                 <span>自适应加速 (Adaptive Turbo)</span>
                 <span class="badge-success">极速秒级恢复</span>
               </div>
+              <p class="switch-desc">在线时低频省电巡检，侦测断网瞬间切换秒级高频抢修</p>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" id="adaptive">
@@ -388,6 +410,7 @@
                 <span>断网跳转瞬间重连 (Instant Trigger)</span>
                 <span class="badge-primary">0秒响应 · 推荐</span>
               </div>
+              <p class="switch-desc">拦截门户重定向并立即唤醒后台静默重连，免等待轮询</p>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" id="instantTrigger">
@@ -404,6 +427,7 @@
                 <span>浏览器启动时自动登录</span>
                 <span class="badge-neutral">静默自启</span>
               </div>
+              <p class="switch-desc">启动浏览器时自动检测校园网状态并在后台完成认证</p>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" id="autoOnStartup">
@@ -420,6 +444,7 @@
                 <span>校园网门户页面自动填单并提交</span>
                 <span class="badge-neutral">内容脚本</span>
               </div>
+              <p class="switch-desc">打开 172.30.100.2 门户网页时自动填充凭据并提交</p>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" id="contentAutoFill">
@@ -453,6 +478,7 @@
       </div>
 
       <div class="dock-right">
+        <span class="dock-sync-pill" id="dockSyncStatus">✓ 配置已实时同步</span>
         <button type="submit" class="btn-main dock-btn-main" id="btnSave">
           <span class="btn-shimmer"></span>
           <svg class="btn-spinner" id="saveSpinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>

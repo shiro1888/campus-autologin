@@ -532,6 +532,7 @@ function load() {
     const storedIsp = typeof s.isp === 'string' ? s.isp : String(s.isp || '1');
     $('isp').value = ['1', '2', '3', '4'].indexOf(storedIsp) !== -1 ? storedIsp : '1';
     syncCustomSelect('isp');
+    syncIspQuickPills();
 
     pickClosest('intervalMin', s.intervalMin === undefined ? DEFAULTS.intervalMin : s.intervalMin);
     pickClosest('offlineIntervalMin', s.offlineIntervalMin === undefined ? DEFAULTS.offlineIntervalMin : s.offlineIntervalMin);
@@ -541,9 +542,57 @@ function load() {
     $('contentAutoFill').checked = s.contentAutoFill !== false;
     $('instantTrigger').checked = s.instantTrigger !== false;
     syncOfflineRow();
+    updatePolicySummaryPill();
+    setDirtyState(false);
   });
 
   refreshStatus();
+}
+
+/** 同步运营商快捷胶囊按钮高亮状态 */
+function syncIspQuickPills() {
+  const wrap = $('ispQuickPills');
+  const sel = $('isp');
+  if (!wrap || !sel) return;
+  const cur = sel.value || '1';
+  wrap.querySelectorAll('.isp-pill').forEach((btn) => {
+    const active = btn.getAttribute('data-isp') === cur;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-checked', active ? 'true' : 'false');
+  });
+}
+
+function initIspQuickPills() {
+  const wrap = $('ispQuickPills');
+  const sel = $('isp');
+  if (!wrap || !sel) return;
+  wrap.addEventListener('click', (e) => {
+    const btn = e.target.closest('.isp-pill');
+    if (!btn) return;
+    const ispVal = btn.getAttribute('data-isp');
+    if (ispVal && sel.value !== ispVal) {
+      sel.value = ispVal;
+      syncCustomSelect('isp');
+      syncIspQuickPills();
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+}
+
+/** 实时更新 Hero 区域保活策略摘要胶囊 */
+function updatePolicySummaryPill() {
+  const pill = $('stPolicyPill');
+  if (!pill) return;
+  const isAdaptive = $('adaptive') ? $('adaptive').checked : true;
+  const iv = fmt($('intervalMin') ? $('intervalMin').value : DEFAULTS.intervalMin).replace(/\s+/g, '');
+  const off = fmt($('offlineIntervalMin') ? $('offlineIntervalMin').value : DEFAULTS.offlineIntervalMin).replace(/\s+/g, '');
+  if (isAdaptive) {
+    pill.textContent = `⚡ 自适应保活 · 在线 ${iv} / 掉线 ${off}`;
+    pill.className = 'stat-policy-pill';
+  } else {
+    pill.textContent = `⏱ 常规轮询 · 每 ${iv}`;
+    pill.className = 'stat-policy-pill regular';
+  }
 }
 
 /** 在 select 里选中最接近给定值的项 */
@@ -582,13 +631,16 @@ function snapToPresetValue(id, value) {
   return best;
 }
 
-/** 自适应关闭时，隐藏「掉线重连间隔」 */
+/** 自适应关闭时，置灰「掉线重连间隔」（保持双列布局对称不坍塌） */
 function syncOfflineRow() {
   const row = $('offlineRow');
+  if (!row) return;
   if ($('adaptive').checked) {
+    row.classList.remove('is-disabled');
     row.style.display = '';
   } else {
-    row.style.display = 'none';
+    row.classList.add('is-disabled');
+    row.style.display = '';
   }
 }
 
@@ -863,9 +915,23 @@ function readForm() {
  * 全新安装（凭据默认为空）的用户无论怎么点都存不上，而且调用方还会弹出
  * 「已自动保存」的成功提示，属于静默失败。凭据校验只放在「立即测试」那一步。
  */
+function setDirtyState(dirty) {
+  const btn = $('btnSave');
+  const syncPill = $('dockSyncStatus');
+  if (btn) {
+    btn.classList.toggle('has-changes', !!dirty);
+  }
+  if (syncPill) {
+    syncPill.classList.toggle('dirty', !!dirty);
+    syncPill.textContent = dirty ? '● 有未保存的凭据改动' : '✓ 配置已实时同步';
+  }
+}
+
 function save(cb) {
   chrome.storage.local.set(readForm(), () => {
-    $('btnSave').classList.remove('has-changes');
+    setDirtyState(false);
+    updatePolicySummaryPill();
+    syncIspQuickPills();
     chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => {
       void chrome.runtime.lastError;
       if (cb) cb(true);
@@ -881,7 +947,7 @@ function hasCredentials() {
 
 // --- 监听表单变更，实时提示未保存状态 ---
 ['input', 'change'].forEach((evt) => {
-  $('form').addEventListener(evt, () => $('btnSave').classList.add('has-changes'));
+  $('form').addEventListener(evt, () => setDirtyState(true));
 });
 
 // --- 保存并连接 ---
@@ -1377,6 +1443,7 @@ $('password')?.addEventListener('input', () => {
 
 $('adaptive').addEventListener('change', () => {
   syncOfflineRow();
+  updatePolicySummaryPill();
   save(() => {
     showToast($('adaptive').checked
       ? `已启用自适应重连加速（掉线重试：${fmt($('offlineIntervalMin').value)}）`
@@ -1387,6 +1454,8 @@ $('adaptive').addEventListener('change', () => {
 // --- 下拉框改动即时保存 ---
 ['intervalMin', 'offlineIntervalMin', 'isp'].forEach((id) => {
   $(id).addEventListener('change', () => {
+    if (id === 'isp') syncIspQuickPills();
+    updatePolicySummaryPill();
     save(() => showToast('参数已自动保存并生效。', 'ok'));
   });
 });
@@ -1394,6 +1463,7 @@ $('adaptive').addEventListener('change', () => {
 // --- 启动初始化 ---
 initTheme();
 initCustomSelects();
+initIspQuickPills();
 load();
 
 // 适配 macOS / Windows 键盘快捷键指示徽章

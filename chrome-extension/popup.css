@@ -709,13 +709,105 @@ body {
 }
 
 .status-desc {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   line-height: 1.35;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 1px;
+  margin-top: 2px;
+}
+
+.status-state-pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.25s ease;
+}
+
+.status-card.on .status-state-pill {
+  color: #059669;
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+[data-theme="dark"] .status-card.on .status-state-pill {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.status-card.wait .status-state-pill {
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+[data-theme="dark"] .status-card.wait .status-state-pill {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.status-card.off .status-state-pill {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="dark"] .status-card.off .status-state-pill {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.status-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  position: relative;
+  z-index: 2;
+}
+
+.gw-route-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-hairline);
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+.gw-route-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-light);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.status-card.on .gw-route-dot {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.status-card.wait .gw-route-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 6px #f59e0b;
+}
+
+.status-card.off .gw-route-dot {
+  background: #ef4444;
 }
 
 /* Warm IP Capsule Tag */
@@ -924,6 +1016,43 @@ body {
   border: 1px solid rgba(59, 130, 246, 0.25);
   margin-left: auto;
   line-height: 1.25;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s var(--ease-spring);
+}
+
+.isp-badge:hover {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: rgba(59, 130, 246, 0.45);
+  transform: scale(1.06);
+}
+
+.isp-badge:active {
+  transform: scale(0.94);
+}
+
+.flow-sub-tag {
+  font-size: 9px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #9333ea;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.22);
+  padding: 1px 5px;
+  border-radius: var(--radius-pill);
+  margin-left: auto;
+  line-height: 1.25;
+  display: none;
+}
+
+.flow-sub-tag.visible {
+  display: inline-block;
+}
+
+[data-theme="dark"] .flow-sub-tag {
+  color: #c084fc;
+  background: rgba(168, 85, 247, 0.18);
+  border-color: rgba(192, 132, 252, 0.3);
 }
 
 @media (prefers-color-scheme: dark) {
