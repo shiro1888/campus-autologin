@@ -489,25 +489,35 @@
           // 因此这里不需要（也无法）手工释放，更不会在用户浏览器里留残留。
           withLock(function () {
             return new Promise(function (resolveFlow) {
-              showHud('校园网自动登录：正在提交认证…', 'loading');
-              // 兜底：fillAndSubmit 内部任何未预期的 DOM 异常都不能让
-              // loading 态 HUD 永久挂在页面上（loading 态不会自动淡出）。
-              let submitted = false;
-              try {
-                submitted = fillAndSubmit(s.account, s.password, s.isp);
-              } catch (e) {
-                submitted = false;
-              }
-              if (!submitted) {
-                // 找不到登录按钮 / 点击异常。
-                // 注意：loading 态的 HUD 不会自动淡出（只有 success/error 才会），
-                // 所以这里必须显式收掉，否则页面顶部会永久挂着「正在提交认证…」。
-                hideHud();
-                resolveFlow();
-                return;
-              }
+              // 拿到锁后再复查一次在线状态：等待表单期间后台 alarm 可能已完成登录，
+              // 若此刻已在线就不要再提交表单（会把刚建立的会话踢下线）。
+              checkStatus().catch(function () { return false; }).then(function (alreadyOnline) {
+                if (alreadyOnline) {
+                  done = true;
+                  hideHud();
+                  report({ ok: true, online: true, message: '页面加载时已在线，无需登录' });
+                  resolveFlow();
+                  return;
+                }
+                showHud('校园网自动登录：正在提交认证…', 'loading');
+                // 兜底：fillAndSubmit 内部任何未预期的 DOM 异常都不能让
+                // loading 态 HUD 永久挂在页面上（loading 态不会自动淡出）。
+                let submitted = false;
+                try {
+                  submitted = fillAndSubmit(s.account, s.password, s.isp);
+                } catch (e) {
+                  submitted = false;
+                }
+                if (!submitted) {
+                  // 找不到登录按钮 / 点击异常。
+                  // 注意：loading 态的 HUD 不会自动淡出（只有 success/error 才会），
+                  // 所以这里必须显式收掉，否则页面顶部会永久挂着「正在提交认证…」。
+                  hideHud();
+                  resolveFlow();
+                  return;
+                }
 
-              report({ ok: false, state: 'submitted', online: false, message: '已自动填写并提交登录表单，等待网关响应…' });
+                report({ ok: false, state: 'submitted', online: false, message: '已自动填写并提交登录表单，等待网关响应…' });
 
               // 兜底：5.0 秒后仍未上线且无明确错误，再用同源 fetch 尝试一次
               setTimeout(function () {
@@ -570,6 +580,7 @@
                   resolveFlow();
                 });
               }, 5000);
+              });
             });
           });
         });

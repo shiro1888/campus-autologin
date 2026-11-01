@@ -23,7 +23,7 @@
   --json          以 JSON 输出结果(供程序调用)
   -q, --quiet     静默模式, 只在失败时输出
   --user NAME     临时覆盖账号
-  --pass PWD      临时覆盖密码
+  --password PWD  临时覆盖密码
   --retry N       失败重试次数(默认取 config.json)
   --timeout N     单次请求超时秒数(默认取 config.json)
 
@@ -417,6 +417,15 @@ class Portal:
             return self._normalize_login(text, code)
         except NetworkError as exc:
             errors.append("GET: %s" % exc)
+            # GET /drcom/login 本身就是认证动作。NetworkError 无法区分「请求未送达」
+            # 与「认证已生效但响应超时/被重置」。若此刻已在线，说明 GET 实际已认证成功，
+            # 绝不能再用 POST 二次认证 —— 会把刚建立的在线会话踢下线。
+            try:
+                if self.is_online():
+                    return {"ok": True, "message": "该 IP 已经在线，无需重复登录",
+                            "format": "jsonp", "http": 0, "raw": {}}
+            except (NetworkError, TypeError, ValueError):
+                pass
 
         # 备通道: POST(部分固件只认 POST)
         params = dict(payload)
@@ -437,8 +446,9 @@ class Portal:
         except NetworkError:
             data = None
         if isinstance(data, dict):
-            result = str(data.get("result", ""))
-            ok = result in ("1", "ok")
+            # 与状态机 _parse_result 保持一致：容错 1/"1"/"ok"/"OK"/true 等，
+            # 避免门户返回 "OK" 等变体时被误判为失败并触发重试（进而重复认证）。
+            ok = _parse_result(data.get("result")) == 1
             raw_msg = str(data.get("msga") or data.get("msg") or "").strip()
             return {
                 "ok": ok,
@@ -802,6 +812,20 @@ def cmd_login(args, cfg) -> int:
     max_attempts = 1 + retry
     last = {}
     for attempt in range(1, max_attempts + 1):
+        # 重试前复查在线状态：上一次尝试可能已让门户接受认证（响应超时/被重置时无法确认），
+        # 若此刻已在线就绝不能再发起重复认证去踢掉刚建立的会话。
+        if attempt > 1:
+            try:
+                if portal.is_online():
+                    if args.json:
+                        emit_json({"action": "login", "success": True, "already_online": True,
+                                   "verified": True, "account": user})
+                    else:
+                        say("● 该 IP 已经在线，无需重复登录。")
+                        say("  账号: %s" % user)
+                    return EXIT_OK
+            except (NetworkError, TypeError, ValueError):
+                pass
         if max_attempts > 1:
             say("→ 正在登录 (第 %d/%d 次)..." % (attempt, max_attempts))
         else:
@@ -853,7 +877,7 @@ def cmd_login(args, cfg) -> int:
             # 「客户端版本过低」是客户端/固件问题，重试同样无用 —— 它与其它
             # ERROR_HINTS 译名不同，不含上面任何关键词，漏掉会让它按 retry 反复打门户。
             low_msg = resp["message"].lower()
-            if any(k in resp["message"] or k in low_msg for k in ("账号", "密码", "锁定", "停机", "已经在线", "客户端版本过低", "禁止使用", "时段", "禁止上网", "password error", "userid error", "out of service")):
+            if any(k in resp["message"] or k in low_msg for k in ("账号", "密码", "锁定", "停机", "已经在线", "客户端版本过低", "禁止使用", "时段", "禁止上网", "password error", "userid error", "out of service", "无法识别", "无法解析")):
                 break
         if attempt < max_attempts:
             time.sleep(delay)
