@@ -1147,6 +1147,7 @@ def cmd_gui(args, cfg) -> int:
     THEME = {
         "bg": "#0f172a",
         "card": "#1e293b",
+        "subcard": "#131c31",
         "input_bg": "#0b1120",
         "border": "#334155",
         "hover": "#475569",
@@ -1155,6 +1156,8 @@ def cmd_gui(args, cfg) -> int:
         "accent": "#2563eb",
         "accent_hover": "#1d4ed8",
         "info": "#3b82f6",
+        "purple": "#a855f7",
+        "amber": "#f59e0b",
         "success": "#10b981",
         "success_border": "#059669",
         "warning": "#f59e0b",
@@ -1171,9 +1174,11 @@ def cmd_gui(args, cfg) -> int:
         "label": ("Microsoft YaHei", 9, "bold"),
         "status": ("Microsoft YaHei", 13, "bold"),
         "body": ("Microsoft YaHei", 9),
+        "small": ("Microsoft YaHei", 8),
         "button": ("Microsoft YaHei", 10),
         "button_bold": ("Microsoft YaHei", 10, "bold"),
         "mono": ("Consolas", 10),
+        "mono_bold": ("Consolas", 10, "bold"),
     }
 
     bg = THEME["bg"]
@@ -1187,9 +1192,13 @@ def cmd_gui(args, cfg) -> int:
     # Header
     head = tk.Frame(root, bg=THEME["bg"], pady=10, padx=18)
     head.pack(side="top", fill="x")
-    title = tk.Label(head, text="校园网自动登录", font=FONTS["title"], fg=THEME["text"], bg=THEME["bg"])
-    title.pack(anchor="w")
-    sub = tk.Label(head, text="Dr.COM ePortal · 实时自动刷新 (30s)", font=FONTS["body"], fg=THEME["text_muted"], bg=THEME["bg"])
+    head_top = tk.Frame(head, bg=THEME["bg"])
+    head_top.pack(fill="x")
+    title = tk.Label(head_top, text="校园网自动登录", font=FONTS["title"], fg=THEME["text"], bg=THEME["bg"])
+    title.pack(side="left")
+    ver_badge = tk.Label(head_top, text=" v1.0.0 ", font=FONTS["small"], fg=THEME["info"], bg=THEME["card"], padx=5, pady=1)
+    ver_badge.pack(side="left", padx=(8, 0), pady=(3, 0))
+    sub = tk.Label(head, text="Dr.COM ePortal · 实时自动刷新 (30s) · F5 刷新 / Ctrl+S 保存", font=FONTS["body"], fg=THEME["text_muted"], bg=THEME["bg"])
     sub.pack(anchor="w", pady=(2, 0))
 
     # Actions Frame（提前固定在窗口底部，确保小屏或高 DPI 缩放下按钮绝不被裁切）
@@ -1259,7 +1268,27 @@ def cmd_gui(args, cfg) -> int:
                             cursor="hand2", padx=6, command=do_copy_ip)
     btn_copy_ip.pack(side="right")
 
-    meta_lbl = tk.Label(st_card, text="已用流量: —  |  时长: —", font=FONTS["body"], fg=THEME["text_muted"], bg=THEME["card"])
+    # 3-Tile Bento Telemetry Strip (流量 / 时长 / 延迟)
+    bento_row = tk.Frame(st_card, bg=THEME["card"])
+    bento_row.pack(fill="x", pady=(8, 4))
+    for col_idx in range(3):
+        bento_row.columnconfigure(col_idx, weight=1, uniform="bento")
+
+    def _make_bento_tile(parent, col, title_text, accent_hex):
+        tile = tk.Frame(parent, bg=THEME["subcard"], padx=8, pady=6, highlightthickness=1, highlightbackground=THEME["border"])
+        tile.grid(row=0, column=col, sticky="nsew", padx=(0 if col == 0 else 4, 0))
+        bar = tk.Frame(tile, bg=accent_hex, height=2)
+        bar.pack(fill="x", pady=(0, 4))
+        tk.Label(tile, text=title_text, font=FONTS["small"], fg=THEME["text_muted"], bg=THEME["subcard"]).pack(anchor="w")
+        val_lbl = tk.Label(tile, text="—", font=FONTS["mono_bold"], fg=accent_hex, bg=THEME["subcard"])
+        val_lbl.pack(anchor="w", pady=(1, 0))
+        return val_lbl
+
+    tile_flow_val = _make_bento_tile(bento_row, 0, "已用流量", THEME["purple"])
+    tile_dur_val = _make_bento_tile(bento_row, 1, "在线时长", THEME["amber"])
+    tile_ping_val = _make_bento_tile(bento_row, 2, "网关延迟", THEME["success"])
+
+    meta_lbl = tk.Label(st_card, text="已用流量: —  |  时长: —", font=FONTS["small"], fg=THEME["text_muted"], bg=THEME["card"])
     meta_lbl.pack(anchor="w", pady=(2, 0))
 
     # 记录从磁盘加载的原始凭据与配置快照，作为未保存修改检测的权威基准
@@ -1321,19 +1350,44 @@ def cmd_gui(args, cfg) -> int:
                                relief="flat", bd=0, cursor="hand2", padx=6, command=toggle_pwd)
     btn_pwd_toggle.pack(side="right", padx=4, pady=2)
 
-    # 运营商选择 (R3 参数)
+    # 运营商选择 (R3 参数 - 现代分段胶囊按钮)
     tk.Label(form_card, text="运营商选择 (R3 认证参数)", font=FONTS["label"],
-             fg=THEME["text"], bg=THEME["card"]).pack(anchor="w", pady=(2, 2))
-    isp_frame = tk.Frame(form_card, bg=THEME["card"])
-    isp_frame.pack(fill="x", pady=(2, 4))
+             fg=THEME["text"], bg=THEME["card"]).pack(anchor="w", pady=(2, 4))
+    isp_frame = tk.Frame(form_card, bg=THEME["input_bg"], padx=3, pady=3, highlightthickness=1, highlightbackground=THEME["border"])
+    isp_frame.pack(fill="x", pady=(0, 4))
     raw_cfg_isp = str(cfg.get("isp", "1")).strip()
     isp_var = tk.StringVar(value=raw_cfg_isp if raw_cfg_isp in ISP_CHOICES else "1")
-    for isp_k, isp_name in [("1", "校园用户"), ("2", "校园电信"), ("3", "校园联通"), ("4", "校园其他")]:
-        r = tk.Radiobutton(isp_frame, text=isp_name, value=isp_k, variable=isp_var,
-                           font=FONTS["body"], fg=THEME["text"], bg=THEME["card"],
-                           selectcolor=THEME["bg"], activebackground=THEME["card"], activeforeground=THEME["text"],
-                           highlightthickness=0)
-        r.pack(side="left", padx=(0, 4))
+    _isp_buttons = {}
+
+    def _sync_isp_pills(*_args):
+        curr = isp_var.get()
+        for k, btn in _isp_buttons.items():
+            if k == curr:
+                btn.config(bg=THEME["accent"], fg=THEME["white"], font=FONTS["label"])
+            else:
+                btn.config(bg=THEME["input_bg"], fg=THEME["text_muted"], font=FONTS["body"])
+
+    for col_i, (isp_k, isp_name) in enumerate([("1", "校园用户"), ("2", "校园电信"), ("3", "校园联通"), ("4", "校园其他")]):
+        isp_frame.columnconfigure(col_i, weight=1, uniform="isp_seg")
+        b_isp = tk.Button(
+            isp_frame,
+            text=isp_name,
+            font=FONTS["body"],
+            bg=THEME["input_bg"],
+            fg=THEME["text_muted"],
+            activebackground=THEME["accent_hover"],
+            activeforeground=THEME["white"],
+            relief="flat",
+            bd=0,
+            cursor="hand2",
+            pady=4,
+            command=lambda k=isp_k: isp_var.set(k),
+        )
+        b_isp.grid(row=0, column=col_i, sticky="ew", padx=1)
+        _isp_buttons[isp_k] = b_isp
+
+    isp_var.trace_add("write", _sync_isp_pills)
+    _sync_isp_pills()
 
     # 单飞（single-flight）保护：同类网络操作尚未结束时，忽略重复触发。
     # 只做后台静默跳过，不改变按钮外观（不置灰），因此不影响界面表现；
@@ -1503,8 +1557,13 @@ def cmd_gui(args, cfg) -> int:
                         st_card.config(highlightbackground=THEME["danger"])
                     ip_lbl.config(text="本机 IP: %s" % (ip or "—"))
                     dur_text = _calculate_duration(st)
+                    dur_short = dur_text if dur_text else (time_str if time_str else "—")
                     dur_display = ("时长: %s" % dur_text) if dur_text else ("上线: %s" % time_str if time_str else "时长: —")
                     refreshed_at = time.strftime("%H:%M:%S")
+                    ping_color = THEME["success"] if ping_ms < 80 else (THEME["warning"] if ping_ms < 250 else THEME["danger"])
+                    tile_flow_val.config(text=flow or "—")
+                    tile_dur_val.config(text=dur_short)
+                    tile_ping_val.config(text="%d ms" % ping_ms, fg=ping_color)
                     meta_lbl.config(text="流量: %s  |  %s  |  延迟: %d ms  |  更新: %s" % (flow, dur_display, ping_ms, refreshed_at))
                 safe_ui(_ui)
             except Exception as e:
@@ -1515,6 +1574,9 @@ def cmd_gui(args, cfg) -> int:
                     st_lbl.config(text="! 网络连接失败", fg=THEME["danger"])
                     st_card.config(highlightbackground=THEME["danger"])
                     ip_lbl.config(text="错误: %s" % err_msg)
+                    tile_flow_val.config(text="—")
+                    tile_dur_val.config(text="—")
+                    tile_ping_val.config(text="超时", fg=THEME["danger"])
                     meta_lbl.config(text="已用流量: —  |  时长: —  |  更新: %s" % time.strftime("%H:%M:%S"))
                 safe_ui(_err)
         run_async(_task, 'refresh')

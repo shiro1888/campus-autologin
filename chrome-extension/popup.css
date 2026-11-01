@@ -814,13 +814,13 @@ body {
 
 .dock-item {
   background: var(--bg-card);
-  border: 1px solid var(--border-hairline);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 65px;
+  min-height: 66px;
   gap: 5px;
   box-shadow: var(--shadow-dock), var(--glass-highlight);
   backdrop-filter: blur(14px);
@@ -829,38 +829,74 @@ body {
   overflow: hidden;
 }
 
+/* Jewel-toned semantic corner aura & top accent indicator for each Bento card */
+.dock-item:nth-child(1) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(245, 158, 11, 0.06) 0%, transparent 65%), var(--bg-card);
+}
+.dock-item:nth-child(2) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(168, 85, 247, 0.06) 0%, transparent 65%), var(--bg-card);
+}
+.dock-item:nth-child(3) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(16, 185, 129, 0.06) 0%, transparent 65%), var(--bg-card);
+}
+.dock-item:nth-child(4) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(59, 130, 246, 0.06) 0%, transparent 65%), var(--bg-card);
+}
+
+[data-theme="dark"] .dock-item:nth-child(1) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(245, 158, 11, 0.1) 0%, transparent 65%), var(--bg-card);
+}
+[data-theme="dark"] .dock-item:nth-child(2) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(168, 85, 247, 0.1) 0%, transparent 65%), var(--bg-card);
+}
+[data-theme="dark"] .dock-item:nth-child(3) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(16, 185, 129, 0.1) 0%, transparent 65%), var(--bg-card);
+}
+[data-theme="dark"] .dock-item:nth-child(4) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(59, 130, 246, 0.1) 0%, transparent 65%), var(--bg-card);
+}
+
 /* Dock Item Top Specular Highlight */
 .dock-item::before {
   content: "";
   position: absolute;
   top: 0;
-  left: 10px;
-  right: 10px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.16) 50%, transparent 100%);
+  left: 0;
+  right: 0;
+  height: 2px;
+  opacity: 0.72;
   pointer-events: none;
   z-index: 2;
-  transition: background 0.25s ease;
+  transition: opacity 0.25s ease, filter 0.25s ease;
 }
 
-:root:not([data-theme="dark"]) .dock-item::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.9) 50%, transparent 100%);
+.dock-item:nth-child(1)::before {
+  background: linear-gradient(90deg, #f59e0b 0%, rgba(245, 158, 11, 0.12) 100%);
+}
+.dock-item:nth-child(2)::before {
+  background: linear-gradient(90deg, #a855f7 0%, rgba(168, 85, 247, 0.12) 100%);
+}
+.dock-item:nth-child(3)::before {
+  background: linear-gradient(90deg, #10b981 0%, rgba(16, 185, 129, 0.12) 100%);
+}
+.dock-item:nth-child(4)::before {
+  background: linear-gradient(90deg, #3b82f6 0%, rgba(59, 130, 246, 0.12) 100%);
 }
 
 .dock-item:hover::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.35) 50%, transparent 100%);
+  opacity: 1;
+  filter: brightness(1.12);
 }
 
 .dock-item:hover {
-  background: var(--bg-card-subtle);
-  border-color: color-mix(in srgb, var(--primary) 28%, var(--border-subtle));
+  border-color: color-mix(in srgb, var(--primary) 34%, var(--border-subtle));
   transform: translateY(-2px);
-  box-shadow: 0 8px 22px -2px rgba(15, 23, 42, 0.08), var(--glass-highlight);
+  box-shadow: 0 8px 22px -2px rgba(15, 23, 42, 0.09), var(--glass-highlight);
 }
 
 [data-theme="dark"] .dock-item:hover {
-  border-color: color-mix(in srgb, var(--primary) 36%, rgba(255, 255, 255, 0.14));
-  box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.5), var(--glass-highlight);
+  border-color: color-mix(in srgb, var(--primary) 42%, rgba(255, 255, 255, 0.16));
+  box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.55), var(--glass-highlight);
 }
 
 .dock-item:active {
@@ -1256,7 +1292,7 @@ body {
   align-items: center;
   gap: 6px;
   background: var(--bg-card-subtle);
-  border: 1px solid var(--border-hairline);
+  border: 1px solid var(--border-subtle);
   padding: 6px 11px;
   border-radius: var(--radius-pill);
   font-size: 12px;
@@ -1272,7 +1308,7 @@ body {
 
 .meta-pill:hover {
   background: var(--bg-card);
-  border-color: var(--border-subtle);
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--border-subtle));
   transform: translateY(-1px);
   box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.08);
 }
@@ -1294,6 +1330,19 @@ body {
   height: 12px;
   color: var(--text-muted);
   flex-shrink: 0;
+  transition: transform 0.2s var(--ease-spring), color 0.2s ease;
+}
+
+.meta-pill:first-child .meta-icon {
+  color: #f59e0b;
+}
+
+.meta-pill:last-child .meta-icon {
+  color: var(--primary);
+}
+
+.meta-pill:hover .meta-icon {
+  transform: scale(1.12);
 }
 
 .meta-caption {

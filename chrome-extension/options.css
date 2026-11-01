@@ -1279,37 +1279,83 @@ body {
   overflow: hidden;
 }
 
-/* Stat Card Top Specular Highlight */
+/* Jewel-toned semantic corner aura for Hero Bento Stat Cards */
+.stat-card:nth-child(1) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(59, 130, 246, 0.06) 0%, transparent 65%), var(--stat-bg);
+}
+.stat-card:nth-child(2) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(245, 158, 11, 0.06) 0%, transparent 65%), var(--stat-bg);
+}
+.stat-card:nth-child(3) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(16, 185, 129, 0.06) 0%, transparent 65%), var(--stat-bg);
+}
+.stat-card:nth-child(4) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(168, 85, 247, 0.06) 0%, transparent 65%), var(--stat-bg);
+}
+.stat-card:nth-child(5) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(14, 165, 233, 0.05) 0%, transparent 65%), var(--stat-bg);
+}
+
+[data-theme="dark"] .stat-card:nth-child(1) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(59, 130, 246, 0.11) 0%, transparent 65%), var(--stat-bg);
+}
+[data-theme="dark"] .stat-card:nth-child(2) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(245, 158, 11, 0.11) 0%, transparent 65%), var(--stat-bg);
+}
+[data-theme="dark"] .stat-card:nth-child(3) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(16, 185, 129, 0.11) 0%, transparent 65%), var(--stat-bg);
+}
+[data-theme="dark"] .stat-card:nth-child(4) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(168, 85, 247, 0.11) 0%, transparent 65%), var(--stat-bg);
+}
+[data-theme="dark"] .stat-card:nth-child(5) {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(14, 165, 233, 0.09) 0%, transparent 65%), var(--stat-bg);
+}
+
+/* Stat Card Top Semantic Indicator Bar */
 .stat-card::before {
   content: "";
   position: absolute;
   top: 0;
-  left: 14px;
-  right: 14px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.16) 50%, transparent 100%);
+  left: 0;
+  right: 0;
+  height: 2px;
+  opacity: 0.72;
   pointer-events: none;
   z-index: 2;
-  transition: background 0.25s ease;
+  transition: opacity 0.25s ease, filter 0.25s ease;
 }
 
-[data-theme="dark"] .stat-card::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.14) 50%, transparent 100%);
+.stat-card:nth-child(1)::before {
+  background: linear-gradient(90deg, #3b82f6 0%, rgba(59, 130, 246, 0.12) 100%);
+}
+.stat-card:nth-child(2)::before {
+  background: linear-gradient(90deg, #f59e0b 0%, rgba(245, 158, 11, 0.12) 100%);
+}
+.stat-card:nth-child(3)::before {
+  background: linear-gradient(90deg, #10b981 0%, rgba(16, 185, 129, 0.12) 100%);
+}
+.stat-card:nth-child(4)::before {
+  background: linear-gradient(90deg, #a855f7 0%, rgba(168, 85, 247, 0.12) 100%);
+}
+.stat-card:nth-child(5)::before {
+  background: linear-gradient(90deg, #0ea5e9 0%, #6366f1 55%, rgba(99, 102, 241, 0.12) 100%);
 }
 
 .stat-card:hover::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.35) 50%, transparent 100%);
+  opacity: 1;
+  filter: brightness(1.12);
 }
 
 .stat-card:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--primary) 24%, var(--border-color));
-  box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.08);
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--border-color));
+  box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.09);
 }
 
 [data-theme="dark"] .stat-card:hover {
-  border-color: color-mix(in srgb, var(--primary) 34%, rgba(255, 255, 255, 0.12));
-  box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.35);
+  border-color: color-mix(in srgb, var(--primary) 38%, rgba(255, 255, 255, 0.14));
+  box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.38);
 }
 
 .stat-card:active {
@@ -2504,9 +2550,16 @@ input[aria-invalid="true"] {
   justify-content: space-between;
   gap: 20px;
   background: var(--bg-card);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+[data-theme="dark"] .actions-dock-card {
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .dock-left {

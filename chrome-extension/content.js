@@ -323,9 +323,16 @@
     }
   }
 
-  /** 在门户页面顶部显示现代浮动指示条 */
+  /** 在门户页面顶部显示现代浮动指示条（灵动岛毛玻璃风格） */
   function showHud(text, state) {
     try {
+      let styleEl = document.getElementById('campus-login-hud-style');
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'campus-login-hud-style';
+        styleEl.textContent = '@keyframes campusHudSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes campusHudIn{from{opacity:0;transform:translateX(-50%) translateY(-12px) scale(0.94)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}';
+        (document.head || document.documentElement).appendChild(styleEl);
+      }
       let hud = document.getElementById('campus-login-hud');
       if (!hud) {
         hud = document.createElement('div');
@@ -336,40 +343,52 @@
           'left:50%',
           'transform:translateX(-50%)',
           'z-index:2147483647',
-          'background:rgba(15, 23, 42, 0.92)',
-          'backdrop-filter:blur(12px)',
-          '-webkit-backdrop-filter:blur(12px)',
-          'color:#ffffff',
-          'padding:9px 18px',
-          'border-radius:30px',
-          'font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", sans-serif',
+          'background:rgba(15, 23, 42, 0.90)',
+          'backdrop-filter:blur(18px) saturate(180%)',
+          '-webkit-backdrop-filter:blur(18px) saturate(180%)',
+          'color:#f8fafc',
+          'padding:9px 18px 9px 12px',
+          'border-radius:999px',
+          'font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
           'font-size:13px',
           'font-weight:600',
-          'box-shadow:0 10px 25px -5px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.18)',
+          'letter-spacing:-0.01em',
           'display:flex',
           'align-items:center',
-          'gap:9px',
+          'gap:10px',
+          'animation:campusHudIn 0.32s cubic-bezier(0.16, 1, 0.3, 1)',
           'transition:all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
           'pointer-events:none'
         ].join(';');
         document.body.appendChild(hud);
       }
-      const icon = state === 'success' ? '✓' : (state === 'error' ? '✗' : '⚡');
-      const iconBg = state === 'success' ? '#10b981' : (state === 'error' ? '#ef4444' : '#3b82f6');
-      // 只把「结构」交给 innerHTML，动态文本一律用 textContent 赋值。
+      const isOk = state === 'success';
+      const isErr = state === 'error';
+      const accentRgba = isOk
+        ? 'rgba(16, 185, 129, 0.45)'
+        : (isErr ? 'rgba(239, 68, 68, 0.45)' : 'rgba(59, 130, 246, 0.45)');
+      const glowRgba = isOk
+        ? 'rgba(16, 185, 129, 0.25)'
+        : (isErr ? 'rgba(239, 68, 68, 0.25)' : 'rgba(59, 130, 246, 0.25)');
+      const iconBg = isOk ? '#10b981' : (isErr ? '#ef4444' : '#2563eb');
+      const iconSvg = isOk
+        ? '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+        : (isErr
+          ? '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+          : '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" style="animation:campusHudSpin 0.85s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>');
+      hud.style.boxShadow = '0 14px 32px -6px rgba(0,0,0,0.45), 0 0 20px -2px ' + glowRgba + ', 0 0 0 1px ' + accentRgba + ', inset 0 1px 0 rgba(255,255,255,0.16)';
+      // 只把静态 SVG 图标结构交给 innerHTML，动态文本一律用 textContent 赋值。
       // text 里可能含门户返回的内容（如登录失败原因 r.msg），而门户是明文 HTTP，
       // 同网段可被篡改 —— 若直接拼进 innerHTML，等价于把任意 HTML/JS 注入门户页面
       // （实测 <img src=x onerror=...> 会真的执行）。
-      hud.innerHTML = '<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:' + iconBg + ';color:#fff;font-size:11px;font-weight:bold;"></span> <span></span>';
-      const iconEl = hud.firstElementChild;
-      if (iconEl) iconEl.textContent = icon;
+      hud.innerHTML = '<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:' + iconBg + ';box-shadow:0 0 10px ' + glowRgba + ';flex-shrink:0;">' + iconSvg + '</span><span></span>';
       const textEl = hud.lastElementChild;
       if (textEl) textEl.textContent = String(text == null ? '' : text);
-      if (state === 'success' || state === 'error') {
+      if (isOk || isErr) {
         setTimeout(function () {
           if (!hud) return;
           hud.style.opacity = '0';
-          hud.style.transform = 'translateX(-50%) translateY(-10px)';
+          hud.style.transform = 'translateX(-50%) translateY(-10px) scale(0.95)';
           setTimeout(function () { if (hud && hud.parentNode) hud.parentNode.removeChild(hud); }, 400);
         }, 3200);
       }
