@@ -27,6 +27,9 @@ campus-autologin-config-*.json
 *.swp
 .zcodeignore
 
+# 会话/工作记忆（Agent 自动生成，含本地路径与仓库信息，勿提交）
+.workbuddy/
+
 # 系统
 Thumbs.db
 desktop.ini
