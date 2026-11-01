@@ -6,8 +6,9 @@ cd /d "%~dp0"
 set "THIS_BAT=%~f0"
 set "SAFE_BAT=%THIS_BAT:'=''%"
 
-:: Check admin rights
-net session >nul 2>&1
+:: Check admin rights (query Administrators membership; net session depends on the
+:: Server service and can false-negative even when already elevated)
+powershell -NoProfile -Command "if(([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){exit 0}else{exit 1}"
 if %errorlevel% neq 0 (
     echo.
     echo   Admin privileges required to uninstall...

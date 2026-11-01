@@ -4,12 +4,16 @@ title Campus Network Auto Login
 cd /d "%~dp0"
 
 set "PYEXE="
-where py >nul 2>nul
-if not errorlevel 1 set "PYEXE=py"
-if defined PYEXE goto :run
-where python >nul 2>nul
-if not errorlevel 1 set "PYEXE=python"
-if defined PYEXE goto :run
+rem Search PATH for an interpreter, skipping the WindowsApps store alias
+rem (that is a placeholder that opens Microsoft Store, not a real Python).
+for /f "delims=" %%P in ('where py 2^>nul') do (
+    echo %%P | findstr /i "WindowsApps" >nul
+    if errorlevel 1 ( set "PYEXE=%%P" & goto :run )
+)
+for /f "delims=" %%P in ('where python 2^>nul') do (
+    echo %%P | findstr /i "WindowsApps" >nul
+    if errorlevel 1 ( set "PYEXE=%%P" & goto :run )
+)
 if exist "%~dp0.python_path" (
     set /p PYEXE=<"%~dp0.python_path"
     if exist "%PYEXE%" goto :run
