@@ -722,9 +722,6 @@ function refreshStatus(cb) {
       if (localSince && Number.isFinite(localSince) && localSince <= now) {
         durationInput = localSince;
         stimeDisplay = '本次连通: ' + new Date(localSince).toLocaleTimeString();
-        if (raw.stime) {
-          stimeDisplay += ` (网关计费: ${raw.stime})`;
-        }
       } else if (raw.stime) {
         const stimeDate = new Date(String(raw.stime).replace(/-/g, '/'));
         const stimeMs = stimeDate.getTime();
@@ -740,13 +737,13 @@ function refreshStatus(cb) {
 
         if (validSec) {
           durationInput = validSec;
-          stimeDisplay = `活跃在线: ${fmtDuration(validSec)} (网关计费: ${raw.stime || '—'})`;
+          stimeDisplay = `活跃在线: ${fmtDuration(validSec)}`;
         } else if (isSameDay) {
           durationInput = raw.stime;
           stimeDisplay = '上线时间: ' + raw.stime;
         } else if (isStimeValid && (now - stimeMs) > 16 * 3600 * 1000) {
           durationInput = Date.now();
-          stimeDisplay = `本次在线中 (网关计费: ${raw.stime}，跨夜未释放)`;
+          stimeDisplay = '本次在线中';
         } else if (isStimeValid) {
           durationInput = raw.stime;
           stimeDisplay = '上线时间: ' + raw.stime;

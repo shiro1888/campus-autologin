@@ -342,9 +342,6 @@ function refresh() {
       if (localSince && Number.isFinite(localSince) && localSince <= now) {
         durationInput = localSince;
         titleText = '本次在线始于: ' + new Date(localSince).toLocaleTimeString();
-        if (rawData.stime) {
-          titleText += ` (网关计费起始: ${rawData.stime})`;
-        }
       } else if (rawData.stime) {
         const stimeDate = new Date(String(rawData.stime).replace(/-/g, '/'));
         const stimeMs = stimeDate.getTime();
@@ -363,14 +360,14 @@ function refresh() {
 
         if (validSec) {
           durationInput = validSec;
-          titleText = `活跃在线: ${fmtDuration(validSec)} (网关计费起始: ${rawData.stime || '—'})`;
+          titleText = `活跃在线: ${fmtDuration(validSec)}`;
         } else if (isSameDay) {
           durationInput = rawData.stime;
           titleText = '上线时间: ' + rawData.stime;
         } else if (isStimeValid && (now - stimeMs) > 16 * 3600 * 1000) {
           // 典型的 Dr.COM 跨夜未注销会话（如昨晨建立、夜间断网、今晨复活）
           durationInput = Date.now();
-          titleText = `本次在线中 (网关计费起始: ${rawData.stime}，跨夜未释放)`;
+          titleText = '本次在线中';
         } else if (isStimeValid) {
           durationInput = rawData.stime;
           titleText = '上线时间: ' + rawData.stime;
