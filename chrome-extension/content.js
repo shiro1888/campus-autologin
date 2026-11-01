@@ -75,9 +75,9 @@
 
   /**
    * 带编码自适应的文本拉取。
-   * Dr.COM 门户返回 GBK 编码的中文字符串（如「本时段禁止使用 1」）。
-   * 校园网门户普遍以 GBK 为主，即便网关误标 utf-8 或未标 charset，
-   * 也应优先尝试 GBK/GB18030，避免被浏览器默认 UTF-8 截断成乱码 (U+FFFD)。
+   * 优先遵循响应头声明的 charset（含 utf-8），声明缺失/解码失败时再回退
+   * gbk -> gb18030 -> utf-8。门户 ePortal 接口可能声明 utf-8，若一律 gbk 优先
+   * 会把 utf-8 字节误解成乱码（GBK 对多数 utf-8 序列不会抛错）。
    */
   function fetchPortalText(url, timeoutMs = 8000) {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -88,16 +88,21 @@
       signal: controller ? controller.signal : undefined
     })
       .then(function (resp) {
-        if (timer) clearTimeout(timer);
+        // 超时定时器必须覆盖整个「读取响应体 + 解码」过程：此前在 header 到达时就
+        // clearTimeout，若服务器先发 header 再拖住 body，Promise 会永久挂起。
         return resp.arrayBuffer().then(function (buf) {
           const ct = String(resp.headers && resp.headers.get ? (resp.headers.get('content-type') || '') : '');
           const m = /charset\s*=\s*"?([\w-]+)"?/i.exec(ct);
           const charset = m ? m[1].toLowerCase() : '';
           const candidates = [];
-          if (charset && charset !== 'utf-8' && charset !== 'utf8') {
-            candidates.push(charset);
-          }
-          candidates.push('gbk', 'gb18030', 'utf-8');
+          const pushEnc = function (enc) {
+            const k = (enc === 'utf8') ? 'utf-8' : enc;
+            if (candidates.indexOf(k) === -1) candidates.push(k);
+          };
+          if (charset) pushEnc(charset);
+          pushEnc('gbk');
+          pushEnc('gb18030');
+          pushEnc('utf-8');
           const bytes = new Uint8Array(buf);
           for (let i = 0; i < candidates.length; i++) {
             try {
@@ -109,9 +114,8 @@
           return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
         });
       })
-      .catch(function (err) {
+      .finally(function () {
         if (timer) clearTimeout(timer);
-        throw err;
       });
   }
 
@@ -422,13 +426,15 @@
           // 另一个标签或后台正在处理认证，安静退出，避免并发竞态
           return;
         }
+        const token = res.token;
+        function release() {
+          try { chrome.runtime.sendMessage({ type: 'releaseAuthLock', token: token }); } catch (e) {}
+        }
         var p = fn();
         if (p && typeof p.then === 'function') {
-          p.finally(function () {
-            try { chrome.runtime.sendMessage({ type: 'releaseAuthLock' }); } catch (e) {}
-          });
+          p.finally(release);
         } else {
-          try { chrome.runtime.sendMessage({ type: 'releaseAuthLock' }); } catch (e) {}
+          release();
         }
       });
     } catch (e) {
@@ -528,26 +534,37 @@
                     resolveFlow();
                     return;
                   }
-                  directLogin(s.account, s.password, s.isp).then(function (r) {
-                    done = true;
-                    if (r.ok) {
-                      showHud('校园网认证成功！已在线', 'success');
-                    } else {
-                      const displayMsg = !r.msg ? '登录失败：认证被拒绝' : (
-                        r.msg.indexOf('登录失败') === 0 || r.msg.indexOf('当前时段') === 0 || r.msg.indexOf('认证失败') === 0
-                          ? r.msg
-                          : ('登录失败：' + r.msg)
-                      );
-                      showHud(displayMsg, 'error');
+                  // 兜底登录前复查「手动注销」标志：用户在等待期间点了注销时不得再把人登回。
+                  getSettings().then(function (fresh) {
+                    if (fresh.paused) {
+                      done = true;
+                      report({ ok: false, online: false, message: '已手动注销，取消兜底登录' });
+                      resolveFlow();
+                      return;
                     }
-                    report({
-                      ok: r.ok,
-                      online: r.ok,
-                      message: r.ok ? '登录成功（兜底请求）' : ('登录失败：' + (r.msg || '认证被拒绝'))
+                    directLogin(s.account, s.password, s.isp).then(function (r) {
+                      done = true;
+                      if (r.ok) {
+                        showHud('校园网认证成功！已在线', 'success');
+                      } else {
+                        const displayMsg = !r.msg ? '登录失败：认证被拒绝' : (
+                          r.msg.indexOf('登录失败') === 0 || r.msg.indexOf('当前时段') === 0 || r.msg.indexOf('认证失败') === 0
+                            ? r.msg
+                            : ('登录失败：' + r.msg)
+                        );
+                        showHud(displayMsg, 'error');
+                      }
+                      report({
+                        ok: r.ok,
+                        online: r.ok,
+                        message: r.ok ? '登录成功（兜底请求）' : ('登录失败：' + (r.msg || '认证被拒绝'))
+                      });
+                      resolveFlow();
+                    }).catch(function () {
+                      resolveFlow();   // 异常也要结束流程，让锁释放
                     });
-                    resolveFlow();
                   }).catch(function () {
-                    resolveFlow();   // 异常也要结束流程，让锁释放
+                    resolveFlow();
                   });
                 }).catch(function () {
                   resolveFlow();

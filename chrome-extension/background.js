@@ -105,6 +105,7 @@ const CONN_STATES = ['unknown', 'online', 'offline', 'unreachable', 'unparseable
 let running = false;
 let activeAuthOp = null; // 'login' | 'logout' | 'content' | null
 let contentLockTimer = null;
+let contentLockToken = null;   // 内容脚本认证锁的持有令牌，释放时须校验
 
 // 连接状态机与退避计数（详见 updateConnState 注释）
 let connState = 'unknown';
@@ -201,11 +202,17 @@ async function fetchText(url) {
     const ct = String(resp.headers && resp.headers.get ? (resp.headers.get('content-type') || '') : '');
     const m = /charset\s*=\s*"?([\w-]+)"?/i.exec(ct);
     const charset = m ? m[1].toLowerCase() : '';
+    // 优先遵循响应头声明的 charset（含 utf-8）：门户 :801/eportal 实测声明 utf-8，
+    // 若仍强制 gbk 优先，会把 utf-8 字节按 gbk 解出乱码且不抛错，静默错译中文错误提示。
     const candidates = [];
-    if (charset && charset !== 'utf-8' && charset !== 'utf8') {
-      candidates.push(charset);
-    }
-    candidates.push('gbk', 'gb18030', 'utf-8');
+    const pushEnc = (enc) => {
+      const k = (enc === 'utf8') ? 'utf-8' : enc;
+      if (candidates.indexOf(k) === -1) candidates.push(k);
+    };
+    if (charset) pushEnc(charset);
+    pushEnc('gbk');
+    pushEnc('gb18030');
+    pushEnc('utf-8');
     const bytes = new Uint8Array(buf);
     for (const enc of candidates) {
       try {
@@ -543,6 +550,14 @@ async function _doLogoutInternal() {
   if (!st.reachable) {
     return fail('网络连接失败，请检查 Wi-Fi 或网线', false);
   }
+  if (st.unparseable) {
+    // 门户返回的是 HTML 而非认证数据（如酒店/机场强制门户）：既拿不到会话参数，
+    // 也得不到真实在线状态，不能把它当成「已下线」。
+    const res = fail('门户返回的不是认证数据，无法执行注销（可能处于强制登录网络）', false);
+    res.state = 'unknown';
+    await saveResult(res);
+    return res;
+  }
   const raw = st.raw || {};
   const ip = String([raw.v4ip, raw.ss5].find((v) => v && v !== '0.0.0.0') || '');
   const mac = String(raw.ss1 || '000000000000');
@@ -592,6 +607,19 @@ async function _doLogoutInternal() {
     await saveResult(res);
     await ensureAlarm();
     console.log('[logout] 网关不可达，无法确认注销结果');
+    return res;
+  }
+
+  if (stAfter.unparseable) {
+    // 门户返回非认证数据：online 恒为 false，但这不是「已下线」，不能据此报成功。
+    onlineSince = null;
+    await setState({ manualLogout: true, unreachableStreak: 0, onlineSince: null });
+    connState = 'unparseable';
+    const res = fail('注销请求已提交，但无法确认是否成功下线（门户返回非认证数据）', false);
+    res.state = 'unknown';
+    await saveResult(res);
+    await ensureAlarm();
+    console.log('[logout] 门户返回非认证数据，无法确认注销结果');
     return res;
   }
 
@@ -838,8 +866,8 @@ async function autoLogin(trigger, manual) {
       } else {
         // 门户已接受认证，但复查时突然不可达（网络抖动 / 网关重启）：
         // 此刻什么都没确认到 —— 不能报「已确认在线」，也不能改判失败。
-        // 按已提交处理，交给下一轮巡检裁决（updateConnState 已切到退避节奏）。
-        r = ok('登录请求已提交，网络波动，待下一轮巡检确认', true);
+        // 按已提交处理，online 置 false（不隐藏离线角标），交给下一轮巡检裁决。
+        r = ok('登录请求已提交，网络波动，待下一轮巡检确认', false);
       }
     }
 
@@ -890,6 +918,9 @@ async function ensureAlarm() {
   try {
     await hydrateState();
     const settings = await getSettings();
+    // 未填写账号密码时，即便状态是 offline 也不该按 1 秒空转 ——
+    // autoLogin 第一步就会因缺凭据早退，此时应退回常规间隔，避免每秒空唤醒。
+    const hasCredentials = !!(String(settings.account || '').trim() && String(settings.password || ''));
     let period;
     // 暂停态从设置里读，而不是靠调用方传参。
     // 否则任何一个调用方（如 settingsChanged 处理器）忘了传，暂停期间就会被
@@ -903,7 +934,7 @@ async function ensureAlarm() {
     } else if (!settings.adaptive) {
       period = clampInterval(settings.intervalMin);   // 关闭自适应：统一常规间隔
     } else if (connState === 'offline') {
-      period = clampInterval(settings.offlineIntervalMin);
+      period = clampInterval(hasCredentials ? settings.offlineIntervalMin : settings.intervalMin);
     } else if (connState === 'unreachable' || connState === 'unparseable') {
       period = backoffPeriod(settings);
     } else {
@@ -1093,7 +1124,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'settingsChanged') {
-    ensureAlarm()
+    // 重新从 storage 同步运行态（connState / unreachableStreak / onlineSince）。
+    // 「恢复默认设置」会把 connState/unreachableStreak 清回 unknown/0，但后台 SW 的
+    // 内存副本仍是旧值；只重建闹钟不会让退避计数归零，导致恢复默认后仍在退避。
+    hydrateState()
+      .then(getSettings)
+      .then((s) => {
+        connState = s.connState;
+        unreachableStreak = s.unreachableStreak;
+        lastPersistedStreak = s.unreachableStreak;
+        onlineSince = s.onlineSince || null;
+        return ensureAlarm();
+      })
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }));
     return true;
@@ -1105,22 +1147,31 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     } else {
       activeAuthOp = 'content';
       running = true;
+      // 为每次获取颁发唯一令牌，释放时必须携带，防止第一个标签结束后误释放第二个标签的锁。
+      const token = 'lock-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+      contentLockToken = token;
       if (contentLockTimer) clearTimeout(contentLockTimer);
+      // 租期需覆盖完整内容脚本流程（提交 + 5s 兜底 + chkstatus 8s + directLogin 8s ≈ 21s），
+      // 此前 8 秒太短，第一个标签还在跑就被第二个标签抢锁；30s 留足余量又不至于
+      // 在孤儿标签（中途被关闭）时过久阻塞后台自动重连。
       contentLockTimer = setTimeout(() => {
-        if (activeAuthOp === 'content') {
+        if (activeAuthOp === 'content' && contentLockToken === token) {
           activeAuthOp = null;
           running = false;
+          contentLockToken = null;
         }
-      }, 8000);
-      sendResponse({ ok: true });
+      }, 30000);
+      sendResponse({ ok: true, token: token });
     }
     return true;
   }
 
   if (msg.type === 'releaseAuthLock') {
-    if (activeAuthOp === 'content') {
+    // 只有持有令牌的一方（或未携带令牌的旧版本）才能释放，避免误释放他人锁
+    if (activeAuthOp === 'content' && (!msg.token || msg.token === contentLockToken)) {
       activeAuthOp = null;
       running = false;
+      contentLockToken = null;
       if (contentLockTimer) clearTimeout(contentLockTimer);
     }
     sendResponse({ ok: true });

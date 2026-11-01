@@ -565,6 +565,23 @@ function pickClosest(id, value) {
   syncCustomSelect(sel);
 }
 
+/** 返回 select 里与给定值最接近的预设值（数值），用于导入时把存储值对齐到 UI 预设 */
+function snapToPresetValue(id, value) {
+  const v = parseFloat(value);
+  const clamp = (n) => Math.max(1 / 60, Math.min(60, n));
+  if (!Number.isFinite(v)) return clamp(0);
+  const sel = $(id);
+  if (!sel || !sel.options || !sel.options.length) return clamp(v);
+  let best = parseFloat(sel.options[0].value);
+  let bestDiff = Infinity;
+  for (let i = 0; i < sel.options.length; i++) {
+    const optVal = parseFloat(sel.options[i].value);
+    const diff = Math.abs(optVal - v);
+    if (diff < bestDiff) { bestDiff = diff; best = optVal; }
+  }
+  return best;
+}
+
 /** 自适应关闭时，隐藏「掉线重连间隔」 */
 function syncOfflineRow() {
   const row = $('offlineRow');
@@ -985,10 +1002,14 @@ $('btnCopyReport').addEventListener('click', (e) => {
     const rawFlow = $('stFlow').textContent;
     const isOnline = $('stOnline').textContent;
     let account = (settings && settings.account) || '未设置';
-    if (settings && settings.privacyMask && account !== '未设置' && account.length > 4) {
-      account = account.length > 7
-        ? account.slice(0, 3) + '****' + account.slice(-4)
-        : account.slice(0, 2) + '****' + account.slice(-2);
+    if (settings && settings.privacyMask && account !== '未设置') {
+      if (account.length <= 4) {
+        account = '****';
+      } else {
+        account = account.length > 7
+          ? account.slice(0, 3) + '****' + account.slice(-4)
+          : account.slice(0, 2) + '****' + account.slice(-2);
+      }
     }
     const ispMap = { '1': '校园用户', '2': '校园电信(@dx)', '3': '校园联通(@lt)', '4': '校园其他' };
     const ispName = ispMap[(settings && settings.isp) || '1'] || '校园用户';
@@ -1247,11 +1268,11 @@ if ($('btnImportConfig') && $('importFileInput')) {
         }
         if (data.intervalMin !== undefined) {
           const v = parseFloat(data.intervalMin);
-          if (Number.isFinite(v)) toSave.intervalMin = Math.max(1 / 60, Math.min(60, v));
+          if (Number.isFinite(v)) toSave.intervalMin = snapToPresetValue('intervalMin', v);
         }
         if (data.offlineIntervalMin !== undefined) {
           const v = parseFloat(data.offlineIntervalMin);
-          if (Number.isFinite(v)) toSave.offlineIntervalMin = Math.max(1 / 60, Math.min(60, v));
+          if (Number.isFinite(v)) toSave.offlineIntervalMin = snapToPresetValue('offlineIntervalMin', v);
         }
         if (data.adaptive !== undefined) toSave.adaptive = !!data.adaptive;
         if (data.autoOnStartup !== undefined) toSave.autoOnStartup = !!data.autoOnStartup;

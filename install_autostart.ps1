@@ -134,12 +134,24 @@ Write-Step "创建计划任务..."
 
 $action = New-ScheduledTaskAction -Execute $target -WorkingDirectory $here
 
-# 双触发器：开机启动（延迟 2 秒） + 用户登录（即时触发），兼顾开机无需登录桌面即连网与合盖休眠唤醒
-# campus_login.py wait 自身内置自适应轮询，无需设置冗余的长延时死等
+# 触发器：开机启动（延迟 2 秒） + 用户登录（即时触发）。
+# 另尽力附加「休眠唤醒」事件触发器（Kernel-Power 107），失败也不影响前两者。
+# campus_login.py wait 自身内置自适应轮询，无需设置冗余的长延时死等。
 $triggerStartup = New-ScheduledTaskTrigger -AtStartup
 $triggerStartup.Delay = "PT2S"
 $triggerLogon = New-ScheduledTaskTrigger -AtLogOn
 $trigger = @($triggerStartup, $triggerLogon)
+
+try {
+    $resumeQuery = '<QueryList><Query Id="0" Path="System"><Select Path="System">*[System[Provider[@Name="Microsoft-Windows-Kernel-Power"] and EventID=107]]</Select></Query></QueryList>'
+    $triggerResume = Get-CimClass -Namespace 'Root/Microsoft/Windows/TaskScheduler' -ClassName 'MSFT_TaskEventTrigger' -ErrorAction Stop | New-CimInstance -ClientOnly
+    $triggerResume.Enabled = $true
+    $triggerResume.Subscription = $resumeQuery
+    $trigger += $triggerResume
+    Write-Ok "已附加休眠唤醒触发器"
+} catch {
+    Write-Warn "当前系统不支持休眠唤醒触发器（已回退为开机+登录触发）"
+}
 
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `

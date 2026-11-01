@@ -144,6 +144,12 @@ if (-not [string]::IsNullOrWhiteSpace($Account)) {
     Write-Host "  [OK] 已在 Git 历史中精确定位到旧账号记录。" -ForegroundColor Green
 }
 
+# 4.0 记录重写前的 origin 地址：filter-repo 会移除 origin，重写后需原样恢复。
+# 绝不能硬编码仓库地址 —— fork / 换源后强行指向原地址会把本地历史推到错误仓库。
+$originalOriginUrl = $null
+$originBefore = Invoke-Git @('remote', 'get-url', 'origin') -AllowFail
+if ($originBefore) { $originalOriginUrl = ($originBefore | Select-Object -First 1).Trim() }
+
 # 4. 动态生成临时脱敏规则文件并执行重写
 Write-Host "  [2/5] 开始重写 Git 历史对象（脱敏账号密码并移除历史 config.json）..." -ForegroundColor Green
 $rules = [System.Collections.Generic.List[string]]::new()
@@ -155,7 +161,9 @@ if (-not [string]::IsNullOrWhiteSpace($Account)) {
 }
 
 $rulesFile = Join-Path $env:TEMP ("campus_filter_rules_" + [System.Guid]::NewGuid().ToString("N") + ".txt")
-$rules | Set-Content -Path $rulesFile -Encoding ASCII
+# 规则必须写为无 BOM 的 UTF-8：账号/密码可能含中文等非 ASCII 字符，
+# 用 ASCII 会把它们写成 "?"，导致规则与历史中的真实凭据不匹配、重写后自检才失败（历史已被改写）。
+[System.IO.File]::WriteAllLines($rulesFile, [string[]]$rules, (New-Object System.Text.UTF8Encoding($false)))
 
 # 记录重写前的 HEAD，供事后验证「含凭据的旧对象」是否已被物理回收
 $preRewriteHead = (Invoke-Git @('rev-parse', 'HEAD') -AllowFail)
@@ -233,14 +241,18 @@ if ($leak.Count -gt 0) {
 }
 Write-Host "  [OK] 自检全部通过：全历史目标归零、config.json 已抹除、无凭据字面量残留。" -ForegroundColor Green
 
-# 6. 幂等恢复远程 origin（避免 git remote remove origin 在不存在时报错）
-Write-Host "  [4/5] 重新绑定远程仓库 origin 并准备推送..." -ForegroundColor Green
-$originUrl = "https://github.com/shiro1888/campus-autologin.git"
-$remotes = Invoke-Git @('remote') -AllowFail
-if ($remotes -contains 'origin') {
-    Invoke-Git @('remote', 'set-url', 'origin', $originUrl)
+# 6. 恢复重写前的原始 origin（filter-repo 会移除 origin，须原样恢复，绝不硬编码仓库地址）
+Write-Host "  [4/5] 恢复远程仓库 origin 并准备推送..." -ForegroundColor Green
+if (-not $originalOriginUrl) {
+    Write-Host "  [警告] 未检测到原始 origin，跳过远程绑定；请手动配置 origin 后再推送。" -ForegroundColor Yellow
 } else {
-    Invoke-Git @('remote', 'add', 'origin', $originUrl)
+    $remotes = Invoke-Git @('remote') -AllowFail
+    if ($remotes -contains 'origin') {
+        Invoke-Git @('remote', 'set-url', 'origin', $originalOriginUrl)
+    } else {
+        Invoke-Git @('remote', 'add', 'origin', $originalOriginUrl)
+    }
+    Write-Host "  [OK] 已恢复原始远程 origin: $originalOriginUrl" -ForegroundColor Green
 }
 
 # 7. 远程推送
@@ -248,7 +260,9 @@ if ($ForcePush) {
     Write-Host "  正在推送分支与标签..." -ForegroundColor Yellow
     Invoke-Git @('push', 'origin', '--force', '--all')
     Invoke-Git @('push', 'origin', '--force', '--tags')
-    Write-Host "  [完成] 远程 Git 历史已彻底更新并覆盖。" -ForegroundColor Green
+    Write-Host "  [完成] 本地全部分支/标签已强制推送覆盖。" -ForegroundColor Green
+    Write-Host "  [注意] 只覆盖了本地存在的分支/标签；若远端存在本地没有的旧分支或旧标签，" -ForegroundColor Yellow
+    Write-Host "         它们仍指向旧提交，需手动删除（git push origin --delete <分支/标签>）或改用 --mirror。" -ForegroundColor Yellow
 } else {
     Write-Host ""
     Write-Host "  本地历史已完成清洗并通过全量自检！请执行以下命令完成强制推送:" -ForegroundColor Cyan
