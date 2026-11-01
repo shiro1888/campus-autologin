@@ -755,8 +755,6 @@ def cmd_status(args, cfg) -> int:
                 if dur_text:
                     say("在线时长: %s" % dur_text)
                 say("已用流量: %s" % flow_detail)
-                if fee_text != "—":
-                    say("账户余额: %s" % fee_text)
                 if info["stime"]:
                     say("上线时间: %s" % info["stime"])
             else:
@@ -776,8 +774,6 @@ def cmd_status(args, cfg) -> int:
                 if dur_text:
                     say(_card_line("在线时长:  %s" % dur_text[:36]))
                 say(_card_line("已用流量:  %s" % flow_detail[:36]))
-                if fee_text != "—":
-                    say(_card_line("账户余额:  %s" % fee_text[:36]))
                 if info["stime"]:
                     say(_card_line("上线时间:  %s" % str(info["stime"])[:36]))
             else:

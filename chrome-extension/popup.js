@@ -278,10 +278,7 @@ function refresh() {
       const total = dl + ul;
 
       if (flowSub) {
-        if (rawData.fee !== undefined && Number.isFinite(parseFloat(rawData.fee))) {
-          flowSub.textContent = '¥' + (parseFloat(rawData.fee) / 10000).toFixed(0);
-          flowSub.classList.add('visible');
-        } else if (total > 0) {
+        if (total > 0) {
           const dlPct = Math.round((dl / total) * 100);
           flowSub.textContent = `↓${dlPct}%`;
           flowSub.classList.add('visible');
