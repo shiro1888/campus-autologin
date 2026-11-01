@@ -698,7 +698,7 @@ function refreshStatus(cb) {
       $('stPing').textContent = '—';
       renderOptPingSparkline(-1);
       $('stFlow').textContent = '—';
-      $('stFee').textContent = '流量明细: —';
+      $('stFlowDetail').textContent = '流量明细: —';
       $('stStime').textContent = '上线时间: —';
       $('btnLogoutNow').disabled = true;
       $('btnLogoutNow').classList.remove('confirming');
@@ -797,7 +797,7 @@ function refreshStatus(cb) {
       renderOptPingSparkline(res.reachable ? 8 : -1);
     }
 
-    // Flow & Fee (下行 / 上行 / 总计 / 余额)
+    // Flow & Traffic Detail (下行 / 上行 / 总计明细)
     const optFlowWrap = $('optFlowBarWrap');
     const optFlowDl = $('optFlowBarDl');
     const optFlowUl = $('optFlowBarUl');
@@ -820,10 +820,10 @@ function refreshStatus(cb) {
       if (raw.actdf !== undefined && raw.actuf !== undefined) {
         sub.push(`↓ ${fmtFlow(raw.actdf)} · ↑ ${fmtFlow(raw.actuf)}`);
       }
-      $('stFee').textContent = sub.length ? sub.join(' · ') : '校园网流量统计';
+      $('stFlowDetail').textContent = sub.length ? sub.join(' · ') : '校园网流量统计';
     } else {
       $('stFlow').textContent = res.online ? '计量中' : '—';
-      $('stFee').textContent = '流量明细: —';
+      $('stFlowDetail').textContent = '流量明细: —';
       if (optFlowWrap) optFlowWrap.style.display = 'none';
     }
 
