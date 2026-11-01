@@ -203,37 +203,8 @@ function refresh() {
         ispEl.title = '认证运营商: ' + (ispFullNames[currentIsp] || currentIsp);
       }
 
-      const iv = s && s.intervalMin !== undefined ? parseFloat(s.intervalMin) : 10 / 60;
-      const off = s && s.offlineIntervalMin !== undefined ? parseFloat(s.offlineIntervalMin) : 1 / 60;
-      const adaptive = !s || s.adaptive !== false;
-
-      const ivText = fmt(iv).replace(/\s+/g, '');
-      const offText = fmt(off).replace(/\s+/g, '');
-
-      const ivEl = $('interval');
-      if (ivEl) {
-        ivEl.textContent = adaptive
-          ? `${ivText} (掉线${offText})`
-          : ivText;
-        ivEl.title = adaptive ? `正常在线: ${fmt(iv)} / 掉线急救: ${fmt(off)}` : `巡检频率: ${fmt(iv)}`;
-      }
-
       const r = s && s.lastResult;
-      // lastResult 可能来自旧版本/手改：time 与 message 都要先确认是字符串再调
-      // .indexOf / .split，否则会抛 TypeError。而这里处于 storage 回调内，
-      // 异常会中断整个 refresh()，让后面的状态卡片、IP、按钮全部不更新
-      // （面板卡在半渲染状态，看起来像"插件坏了"）。
-      const rTime = r && typeof r.time === 'string' ? r.time : '';
       const rMsg = r && typeof r.message === 'string' ? r.message : '';
-      if (rTime) {
-        // 只保留时分秒以节省空间
-        const t = rTime.indexOf(' ') !== -1 ? rTime.split(' ')[1] : rTime;
-        const ltEl = $('lastTime');
-        if (ltEl) {
-          ltEl.textContent = t;
-          ltEl.title = '上次检查记录: ' + rTime;
-        }
-      }
       if (rMsg && (!r.ok || rMsg.indexOf('无需登录') === -1)) {
         const msgType = r.state === 'submitted' ? 'info' : (r.ok === false ? 'err' : 'ok');
         setMsg(rMsg, msgType);
@@ -347,7 +318,7 @@ function refresh() {
       $('btnLoginText').textContent = paused ? '恢复登录' : '立即登录';
       $('btnLogout').disabled = true;
     } else if (res.online) {
-      setStatus('已在线 · 认证通过', 'Dr.COM ePortal · 互联网已放行', 'on');
+      setStatus('已在线 · 认证通过', '', 'on');
       $('btnLogin').classList.add('online-mode');
       $('btnLoginText').textContent = '刷新状态';
       $('btnLogout').disabled = false;
@@ -672,44 +643,6 @@ if (accountIspEl) {
       e.preventDefault();
       cycleIsp(e);
     }
-  });
-}
-
-// --- 底部栏：一键复制网络诊断报告 ---
-const btnPopDiag = $('btnPopCopyDiag');
-if (btnPopDiag) {
-  btnPopDiag.addEventListener('click', (e) => {
-    e.preventDefault();
-    const diagTextEl = $('popCopyDiagText');
-    const stTitle = $('statusTitle') ? $('statusTitle').textContent : '未知';
-    const ipVal = $('localIp') ? $('localIp').textContent : '—';
-    const durVal = $('onlineDuration') ? $('onlineDuration').textContent : '—';
-    const flowVal = $('popFlow') ? $('popFlow').textContent : '—';
-    const pingVal = $('popPing') ? $('popPing').textContent : '—';
-    const ispVal = $('accountIsp') ? $('accountIsp').textContent : '校园';
-    const accShown = currentAccount ? (isMasked ? maskAccount(currentAccount) : currentAccount) : '未设置';
-
-    const report = [
-      '=== 校园网自动登录 · 快速诊断 ===',
-      `时间: ${new Date().toLocaleString('zh-CN', { hour12: false })}`,
-      `状态: ${stTitle}`,
-      `本机 IP: ${ipVal}`,
-      `网关延迟: ${pingVal}`,
-      `在线时长: ${durVal}`,
-      `已用流量: ${flowVal}`,
-      `认证账号: ${accShown} (${ispVal})`,
-      '================================='
-    ].join('\n');
-
-    navigator.clipboard.writeText(report).then(() => {
-      if (diagTextEl) {
-        diagTextEl.textContent = '已复制 ✓';
-        setTimeout(() => { diagTextEl.textContent = '复制诊断'; }, 1800);
-      }
-      setMsg('诊断报告已复制到剪贴板', 'ok', 1800);
-    }).catch(() => {
-      setMsg('复制失败，请检查剪贴板权限', 'err', 2000);
-    });
   });
 }
 

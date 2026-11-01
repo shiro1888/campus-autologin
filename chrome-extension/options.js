@@ -1054,58 +1054,6 @@ $('btnLoginNow').addEventListener('click', () => {
   }
 });
 
-// --- 顶部快捷：一键复制完整诊断报告 ---
-$('btnCopyReport').addEventListener('click', (e) => {
-  const btn = $('btnCopyReport');
-  const span = $('btnCopyReportText');
-  if (span && span.textContent.includes('已复制')) return;
-
-  chrome.storage.local.get(null, (settings) => {
-    const rawIp = $('stIp').textContent;
-    const rawMac = $('stMac').textContent;
-    const rawTime = $('stTime').textContent;
-    const rawPing = $('stPing').textContent;
-    const rawFlow = $('stFlow').textContent;
-    const isOnline = $('stOnline').textContent;
-    let account = (settings && settings.account) || '未设置';
-    if (settings && settings.privacyMask && account !== '未设置') {
-      if (account.length <= 4) {
-        account = '****';
-      } else {
-        account = account.length > 7
-          ? account.slice(0, 3) + '****' + account.slice(-4)
-          : account.slice(0, 2) + '****' + account.slice(-2);
-      }
-    }
-    const ispMap = { '1': '校园用户', '2': '校园电信(@dx)', '3': '校园联通(@lt)', '4': '校园其他' };
-    const ispName = ispMap[(settings && settings.isp) || '1'] || '校园用户';
-
-    const report = [
-      '================ 校园网连接诊断报告 ================',
-      `诊断时间: ${new Date().toLocaleString('zh-CN', { hour12: false })}`,
-      `网关门户: http://172.30.100.2/ (Dr.COM ePortal)`,
-      `网络状态: ${isOnline}`,
-      `本机出口 IP: ${rawIp}`,
-      `${rawMac}`,
-      `网关延迟: ${rawPing}`,
-      `在线时长: ${rawTime}`,
-      `已用流量: ${rawFlow}`,
-      `认证账号: ${account} (${ispName})`,
-      '===================================================='
-    ].join('\n');
-
-    navigator.clipboard.writeText(report).then(() => {
-      span.textContent = '已复制 ✓';
-      showToast('诊断报告已成功复制到剪贴板', 'ok');
-      setTimeout(() => {
-        span.textContent = '复制诊断';
-      }, 2000);
-    }).catch(() => {
-      showToast('复制失败，请手动记录', 'err');
-    });
-  });
-});
-
 // --- 点击本机 IP 卡片快速单项复制 ---
 const cardStatIp = $('cardStatIp');
 if (cardStatIp) {

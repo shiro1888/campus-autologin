@@ -57,7 +57,7 @@
         </div>
         <div class="status-content">
           <div class="status-title" id="statusTitle">正在检测…</div>
-          <div class="status-desc" id="statusDesc">正在探测网关状态…</div>
+          <div class="status-desc" id="statusDesc" style="display: none;"></div>
         </div>
         <span class="status-state-pill" id="statusStatePill">检测中</span>
       </div>
@@ -155,20 +155,6 @@
       </div>
     </section>
 
-    <!-- Sleek Meta Capsule Bar (告别奇怪的孤立小句号，对称双胶囊) -->
-    <div class="meta-capsule-bar">
-      <div class="meta-pill">
-        <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        <span class="meta-caption">轮询:</span>
-        <span class="meta-value" id="interval">—</span>
-      </div>
-      <div class="meta-pill">
-        <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span class="meta-caption">上次:</span>
-        <span class="meta-value" id="lastTime">—</span>
-      </div>
-    </div>
-
     <!-- Alert / Toast Capsule (操作或异常时灵动滑入) -->
     <div class="msg-box" id="msgBox" role="status" aria-live="polite">
       <span class="msg-icon" id="msgIcon"></span>
@@ -201,11 +187,6 @@
       <a href="#" id="openOptions" class="foot-link" title="打开控制中心与偏好设置">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span>偏好设置</span>
-      </a>
-      <span class="foot-sep"></span>
-      <a href="#" id="btnPopCopyDiag" class="foot-link" title="一键复制当前网络诊断报告">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        <span id="popCopyDiagText">复制诊断</span>
       </a>
       <span class="foot-sep"></span>
       <a href="http://172.30.100.2/" target="_blank" rel="noopener noreferrer" class="foot-link" title="打开校园网网页门户">
