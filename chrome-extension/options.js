@@ -30,6 +30,8 @@ function showToast(text, kind = 'info', duration = 4000) {
     iconSpan.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
   } else if (kind === 'err') {
     iconSpan.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+  } else if (kind === 'warn') {
+    iconSpan.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
   } else {
     iconSpan.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
   }
@@ -900,15 +902,7 @@ function readForm() {
   };
 }
 
-/**
- * 保存当前表单到 chrome.storage 并通知后台刷新定时器。
- *
- * 注意：这里**不校验**账号密码。开关类与间隔类设置（自适应、开机自启、
- * 轮询间隔、运营商等）本身就是合法的，与是否填写凭据无关；在此拦截会导致
- * 全新安装（凭据默认为空）的用户无论怎么点都存不上，而且调用方还会弹出
- * 「已自动保存」的成功提示，属于静默失败。凭据校验只在真正发起认证时进行
- * （设置页的「保存并连接」与后台的定时巡检）。
- */
+/** 切换「有未保存改动」提示状态（保存按钮高亮与同步状态胶囊文案） */
 function setDirtyState(dirty) {
   const btn = $('btnSave');
   const syncPill = $('dockSyncStatus');
@@ -921,6 +915,15 @@ function setDirtyState(dirty) {
   }
 }
 
+/**
+ * 保存当前表单到 chrome.storage 并通知后台刷新定时器。
+ *
+ * 注意：这里**不校验**账号密码。开关类与间隔类设置（自适应、开机自启、
+ * 轮询间隔、运营商等）本身就是合法的，与是否填写凭据无关；在此拦截会导致
+ * 全新安装（凭据默认为空）的用户无论怎么点都存不上，而且调用方还会弹出
+ * 「已自动保存」的成功提示，属于静默失败。凭据校验只在真正发起认证时进行
+ * （设置页的「保存并连接」与后台的定时巡检）。
+ */
 function save(cb) {
   chrome.storage.local.set(readForm(), () => {
     setDirtyState(false);
@@ -1155,7 +1158,7 @@ $('btnResetDefaults').addEventListener('click', () => {
   }, () => {
     $('btnSave').classList.remove('has-changes');
     load();
-    chrome.runtime.sendMessage({ type: 'settingsChanged' });
+    chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => { void chrome.runtime.lastError; });
     showToast('已恢复为默认配置，请重新填写账号密码。', 'ok');
   });
 });
@@ -1294,7 +1297,7 @@ if ($('btnImportConfig') && $('importFileInput')) {
 
         chrome.storage.local.set(toSave, () => {
           load();
-          chrome.runtime.sendMessage({ type: 'settingsChanged' });
+          chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => { void chrome.runtime.lastError; });
           showToast('配置已成功导入并生效！', 'ok');
           $('btnSave').classList.remove('has-changes');
         });
