@@ -33,6 +33,7 @@ if ($LASTEXITCODE -ne 0) {
 
 try {
     $scriptInClone = Join-Path $tmpClone "clean_history.ps1"
+    $skippedTests = 0
 
     # -------------------------------------------------------------
     # 测试用例 1: 错误密码拦截验证（杜绝假通过与误改动）
@@ -80,12 +81,14 @@ try {
     $realAcc  = $env:CAMPUS_LEAKED_ACCOUNT
 
     if (-not $realPass -or -not $realAcc) {
+        $skippedTests++
         Write-Host "  [SKIP] 未设置环境变量 CAMPUS_LEAKED_PASSWORD / CAMPUS_LEAKED_ACCOUNT。" -ForegroundColor Yellow
         Write-Host "         跳过依赖真实泄露凭据的重写用例（在历史已清洗干净的环境中，此为预期行为）。" -ForegroundColor Yellow
     } else {
         # 先确认克隆库历史中是否存在该旧凭据
         $preCheckHits = (git -C $tmpClone log --all --oneline "-S$realPass")
         if (-not $preCheckHits) {
+            $skippedTests++
             Write-Host "  [SKIP] 克隆库历史中已无该旧凭据记录（仓库已被清洗干净），跳过重写用例。" -ForegroundColor Yellow
         } else {
             $p2 = Start-Process powershell -ArgumentList "-NoProfile", "-File", "`"$scriptInClone`"", "-Account", "`"$realAcc`"", "-Password", "`"$realPass`"" -NoNewWindow -Wait -PassThru -RedirectStandardOutput (Join-Path $tmpClone "test2_stdout.txt") -RedirectStandardError (Join-Path $tmpClone "test2_stderr.txt")
@@ -139,7 +142,15 @@ try {
 
     Write-Host ""
     Write-Host "============================================================" -ForegroundColor Green
-    Write-Host "  端到端自动化测试全部通过 (100% SUCCESS)！" -ForegroundColor Green
+    if ($skippedTests -gt 0) {
+        # 不能报 100%：依赖真实旧凭据的重写用例在本仓库永远无法执行，
+        # 必须如实标注为部分通过，避免"测试全绿"掩盖未覆盖的路径。
+        Write-Host "  [PARTIAL] 已通过：错误密码拦截 + 主仓库隔离核验。" -ForegroundColor Yellow
+        Write-Host "  [PARTIAL] 已跳过：$skippedTests 个依赖历史旧凭据的重写用例。" -ForegroundColor Yellow
+        Write-Host "            （历史已清洗干净时属预期；需全量验证请注入 CAMPUS_LEAKED_* 环境变量）" -ForegroundColor Yellow
+    } else {
+        Write-Host "  端到端自动化测试全部通过 (100% SUCCESS)！" -ForegroundColor Green
+    }
     Write-Host "============================================================" -ForegroundColor Green
 } finally {
     Set-Location $repoRoot

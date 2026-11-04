@@ -14,6 +14,9 @@ _h1/
 # 本地个人配置（含真实密码）——默认不提交
 # 插件设置页「导出配置」生成的明文备份，请勿提交
 campus-autologin-config-*.json
+# 防御性忽略：桌面版遗留的本地凭据文件（当前纯扩展版不生成，防止误提交）
+config.json
+config.local.json
 
 # 编辑器与工具
 .vscode/

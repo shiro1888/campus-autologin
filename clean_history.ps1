@@ -6,7 +6,6 @@
 param(
     [string]$Account,
     [string]$Password,
-    [switch]$UseConfigFile,
     [switch]$ForcePush
 )
 
@@ -85,19 +84,7 @@ if (-not $hasTool) {
 }
 
 # 2. 运行时获取需要脱敏的凭据（不将任何明文写入脚本自身）
-if ($UseConfigFile -and (-not $Account -or -not $Password)) {
-    $cfg = Join-Path $here "config.json"
-    if (Test-Path $cfg) {
-        try {
-            $o = Get-Content $cfg -Raw -Encoding UTF8 | ConvertFrom-Json
-            if (-not $Account -and $o.username) { $Account = [string]$o.username }
-            if (-not $Account -and $o.account)  { $Account = [string]$o.account }
-            if (-not $Password -and $o.password) { $Password = [string]$o.password }
-            Write-Host "  [提示] 已从本地 config.json 读取凭据作为清洗目标。" -ForegroundColor Cyan
-        } catch {}
-    }
-}
-
+# 本仓库已精简为纯 Chrome 扩展，不再有 config.json；凭据一律由参数或交互输入。
 if (-not $Account) {
     $Account = (Read-Host "请输入【历史中泄露的旧账号/手机号】（直接回车可跳过）").Trim()
 }
@@ -127,6 +114,7 @@ if (-not [string]::IsNullOrWhiteSpace($Password)) {
     if (-not $prePass) {
         Write-Host "  [错误] 目标旧密码在 Git 全历史中未找到任何匹配记录！" -ForegroundColor Red
         Write-Host "         可能原因：您输入的是新密码，或密码拼写有误。" -ForegroundColor Yellow
+        Write-Host "         也可能历史已清洗完成 —— 此时无需再运行本脚本，可改用 git log --all -S<旧凭据> 复核。" -ForegroundColor Yellow
         Write-Host "         脚本必须在历史中检索到泄露记录才可执行清洗。尚未改动任何历史，已安全终止。" -ForegroundColor Yellow
         Write-Host ""
         exit 1
@@ -212,20 +200,11 @@ if ($LASTEXITCODE -ne 0 -and ($pcreCheck -match "cannot use Perl-compatible rege
 }
 
 $benignTokens = [System.Collections.Generic.List[string]]::new()
+# 内置排除表已独立覆盖历史中出现过的全部占位符
+# （"校园网密码 —— 请填入你自己的" 等），不依赖任何已移除的模板文件。
 foreach ($item in @('123', '你的密码', '校园网密码', 'REDACTED', 'example')) {
     $benignTokens.Add($item)
 }
-$exampleCfg = Join-Path $here "config.example.json"
-if (Test-Path $exampleCfg) {
-    try {
-        $exJson = Get-Content $exampleCfg -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ($exJson._password) { $benignTokens.Add([string]$exJson._password) }
-        if ($exJson.password)  { $benignTokens.Add([string]$exJson.password) }
-    } catch {}
-}
-# 说明：上面的动态收集是兜底路径。桌面端模板 config.example.json 已随本次精简移除，
-# 但内置排除表已独立覆盖历史中出现过的全部占位符（"校园网密码 —— 请填入你自己的" 等），
-# 因此模板缺失时扫描结果不受影响。
 $tokenPattern = ($benignTokens | Sort-Object -Unique | Where-Object { $_ } | ForEach-Object { [regex]::Escape($_) }) -join '|'
 $credPat = "(?<![a-zA-Z0-9_])password[`"']?[[:space:]]*[:=][[:space:]]*[`"'](?!$tokenPattern)[^`"']{3,}[`"']"
 

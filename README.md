@@ -53,11 +53,11 @@
 插件通过 JSONP 调用门户接口（与门户网页的 `a40.js` 一致）：
 
 ```
-状态：GET /drcom/chchkstatus?callback=dr1001&lang=zh&jsVersion=4.1.3
-登录：GET /drcom/login?callback=dr1002&DDDDD=账号&upass=密码&R3=<运营商>&...
+状态：GET /drcom/chkstatus?callback=dr1001&v=<随机>&lang=zh&jsVersion=4.1.3
+登录：GET /drcom/login?callback=dr1002&DDDDD=账号&upass=密码&R3=<运营商代码 1~4>&...
 ```
 
-返回形如 `dr1002({"result":1,"uid":"13800000000","v4ip":"10.0.0.100",...});`
+返回形如 `dr1001({"result":1,"uid":"13800000000","v4ip":"10.0.0.100",...});`（`dr1002` 为登录回调）。
 
 - `result: 1` → 在线 / 登录成功
 - `result: 0` → 失败，`msga` 说明原因（`userid error1` 账号不存在、`userid error2` 密码错误）
@@ -96,7 +96,8 @@ campus-autologin/
 # 扩展结构与 DOM 契约测试（manifest / 弹窗与设置页的 DOM ID 对应关系 / 外链 noopener）
 python -m unittest discover tests -v
 
-# 端到端回归：克隆临时副本，跑通「错误密码被拦截」与「正确凭据完整清洗」两条路径
+# 端到端回归：在隔离临时克隆中验证「错误密码被拦截」；
+# 「正确凭据完整清洗」需环境变量注入历史旧凭据，历史已清洗时会明确标记 SKIP
 powershell -File tests/test_clean_history_e2e.ps1
 
 # 重新生成扩展图标（需要 Pillow：pip install pillow）
@@ -118,11 +119,14 @@ python assets/make_icons.py
   虽然 Git 历史已用 `git filter-repo` 完整重写、相关对象已全部物理回收，
   但旧密码**至今仍可能有效**，一旦泄露即等于门户账号失守。
 - 本仓库当前 HEAD **不含任何真实凭据**；`.gitignore` 也已排除插件「导出配置」生成的明文备份。
-- 若将来要把本仓库转为公开，**务必先改密码**，再用 `clean_history.ps1` 复核一次历史。
+- 若将来要把本仓库转为公开，**务必先改密码**，再用 `git log --all -S<旧账号> -S<旧密码> --oneline` 复核历史确无残留。
 - 门户通信是**明文 HTTP**，同网段可被嗅探 —— 这是校园网本身的限制，插件无法规避。
 - 公用电脑使用完毕后，请清空插件设置页里的账号密码。
 
-### 历史脱敏工具
+### 历史脱敏工具（仅用于历史仍含旧凭据时）
+
+> 本仓库历史**已清洗完成**。`clean_history.ps1` 带有「凭据必须真实存在于历史中」的前置校验，
+> 对已清洗的仓库会在改写任何内容之前安全退出，属于预期行为，无需（也无法）再次执行。
 
 ```powershell
 pip install git-filter-repo
