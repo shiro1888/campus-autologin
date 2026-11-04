@@ -14,6 +14,30 @@ $testsDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyIn
 $repoRoot = (Resolve-Path (Join-Path $testsDir "..")).Path
 Set-Location $repoRoot
 
+# Windows PowerShell 5.1 的 Start-Process 在构造子进程环境时，若环境变量存在
+# 「仅大小写不同」的重复键（如代理工具同时注入 HTTP_PROXY 与 http_proxy），会抛
+# "Item has already been added" 直接中断测试。此处仅在本测试进程内归一化：
+# 读取值 -> 删除全部变体 -> 用大写规范名写回。不改系统/用户环境变量，值也不丢失。
+try {
+    $rawEnv = [System.Environment]::GetEnvironmentVariables()
+    $dupGroups = @($rawEnv.Keys | Group-Object { $_.ToLowerInvariant() } | Where-Object { $_.Count -gt 1 })
+    foreach ($g in $dupGroups) {
+        $canonical = $g.Name.ToUpperInvariant()
+        $val = [System.Environment]::GetEnvironmentVariable($g.Name)
+        foreach ($name in $g.Group) {
+            [System.Environment]::SetEnvironmentVariable($name, $null, 'Process')
+        }
+        if ($null -ne $val) {
+            [System.Environment]::SetEnvironmentVariable($canonical, $val, 'Process')
+        }
+    }
+    if ($dupGroups.Count -gt 0) {
+        Write-Host "  [环境] 已归一化 $($dupGroups.Count) 组大小写重复环境变量（PowerShell 5.1 兼容）。" -ForegroundColor Gray
+    }
+} catch {
+    # 归一化失败不阻断测试；若 Start-Process 仍失败，会由后续强断言明确暴露。
+}
+
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host "  clean_history.ps1 端到端自动化回归测试" -ForegroundColor Yellow
 Write-Host "============================================================" -ForegroundColor Cyan
