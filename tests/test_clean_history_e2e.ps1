@@ -92,7 +92,7 @@ try {
         Write-Host "  [失败] 错误密码导致了历史改动！HEAD 发生变化。" -ForegroundColor Red
         exit 1
     }
-    Write-Host "  [PASS] 测试 1 通过：错误密码被前置检查拦截（退出码 1，匹配预期间隔），历史 0 改动。" -ForegroundColor Green
+    Write-Host "  [PASS] 测试 1 通过：错误密码被前置检查拦截（退出码 1，匹配预期拦截），历史 0 改动。" -ForegroundColor Green
 
     # -------------------------------------------------------------
     # 测试用例 2: 真实旧凭据全流程脱敏与自检验证
