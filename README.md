@@ -1,16 +1,69 @@
-# Campus AutoLogin (校园网自动登录)
+# Campus AutoLogin · 校园网自动登录（Chrome 扩展）
 
-针对 **http://172.30.100.2/** （Dr.COM / 哆点 ePortal 认证系统）的自动登录工具。
+针对 **http://172.30.100.2/**（Dr.COM / 哆点 ePortal 认证系统）的 Chrome 扩展：
+**掉线自动重连**，无需手动打开门户登录页。
 
-包含两部分，任选其一或搭配使用：
+> 本仓库现在只包含 **Chrome 扩展**。命令行脚本 / 桌面控制中心 / 开机自启计划任务已全部移除。
 
-| 方案 | 适用场景 | 说明 |
+---
+
+## 安装（30 秒）
+
+1. 打开 Chrome，地址栏输入 `chrome://extensions/` 回车
+2. 打开右上角 **开发者模式** 开关
+3. 点击左上角 **加载已解压的扩展程序**
+4. 选择本仓库下的 **`chrome-extension`** 文件夹
+5. 点工具栏的插件图标 → **⚙ 设置**，填入校园网账号密码 → **保存并连接**
+
+> 工具栏看不到图标？点地址栏右侧的「拼图」图标，把 **Campus AutoLogin** 固定住。
+>
+> 详细说明（含功能清单、设置项、工作原理）见 **[chrome-extension/README.md](chrome-extension/README.md)**。
+
+---
+
+## 功能一览
+
+| 功能 | 说明 |
+| --- | --- |
+| **断网秒级重连** | 网页打不开 / 被跳到门户登录页的**瞬间**就重连，不等定时器 |
+| **自适应加速** | 在线时低频检查（默认 10 秒）；确认掉线自动切到 **1 秒**高频重连，连上再切回 |
+| **离线自动退避** | 不在校园网内（在家 / 热点）时指数退避到 1 分钟一次，不会每秒空转 |
+| **浏览器启动自动登录** | 打开 Chrome 就检查一次 |
+| **登录页自动填写** | 被断网跳转到门户登录页时，自动填账号密码并点登录 |
+| **手动登录 / 注销** | 点插件图标 → 「立即登录」/「注销」；注销后会暂停自动登录 |
+| **图标角标状态** | 离线高亮红色 `!`，重连中显示 `...`，在线自动隐藏 |
+| **全局快捷键** | `Alt+Shift+L` 在任意网页直接触发静默认证 |
+| **配置备份与恢复** | 设置页「导出配置」/「导入配置」，一键生成/恢复 JSON 备份 |
+
+### 重连有多快？
+
+| 层级 | 触发时机 | 延迟 |
 | --- | --- | --- |
-| **① Python 脚本** | 开机自动登录、命令行、计划任务 | 零依赖，双击即用 |
-| **② Chrome 插件** | 日常用浏览器上网 | 后台定时检测，掉线自动重连 |
+| ① 断网跳转瞬间 | 导航失败 / 被跳到门户 | **≈ 0 秒** |
+| ② 掉线后高频轮询 | 确认掉线（门户可达但未认证），每 1 秒重试 | **≤ 1 秒** |
+| ③ 在线时低频轮询 | 常规守护，默认 10 秒 | 兜底 |
 
-> **首次使用请先填账号密码**：Python 脚本请复制 `config.example.json` 为 `config.json` 并填入自己的账号密码；
-> Chrome 插件请在插件设置页里填写。当前版本源码与模板中已剔除所有真实凭据，请勿把包含自己真实密码的配置文件提交进仓库。
+> **区分「掉线」与「不在校园网内」**：门户可达但未认证才是真·掉线，按 1 秒间隔快速抢修；
+> 门户根本连不上时先快速重试约 10 次，之后指数退避（2 → 4 → 8 → … → 60 秒封顶）。
+
+---
+
+## 工作原理
+
+插件通过 JSONP 调用门户接口（与门户网页的 `a40.js` 一致）：
+
+```
+状态：GET /drcom/chchkstatus?callback=dr1001&lang=zh&jsVersion=4.1.3
+登录：GET /drcom/login?callback=dr1002&DDDDD=账号&upass=密码&R3=<运营商>&...
+```
+
+返回形如 `dr1002({"result":1,"uid":"13800000000","v4ip":"10.0.0.100",...});`
+
+- `result: 1` → 在线 / 登录成功
+- `result: 0` → 失败，`msga` 说明原因（`userid error1` 账号不存在、`userid error2` 密码错误）
+
+**插件先查状态再决定是否登录**，已在线时不会重复认证，避免把正常网络踢掉；
+重试前若发现已上线也会立即中止，绝不会二次认证把刚建立的会话顶掉。
 
 ---
 
@@ -18,282 +71,70 @@
 
 ```
 campus-autologin/
-├── login.bat               ← 双击运行（命令行智能登录）
-├── gui.bat                 ← 桌面控制中心 GUI（暗色科技面板）
-├── campus_login.py         ← 核心脚本（纯 Python 标准库，零依赖）
-├── config.example.json     ← 配置模板（复制为 config.json 后填入自己的账号密码）
-├── autostart.bat           ← 静默版，供计划任务调用（写日志）
-├── install_autostart.bat   ← 双击自动提权安装计划任务
-├── uninstall_autostart.bat ← 双击自动提权卸载计划任务
-├── install_autostart.ps1   ← PowerShell 计划任务配置脚本
-├── reload_extension.bat    ← 改完插件代码后，一键打开扩展页刷新
-├── clean_history.ps1       ← Git 历史敏感凭据彻底脱敏与重写工具
-├── tests/                  ← 自动化单元测试套件（python -m unittest）
-├── chrome-extension/       ← Chrome 浏览器插件
-│   ├── manifest.json
-│   ├── background.js
-│   ├── popup.html / popup.js / popup.css
-│   ├── options.html / options.js / options.css
-│   ├── icons/
-│   └── README.md           ← 插件单独的安装说明
-├── assets/                 ← 图标生成工具
-├── logs/                   ← 计划任务运行日志
-└── README.md               ← 本文件
+├── chrome-extension/          ← Chrome 扩展本体（唯一的功能载体）
+│   ├── manifest.json          MV3 清单
+│   ├── background.js          Service Worker：定时检查 + 自动重连 + webNavigation 监听
+│   ├── content.js             登录页自动填写与 HUD 提示
+│   ├── common.js              公共模块：时间格式化、流量换算、状态秒表
+│   ├── popup.html/js/css      工具栏弹出面板
+│   ├── options.html/js/css    控制中心设置页
+│   ├── icons/                 各尺寸图标
+│   └── README.md              详细功能与设置说明
+├── assets/                    ← 图标生成工具（make_icons.py，基于 master.jpg）
+├── tests/                     ← 自动化测试套件
+├── clean_history.ps1          ← Git 历史敏感凭据脱敏工具（见下方安全公告）
+├── reload_extension.bat       ← 改完扩展代码后一键打开扩展页刷新
+├── .gitattributes
+└── README.md
 ```
 
 ---
 
-## ① Python 脚本
-
-### 环境要求
-
-只需要 **Python 3**（本机已安装：`Python 3.14.6`）。没有任何第三方库依赖。
-
-> 如果没有 Python，到 <https://www.python.org/downloads/> 下载安装，安装时**务必勾选 `Add Python to PATH`**。
-
-### 快速开始
-
-**方式一（最简单）**：双击 `login.bat` 或运行 `gui.bat`（桌面图形控制台）
-
-**方式二（命令行）**：
+## 开发
 
 ```powershell
-cd "C:\Project\campus-autologin"
-python campus_login.py            # 智能登录：已在线就跳过，没在线就登录
-```
-
-### 命令一览
-
-| 命令 | 作用 |
-| --- | --- |
-| `python campus_login.py` | **智能登录**：先查状态，已在线则跳过；不在线则自动登录 |
-| `python campus_login.py status` | 只看当前在线状态（不登录） |
-| `python campus_login.py login` | 强制登录（已在线也会重新认证） |
-| `python campus_login.py logout` | 注销下线 |
-| `python campus_login.py wait` | 等待校园网就绪后再登录（**开机自启推荐用这个**） |
-| `python campus_login.py test` | 自检：配置 + 本机 IP + 门户连通性 |
-
-### 常用参数
-
-| 参数 | 说明 |
-| --- | --- |
-| `--json` | 以 JSON 输出，方便被其它程序调用 |
-| `-q` / `--quiet` | 静默模式，只在失败时输出（计划任务用） |
-| `--force` | 强制重新登录，即使已在线 |
-| `--user 账号` | 临时指定账号，不改配置文件 |
-| `--password 密码` | 临时指定密码 |
-| `--retry N` | 失败重试次数 |
-| `--timeout N` | 单次请求超时（秒） |
-
-**退出码**：`0` = 成功在线 · `1` = 失败 · `2` = 配置错误
-
-### 使用示例
-
-```powershell
-# 查看状态
-python campus_login.py status
-
-# 自检（网络不通时先用这个排查）
-python campus_login.py test
-
-# 供程序调用的 JSON 输出
-python campus_login.py status --json
-# => {"action": "status", "online": true, "ip": "10.0.0.100", "account": "13800000000", ...}
-```
-
-### 修改账号密码
-
-将 `config.example.json` 复制为 `config.json`，然后编辑 `config.json`：
-
-```json
-{
-  "portal_host": "172.30.100.2",
-  "username": "你的账号",
-  "password": "你的密码",
-  "isp": "1"
-}
-```
-
-> `config.json` 已被 `.gitignore` 忽略，不会被提交到 Git 仓库。
-
-`isp` 为运营商代码：`1` = 校园用户（默认，无后缀） · `2` = 校园电信 `@dx` · `3` = 校园联通 `@lt` · `4` = 校园其他
-
----
-
-## ② 设置开机自动登录
-
-> **前提：`config.json` 里必须已填好账号密码。** 计划任务开机跑的是 `wait` 模式，
-> 未在线时会真的发起认证；若凭据为空，任务每次开机都只会失败。
-> 安装脚本会提前检查并在未填写时直接拒绝安装（避免建出一个注定失败的任务）。
-
-**推荐方式（一键双击）**：
-* **安装**：直接双击运行项目根目录下的 **`install_autostart.bat`**。系统会自动弹出管理员授权窗口，点击「是」即自动完成自检并注册计划任务（开机 2 秒后启动 + 用户登录即时启动，并尽力附加休眠唤醒触发器，兼顾台式机常开与笔记本合盖休眠唤醒）。
-* **卸载**：直接双击运行 **`uninstall_autostart.bat`** 即可安全清理。
-
-**高级方式（手动 PowerShell）**：
-以管理员身份打开 PowerShell，执行：
-
-```powershell
-cd "C:\Project\campus-autologin"
-powershell -ExecutionPolicy Bypass -File "install_autostart.ps1"
-# 卸载请加 -Uninstall 参数
-```
-
-**相关操作**：
-
-```powershell
-schtasks /Run /TN CampusNetAutoLogin          # 立即手动触发一次
-notepad "C:\Project\campus-autologin\logs\autologin.log"   # 查看运行日志
-```
-
-> 开机自启用的是 `wait` 模式：网卡还没拿到 IP 时会自动等待（最多 90 秒），等校园网就绪后再登录。
-> 也可在桌面控制台 `gui.bat` 中通过「Windows 计划任务开机自启」卡片一键配置或卸载。
-
----
-
-## ③ Chrome 插件
-
-详见 [`chrome-extension/README.md`](chrome-extension/README.md)。
-
-简要步骤：
-
-1. 打开 Chrome，地址栏输入 `chrome://extensions/`
-2. 右上角开启 **开发者模式**
-3. 点击 **加载已解压的扩展程序**
-4. 选择 `C:\Project\campus-autologin\chrome-extension` 文件夹
-5. 点击插件图标 → 打开 **设置**，确认账号密码后保存
-
-插件重连很快，掉线基本无感（三层保障）：
-
-| 层级 | 触发时机 | 延迟 |
-| --- | --- | --- |
-| ① 断网跳转瞬间 | 网页打不开 / 被跳到门户 | **≈ 0 秒** |
-| ② 掉线后高频轮询 | 已确认掉线，每 **1 秒**重试 | **≤ 1 秒** |
-| ③ 在线时轮询 | 常规守护 | 兜底 |
-
-> **关于 1 秒间隔**：Chrome 官方文档说 `chrome.alarms` 最快 30 秒，但该限制**只对已打包/商店安装的扩展生效**。
-> 开发者模式加载的扩展不受限制 —— 本插件在 Chrome 154 实测：闹钟 `period=0.0167 分 = 1.0 秒`，
-> 16 秒内精确触发 16 次。若将来打包发布到商店，会被自动夹到 30 秒。
-
-> **⚠️ 改完插件代码没生效？这是 Chrome 的正常行为，不是 bug。**
->
-> Chrome 只在**加载扩展的那一刻**读取代码，之后一直用内存里的副本。
-> 改了磁盘文件，不点刷新是不会生效的。两种解决办法，任选其一：
->
-> **方法 A（推荐）**：双击 `reload_extension.bat`，在扩展页点「Campus AutoLogin」卡片上的 **🔄 刷新**，
-> 然后**把旧设置页标签关掉重新打开**。
->
-> **方法 B（最省事）**：**完全退出 Chrome 再打开**（关掉所有窗口；或右下角托盘退出）。
-> 重启后所有扩展都会重新从磁盘加载，等于自动刷新。
->
-> 确认成功的标志：设置页标题右边出现版本号 **v1.0.0**。
-
-### 更多便捷特性
-
-* **图标角标状态**：工具栏插件图标动态反映网络状态（离线高亮红色 `!`，重连中显示 `...`，在线自动隐藏）。
-* **全局快捷键**：按下 **`Alt+Shift+L`** 即可在任意网页直接触发静默认证，无需呼出弹窗。
-* **配置备份与恢复**：设置页底部提供「导出配置」与「导入配置」，一键生成/恢复 JSON 备份。
-* **账号快速清空**：设置页上网账号输入框内置 `×` 清空按钮，编辑更高效。
-
----
-
-## 工作原理（技术细节）
-
-门户是 Dr.COM / 哆点 ePortal，认证接口通过 JSONP 调用：
-
-| 用途 | 请求 |
-| --- | --- |
-| 查询状态 | `GET http://172.30.100.2/drcom/chkstatus?callback=dr1001&lang=zh&jsVersion=4.1.3` |
-| 登录认证 | `GET http://172.30.100.2/drcom/login?callback=dr1002&DDDDD=账号&upass=密码&0MKKey=123456&R1=0&R2=&R3=1&R6=0&para=00&v6ip=&terminal_type=1&lang=zh-cn&jsVersion=4.1.3` |
-| 注销 | `GET http://172.30.100.2/drcom/logout?...` |
-
-返回格式（JSONP 包了一层）：
-
-```javascript
-dr1002({"result":1,"uid":"13800000000","v4ip":"10.0.0.100",...});
-```
-
-- `result: 1` → 在线 / 登录成功
-- `result: 0` → 失败，`msga` 字段给出原因（`userid error1` 账号不存在、`userid error2` 密码错误）
-
-脚本会**先查状态再决定是否登录**，避免把已经正常的网络踢下线。
-
----
-
-## 自动化测试
-
-项目内置完整的标准单元测试与端到端脱敏回归套件：
-
-```powershell
-# 1. 核心功能与扩展契约单元测试（基于 Python unittest，零依赖）
+# 扩展结构与 DOM 契约测试（manifest / 弹窗与设置页的 DOM ID 对应关系 / 外链 noopener）
 python -m unittest discover tests -v
 
-# 2. clean_history.ps1 历史脱敏端到端回归测试（在隔离临时克隆中验证双分支逻辑）
+# 端到端回归：克隆临时副本，跑通「错误密码被拦截」与「正确凭据完整清洗」两条路径
 powershell -File tests/test_clean_history_e2e.ps1
+
+# 重新生成扩展图标（需要 Pillow：pip install pillow）
+python assets/make_icons.py
+
+# 改完扩展代码后：双击 reload_extension.bat → 在扩展页点 🔄 刷新 → 关掉旧设置页重开
 ```
 
-包含状态机三态容错解析、CLI 56 显示列垂直对齐、代理直连隔离保护、命令行边界钳位、Chrome 扩展 DOM 契约，以及历史清洗脚本在「错误密码拦截」与「真实旧凭据全流程脱敏自检」双路径下的端到端自动化验证。
-
----
-
-## 常见问题
-
-**Q：提示「门户不可达」？**
-说明当前不在校园网内。先连上校园网 Wi-Fi 或网线，再运行 `python campus_login.py test` 自检。
-
-**Q：提示「密码错误」但密码明明是对的？**
-检查 `config.json` 里的 `isp` 是否选对了运营商（部分学校需要在账号后加 `@dx` / `@lt` 后缀）。
-
-**Q：`logout` 显示「注销未生效」或注销后断网了？**
-注销接口 `http://172.30.100.2/drcom/logout` 在本校 AC 上是**真实生效**的（实测注销后 `chkstatus` 立即返回 `result: 0`，需要重新认证才能上网）。
-所以：**除非你真的想断网，否则不要运行 `logout`**。日常使用只用默认的智能登录即可。
-
-**Q：为什么不能用错误密码测试？**
-同一 IP 用错误密码发起认证，**会把当前在线的会话踢掉**（实测确认）。这也反过来证明认证是真实生效的。本脚本因此默认先查状态、已在线就直接返回，不会误触发认证。
-
-**Q：脚本会把我的网络踢下线吗？**
-不会。默认智能模式先查询状态，已在线就直接返回，不会重复认证。
+> Chrome 只在**加载扩展的那一刻**读取代码，之后一直用内存里的副本。
+> 改了磁盘文件不点刷新不会生效 —— 这是 Chrome 的正常行为，不是插件的问题。
 
 ---
 
 ## 安全提醒
 
-`config.json`（本地配置）和 Chrome 插件里保存了你的校园网密码（明文）。请注意：
+插件把校园网账号密码保存在浏览器扩展存储（`chrome.storage.local`）中，**明文**。
 
-- `config.json` 已被 `.gitignore` 忽略，请**切勿使用 `git add -f` 强制提交**到 Git 仓库。
-- **历史凭据处置与安全公告**：
-  - 本项目当前 HEAD 分支下的全部工程源码、脚本与测试用例均**不包含任何真实明文凭据**。
-  - 本项目 Git 历史**已完成重写清洗**：早期含真实凭据的 commit 对象已全部抹除，`git log -S` 全历史自检归零，当前仓库任何分支/标签的提交记录中均不含旧账号、旧密码与 `config.json`。
-  - **根本防御措施**：旧密码曾短暂暴露在公开历史中（可能已被 GitHub 缓存、第三方 fork 或搜索引擎快照留存），请**立即前往学校校园网自助服务网站修改一次密码**，旧密码在网关端将永久作废。
-  - **Git 历史重写清洗**：项目根目录附带历史清洗工具 `clean_history.ps1`。该脚本自身不存储任何凭据，运行时通过安全掩码交互输入（或 `-Account`/`-Password` 参数）获取需清洗的历史旧凭据，随后自动执行 `git-filter-repo` 重写历史，并在推送前**自动执行 `git log -S` 全历史残留自检**，抹去本地全部分支/标签历史中的旧账号、旧密码文本与 `config.json`（杜绝假成功）。注意：只会覆盖本地存在的分支/标签，若远端存在本地已删除的旧分支/标签，需手动删除。执行方式：
-    ```powershell
-    pip install git-filter-repo
-    powershell -File clean_history.ps1 -ForcePush
-    ```
-- **请勿使用错误密码高频测试**：真实校园网 Dr.COM AC 网关普遍内置防暴力破解策略，短时间内若连续收到错误密码可能会触发 IP 或账号封禁（15~30 分钟），导致暂时断网。
-- 不要把本工程目录直接打包上传公共网盘或发给他人（Chrome 插件设置及本地配置均包含个人凭据）。
-- 公用电脑（如机房、实验室）使用完毕后，建议立即删除 `config.json` 并清空插件内保存的凭据。
+- **请务必修改一次校园网密码**。本项目早期历史提交中曾包含真实账号与初始密码，
+  虽然 Git 历史已用 `git filter-repo` 完整重写、相关对象已全部物理回收，
+  但旧密码**至今仍可能有效**，一旦泄露即等于门户账号失守。
+- 本仓库当前 HEAD **不含任何真实凭据**；`.gitignore` 也已排除插件「导出配置」生成的明文备份。
+- 若将来要把本仓库转为公开，**务必先改密码**，再用 `clean_history.ps1` 复核一次历史。
+- 门户通信是**明文 HTTP**，同网段可被嗅探 —— 这是校园网本身的限制，插件无法规避。
+- 公用电脑使用完毕后，请清空插件设置页里的账号密码。
+
+### 历史脱敏工具
+
+```powershell
+pip install git-filter-repo
+powershell -File clean_history.ps1 -ForcePush
+```
+
+脚本会在重写前校验「你输入的凭据确实存在于历史中」，重写后执行多层自检
+（目标归零 / `config.json` 已抹除 / 无凭据字面量残留 / 旧对象已物理回收），
+任何一项不通过都会**阻断推送**，避免"改了但没改干净"的假成功。
 
 ---
 
-## 已验证信息
+## 许可
 
-在 `10.0.0.100`（Ethernet 网卡）上对本门户实测通过：
-
-| 项目 | 结果 |
-| --- | --- |
-| 门户可达 | ✅ `http://172.30.100.2/` HTTP 200，`Server: DrCOMServer1.0` |
-| 状态查询 | ✅ 返回 `result: 1`，账号 `13800000000`，IP `10.0.0.100` |
-| **正确账号密码** | ✅ 返回**认证成功页** `Dr.COMWebLoginID_3.htm` |
-| **错误密码** | ✅ 返回**认证失败页** `Dr.COMWebLoginID_2.htm`（`userid error2`） |
-| **不存在的账号** | ✅ 返回**认证失败页** `Dr.COMWebLoginID_2.htm`（`userid error1`） |
-| Python 脚本登录 | ✅ `login --force` → 登录成功，复核已在线 |
-| Python 脚本自检 | ✅ `test` → 全部接口 HTTP 200 |
-| 批处理启动器 | ✅ `login.bat` / `gui.bat` / `autostart.bat` 运行正常，日志正常写入 |
-| Chrome 插件网络层 | ✅ 11 项自动化检查全部通过（含真实门户请求） |
-| Chrome 插件间隔逻辑 | ✅ 17 项边界检查全部通过（含 30 秒闹钟） |
-| Chrome 插件图标 | ✅ 16/32/48/128 PNG 签名与尺寸校验通过 |
-| JS 语法 | ✅ `node --check` 全部通过 |
-
-> ⚠️ 注意：测试过程中确认「错误密码认证」和「注销」都会导致当前会话下线、需要重新登录。
-> 正常使用脚本不会触发这两种情况（默认先查状态，已在线直接返回）。
+供个人学习与自用。

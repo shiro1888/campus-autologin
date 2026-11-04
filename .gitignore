@@ -1,9 +1,7 @@
-# 运行日志（保留目录本身，忽略里面的日志文件）
-logs/*
-!logs/.gitkeep
+# 运行日志
 *.log
 
-# Python 缓存
+# Python 缓存（仅测试脚本使用）
 __pycache__/
 *.py[cod]
 *$py.class
@@ -14,12 +12,8 @@ _verify/
 _h1/
 
 # 本地个人配置（含真实密码）——默认不提交
-# 如果你 fork 了这个项目，请复制 config.example.json 为 config.json 并填入自己的账号密码
-config.json
-config.local.json
+# 插件设置页「导出配置」生成的明文备份，请勿提交
 campus-autologin-config-*.json
-.python_path
-.task_name
 
 # 编辑器与工具
 .vscode/

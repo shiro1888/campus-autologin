@@ -87,8 +87,8 @@ const ERROR_MAP = {
   'error1': '账号不存在',
   'error2': '密码错误',
   'error3': '账号或密码错误',
-  // 以下三条与 campus_login.py 的 ERROR_HINTS 对齐（此前只有 Python 侧识别，
-  // 导致同一错误码在扩展里退化成每秒重试）。
+  // 以下三条是「重试也没用」的凭据类错误，必须显式识别，
+  // 否则同一错误码在扩展里会退化成每秒重试（每天上万次注定失败的认证请求）。
   'out of service': '账号已停机，请充值后使用',
   'supplicant version too low': '客户端版本过低',
   'ip has been online': '该 IP 已经在线，无需重复登录',
@@ -419,7 +419,7 @@ function friendlyError(data) {
  * 判断登录失败是否属于「重试也没用」的凭据类错误（密码错、账号不存在、被锁、欠费等）。
  * 这类错误按 1 秒间隔无限重试毫无意义 —— 每天会产生上万次注定失败的认证请求，
  * 门户侧还可能触发「该账号已在别处登录」等副作用。
- * 对照：campus_login.py 的 cmd_login 早就有同样的判断（命中即 break 停止重试）。
+ * 命中即停止重试，改由常规间隔等待用户改好凭据。
  */
 function isPermanentAuthError(msg) {
   const m = String(msg || '');
@@ -463,8 +463,8 @@ async function doLogin(settings) {
 
   const data = parseJsonp(text);
   if (!data) {
-    // 非结构化响应：只认明确的成功标记（判定标准与 campus_login.py 对齐：
-    // 纯文本 "ok"、Dr.COMWebLoginID_3 成功结果页、"认证成功" 字样）。
+    // 非结构化响应：只认明确的成功标记（纯文本 "ok"、Dr.COMWebLoginID_3 成功结果页、
+    // "认证成功" 字样）。
     // 绝不能退回宽松的 /ok/ 子串匹配 —— 错误页里的 "network"/"token" 都含 "ok"，
     // 宽松匹配会把任意失败页误判成登录成功，且这一假成功还可能被二次验证坐实。
     // 成功标记必须先于 validateContentType 检查：成功结果页本身就是 HTML。

@@ -223,6 +223,9 @@ if (Test-Path $exampleCfg) {
         if ($exJson.password)  { $benignTokens.Add([string]$exJson.password) }
     } catch {}
 }
+# 说明：上面的动态收集是兜底路径。桌面端模板 config.example.json 已随本次精简移除，
+# 但内置排除表已独立覆盖历史中出现过的全部占位符（"校园网密码 —— 请填入你自己的" 等），
+# 因此模板缺失时扫描结果不受影响。
 $tokenPattern = ($benignTokens | Sort-Object -Unique | Where-Object { $_ } | ForEach-Object { [regex]::Escape($_) }) -join '|'
 $credPat = "(?<![a-zA-Z0-9_])password[`"']?[[:space:]]*[:=][[:space:]]*[`"'](?!$tokenPattern)[^`"']{3,}[`"']"
 
