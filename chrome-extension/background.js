@@ -1188,16 +1188,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const token = 'lock-' + Date.now() + '-' + Math.random().toString(36).slice(2);
       contentLockToken = token;
       if (contentLockTimer) clearTimeout(contentLockTimer);
-      // 租期需覆盖完整内容脚本流程（提交 + 5s 兜底 + chkstatus 8s + directLogin 8s ≈ 21s），
-      // 此前 8 秒太短，第一个标签还在跑就被第二个标签抢锁；30s 留足余量又不至于
-      // 在孤儿标签（中途被关闭）时过久阻塞后台自动重连。
+      // 租期需覆盖完整内容脚本流程：拿到锁后的最坏链路是
+      // 复查 chkstatus 8s + 5s 表单兜底等待 + 复查 chkstatus 8s + directLogin 8s ≈ 29s，
+      // 此前租期 30s 只剩 1 秒余量，门户响应偏慢时租约会中途到期、锁被清掉，
+      // 另一个门户标签就能抢锁并发认证（正是本锁要防的事）。放宽到 40s 留足余量，
+      // 又不至于在孤儿标签（中途被关闭）时过久阻塞后台自动重连。
       contentLockTimer = setTimeout(() => {
         if (activeAuthOp === 'content' && contentLockToken === token) {
           activeAuthOp = null;
           running = false;
           contentLockToken = null;
         }
-      }, 30000);
+      }, 40000);
       sendResponse({ ok: true, token: token });
     }
     return true;
