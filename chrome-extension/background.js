@@ -513,7 +513,36 @@ async function doLogin(settings) {
  * 重要：注销成功后必须置上 manualLogout 抑制标志。否则下一次后台巡检
  * （掉线间隔默认 1 秒）会立刻把用户重新认证上网，「注销」形同虚设。
  */
+// 注销去重：doLogout() 与 autoLogin 里「登录在途时用户点了注销」的补发路径
+// 可能同时触发注销。若各发一条完整序列，会重复请求门户；更糟的是 doLogout
+// 抢锁超时会回滚 manualLogout，而补发的注销又把它改回 true，最终状态取决于时序。
+// 统一由此执行器去重：在途复用同一 Promise；刚完成的结果在 3 秒窗口内复用。
+let logoutInFlight = null;
+let lastLogoutResult = null;
+let lastLogoutAt = 0;
+const LOGOUT_DEDUP_MS = 3000;
+
+function runLogoutOnce() {
+  if (logoutInFlight) return logoutInFlight;
+  if (lastLogoutResult && Date.now() - lastLogoutAt < LOGOUT_DEDUP_MS) {
+    return Promise.resolve(lastLogoutResult);
+  }
+  logoutInFlight = _doLogoutInternal().then((res) => {
+    lastLogoutResult = res;
+    lastLogoutAt = Date.now();
+    return res;
+  }).finally(() => {
+    logoutInFlight = null;
+  });
+  return logoutInFlight;
+}
+
 async function doLogout() {
+  // 已有注销在途（多为 autoLogin 因 manualLogout 补发的那一次）：直接复用结果，
+  // 不再发第二条序列，也不回滚 manualLogout。
+  if (logoutInFlight) {
+    return logoutInFlight;
+  }
   const prevSettings = await getSettings();
   const prevManualLogout = Boolean(prevSettings.manualLogout);
 
@@ -530,6 +559,12 @@ async function doLogout() {
   }
 
   if (activeAuthOp && activeAuthOp !== 'logout') {
+    // 竞态下 autoLogin 可能已补发注销（还没等到锁释放）：此时绝不能回滚暂停标志，
+    // 否则 UI 说「注销已跳过」、门户实际已注销，下一轮巡检又会把人静默登回。
+    if (logoutInFlight) return logoutInFlight;
+    if (lastLogoutResult && Date.now() - lastLogoutAt < LOGOUT_DEDUP_MS) {
+      return lastLogoutResult;
+    }
     // 抢锁超时（例如内容脚本持续占用）：回滚 manualLogout，避免未注销时误将守护置为暂停态
     await setState({ manualLogout: prevManualLogout });
     return fail(`当前正在进行${activeAuthOp === 'content' ? '页面认证' : '网络操作'}，注销已跳过，请稍后重试`, false);
@@ -538,7 +573,7 @@ async function doLogout() {
   activeAuthOp = 'logout';
   running = true;
   try {
-    return await _doLogoutInternal();
+    return await runLogoutOnce();
   } finally {
     activeAuthOp = null;
     running = false;
@@ -847,7 +882,7 @@ async function autoLogin(trigger, manual) {
     //   其实还在计费上网，且插件自认为暂停、不会再纠正。
     if ((await getSettings()).manualLogout) {
       console.log(tag + '登录期间用户已注销，补发注销以尊重用户意图');
-      const lr = await _doLogoutInternal();
+      const lr = await runLogoutOnce();
       await saveResult(lr);
       return lr;
     }
@@ -867,7 +902,9 @@ async function autoLogin(trigger, manual) {
         // 门户已接受认证，但复查时突然不可达（网络抖动 / 网关重启）：
         // 此刻什么都没确认到 —— 不能报「已确认在线」，也不能改判失败。
         // 按已提交处理，online 置 false（不隐藏离线角标），交给下一轮巡检裁决。
+        // 标 pending：这是「待确认」而非成功，避免面板渲染成绿色成功提示。
         r = ok('登录请求已提交，网络波动，待下一轮巡检确认', false);
+        r.pending = true;
       }
     }
 

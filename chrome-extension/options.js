@@ -906,7 +906,8 @@ function readForm() {
  * 注意：这里**不校验**账号密码。开关类与间隔类设置（自适应、开机自启、
  * 轮询间隔、运营商等）本身就是合法的，与是否填写凭据无关；在此拦截会导致
  * 全新安装（凭据默认为空）的用户无论怎么点都存不上，而且调用方还会弹出
- * 「已自动保存」的成功提示，属于静默失败。凭据校验只放在「立即测试」那一步。
+ * 「已自动保存」的成功提示，属于静默失败。凭据校验只在真正发起认证时进行
+ * （设置页的「保存并连接」与后台的定时巡检）。
  */
 function setDirtyState(dirty) {
   const btn = $('btnSave');
@@ -1149,7 +1150,8 @@ $('btnResetDefaults').addEventListener('click', () => {
     manualLogout: false,
     unreachableStreak: 0,
     connState: 'unknown',
-    authError: false
+    authError: false,
+    onlineSince: null
   }, () => {
     $('btnSave').classList.remove('has-changes');
     load();

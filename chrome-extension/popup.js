@@ -206,7 +206,9 @@ function refresh() {
       const r = s && s.lastResult;
       const rMsg = r && typeof r.message === 'string' ? r.message : '';
       if (rMsg && (!r.ok || rMsg.indexOf('无需登录') === -1)) {
-        const msgType = r.state === 'submitted' ? 'info' : (r.ok === false ? 'err' : 'ok');
+        // pending（登录已提交但复查时网络抖动）是「待确认」，按 info 显示，
+        // 不能因为 ok:true 就渲染成绿色成功。
+        const msgType = (r.state === 'submitted' || r.pending) ? 'info' : (r.ok === false ? 'err' : 'ok');
         setMsg(rMsg, msgType);
       }
     }

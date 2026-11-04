@@ -179,10 +179,17 @@
         const d = parseJsonp(t);
         if (d) {
           const code = String(d.result);
-          const rawMsg = d.msga || d.msg || '';
+          const rawMsg = String(d.msga || d.msg || '');
+          // 「该 IP 已经在线」不是失败：门户在说会话是好的（与 background.js 对齐）。
+          // 否则兜底登录会把一个本来就成功的会话显示成「登录失败」。
+          if (/ip has been online/i.test(rawMsg)) return { ok: true, msg: '' };
           return { ok: code === '1' || code.toLowerCase() === 'ok', msg: formatErrMsg(rawMsg) };
         }
-        if (/Dr\.COMWebLoginID_3/.test(t)) return { ok: true, msg: '' };
+        // 非结构化响应只认明确的成功标记（纯文本 ok / 成功结果页 / 认证成功）。
+        // 不能放宽成 /ok/ 子串：错误页里的 "network"、"token" 都含 ok。
+        if (/Dr\.COMWebLoginID_3/.test(t) || /^\s*ok[\s;]*$/i.test(t) || t.indexOf('认证成功') !== -1) {
+          return { ok: true, msg: '' };
+        }
         return { ok: false, msg: '' };
       })
       .catch(function () { return { ok: false, msg: '请求失败' }; });
