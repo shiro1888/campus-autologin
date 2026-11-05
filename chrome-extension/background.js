@@ -514,8 +514,7 @@ async function doLogin(settings) {
  * （掉线间隔默认 1 秒）会立刻把用户重新认证上网，「注销」形同虚设。
  */
 // 注销去重：doLogout() 与 autoLogin 里「登录在途时用户点了注销」的补发路径
-// 可能同时触发注销。若各发一条完整序列，会重复请求门户；更糟的是 doLogout
-// 抢锁超时会回滚 manualLogout，而补发的注销又把它改回 true，最终状态取决于时序。
+// 可能同时触发注销。若各发一条完整序列，会重复请求门户。
 // 统一由此执行器去重：在途复用同一 Promise；刚完成的结果在 3 秒窗口内复用。
 let logoutInFlight = null;
 let lastLogoutResult = null;
@@ -543,8 +542,6 @@ async function doLogout() {
   if (logoutInFlight) {
     return logoutInFlight;
   }
-  const prevSettings = await getSettings();
-  const prevManualLogout = Boolean(prevSettings.manualLogout);
 
   // 用户明确注销：第一时间落盘 manualLogout=true，令在途的 autoLogin 主动让出
   await setState({ manualLogout: true, unreachableStreak: 0 });
@@ -565,9 +562,11 @@ async function doLogout() {
     if (lastLogoutResult && Date.now() - lastLogoutAt < LOGOUT_DEDUP_MS) {
       return lastLogoutResult;
     }
-    // 抢锁超时（例如内容脚本持续占用）：回滚 manualLogout，避免未注销时误将守护置为暂停态
-    await setState({ manualLogout: prevManualLogout });
-    return fail(`当前正在进行${activeAuthOp === 'content' ? '页面认证' : '网络操作'}，注销已跳过，请稍后重试`, false);
+    // 抢锁超时（例如内容脚本仍在认证）：必须保留 manualLogout=true。
+    // 在途操作会读取该标志并主动让出（autoLogin 的补发注销、content.js 的 5 秒复查），
+    // 一旦回滚，反而会让它们继续把用户登回去 —— 注销被静默撤销。
+    // 代价只是守护进入暂停态，用户可随时点「立即登录」恢复，远优于注销失效。
+    return fail(`当前正在进行${activeAuthOp === 'content' ? '页面认证' : '网络操作'}，已暂停自动登录；该操作结束后不会自动重连`, false);
   }
 
   activeAuthOp = 'logout';
@@ -1206,8 +1205,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'releaseAuthLock') {
-    // 只有持有令牌的一方（或未携带令牌的旧版本）才能释放，避免误释放他人锁
-    if (activeAuthOp === 'content' && (!msg.token || msg.token === contentLockToken)) {
+    // 只有持有当前令牌的一方才能释放；无令牌的旧版消息一律忽略，
+    // 避免扩展 reload 后残留的旧标签页误清新实例的锁。
+    if (activeAuthOp === 'content' && msg.token && msg.token === contentLockToken) {
       activeAuthOp = null;
       running = false;
       contentLockToken = null;

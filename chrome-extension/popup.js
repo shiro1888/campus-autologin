@@ -391,6 +391,8 @@ function refresh() {
       durationTicker.stop();
       if (paused) {
         setStatus('已手动注销 · 自动登录暂停', '点「立即登录」可恢复自动重连', 'wait');
+      } else if (res.unparseable) {
+        setStatus('未识别的网络', '当前网络需要网页登录（非校园网认证页）', 'wait');
       } else {
         setStatus('未登录 · 需要认证', '已连上校园局域网，请点击登录', 'wait');
       }
