@@ -153,7 +153,7 @@ function setLocalIp(ip) {
   $('localIp').textContent = currentIp || '未连接';
 }
 
-const renderPingSparkline = createSparkline('popPingSparkline', 4);
+const renderPingSparkline = createSparkline('popPingSparkline', 7);
 
 
 /** 刷新面板状态 */
@@ -247,11 +247,15 @@ function refresh() {
     paused = !!res.manualLogout;
 
     const pingEl = $('popPing');
+    const hist = Array.isArray(res.pingHistory) && res.pingHistory.length ? res.pingHistory : null;
     if (res.pingMs !== undefined && res.pingMs >= 0) {
       pingEl.textContent = `${res.pingMs} ms`;
-      if (res.pingMs <= 50) {
+      if (res.pingMs <= 35) {
         pingEl.className = 'dock-value mono ping-fast';
         pingEl.title = `极佳延迟 (${res.pingMs} ms)`;
+      } else if (res.pingMs <= 75) {
+        pingEl.className = 'dock-value mono ping-good';
+        pingEl.title = `网络畅通 (${res.pingMs} ms)`;
       } else if (res.pingMs <= 150) {
         pingEl.className = 'dock-value mono ping-normal';
         pingEl.title = `正常延迟 (${res.pingMs} ms)`;
@@ -259,12 +263,12 @@ function refresh() {
         pingEl.className = 'dock-value mono ping-slow';
         pingEl.title = `较高延迟 (${res.pingMs} ms)`;
       }
-      renderPingSparkline(res.pingMs);
+      renderPingSparkline(hist || res.pingMs);
     } else {
       pingEl.textContent = res.reachable ? '< 10 ms' : '超时';
       pingEl.className = res.reachable ? 'dock-value mono ping-fast' : 'dock-value mono ping-slow';
       pingEl.title = res.reachable ? '网关连通正常' : '网关不可达';
-      renderPingSparkline(res.reachable ? 8 : -1);
+      renderPingSparkline(hist || (res.reachable ? 8 : -1));
     }
 
     const rawData = res.raw || {};

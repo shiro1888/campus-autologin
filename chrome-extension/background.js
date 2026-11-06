@@ -356,6 +356,22 @@ function fail(message, online) {
  * ——典型场景是酒店 / 机场的强制门户把任意请求都拦成自家登录页，
  * 这种情况重试再多次也不会成功，必须走退避而非 1 秒高频重试。
  */
+const MAX_PING_HISTORY = 12;
+const pingHistory = [];
+
+function recordPingHistory(ms) {
+  if (typeof ms === 'number') {
+    pingHistory.push(ms);
+    if (pingHistory.length > MAX_PING_HISTORY) {
+      pingHistory.shift();
+    }
+  }
+}
+
+function getPingHistory() {
+  return pingHistory.slice();
+}
+
 async function checkStatus() {
   const url = URL_CHKSTATUS + '?callback=dr1001&v=' + rand() + '&lang=zh&jsVersion=' + JS_VERSION;
   const t0 = Date.now();
@@ -363,9 +379,11 @@ async function checkStatus() {
   try {
     text = await fetchText(url);
   } catch (e) {
-    return { reachable: false, online: false, raw: null, pingMs: -1, message: '网络连接失败，请检查 Wi-Fi 或网线' };
+    recordPingHistory(-1);
+    return { reachable: false, online: false, raw: null, pingMs: -1, pingHistory: getPingHistory(), message: '网络连接失败，请检查 Wi-Fi 或网线' };
   }
   const pingMs = Date.now() - t0;
+  recordPingHistory(pingMs);
 
   let bad = null;
   try {
@@ -376,12 +394,12 @@ async function checkStatus() {
   const data = bad ? null : parseJsonp(text);
   if (!data) {
     return {
-      reachable: true, online: false, unparseable: true, raw: null, pingMs,
+      reachable: true, online: false, unparseable: true, raw: null, pingMs, pingHistory: getPingHistory(),
       message: bad || '门户返回数据无法解析（可能认证页已变更）'
     };
   }
   const online = Number(data.result) === 1;
-  return { reachable: true, online: online, raw: data, pingMs: pingMs,
+  return { reachable: true, online: online, raw: data, pingMs: pingMs, pingHistory: getPingHistory(),
            message: online ? '当前已在线' : '当前未登录' };
 }
 

@@ -113,35 +113,79 @@ function createTicker(onTick) {
 }
 
 /**
- * 创建心跳延迟波动小柱图渲染器
+ * 创建心跳延迟波动实时柱状/波形图渲染器
  * @param {string} containerId 容器元素ID
  * @param {number} maxBars 最多保留的历史条数
  */
-function createSparkline(containerId, maxBars = 5) {
-  const history = [];
-  return function render(pingMs) {
+function createSparkline(containerId, maxBars = 8) {
+  let history = [];
+  return function render(pingInput) {
     const container = $(containerId);
     if (!container) return;
-    if (pingMs !== undefined && pingMs >= 0) {
-      history.push(pingMs);
+
+    if (Array.isArray(pingInput)) {
+      history = pingInput.slice(-maxBars);
+    } else if (typeof pingInput === 'number' && Number.isFinite(pingInput)) {
+      if (pingInput >= 0 || pingInput === -1) {
+        history.push(pingInput);
+      }
       if (history.length > maxBars) history.shift();
     }
+
     const bars = container.querySelectorAll('.spark-bar');
     if (!bars.length) return;
-    const maxPing = Math.max(60, ...history, 1);
+
+    const validPings = history.filter((p) => typeof p === 'number' && p >= 0);
+    const maxPing = Math.max(50, ...validPings, 1);
+    const minPing = validPings.length ? Math.min(...validPings) : 0;
+    const avgPing = validPings.length ? Math.round(validPings.reduce((a, b) => a + b, 0) / validPings.length) : 0;
+
+    // 右对齐填充：最新的心跳始终在最右侧显示
+    const offset = bars.length - history.length;
+
     bars.forEach((bar, idx) => {
-      const val = history[idx];
-      if (val !== undefined) {
-        const pct = Math.max(25, Math.min(100, Math.round((val / maxPing) * 100)));
-        bar.style.height = `${pct}%`;
-        bar.className = 'spark-bar ' + (val <= 50 ? 'fast' : (val <= 150 ? 'normal' : 'slow'));
-        bar.title = `${val} ms`;
+      const historyIdx = idx - offset;
+      if (historyIdx >= 0 && historyIdx < history.length) {
+        const val = history[historyIdx];
+        const isLatest = historyIdx === history.length - 1;
+
+        if (val === -1) {
+          bar.style.height = '42%';
+          bar.className = 'spark-bar timeout' + (isLatest ? ' latest' : '');
+          bar.title = `心跳 #${historyIdx + 1}: 超时 / 丢包`;
+        } else {
+          const pct = Math.max(22, Math.min(100, Math.round((val / maxPing) * 100)));
+          bar.style.height = `${pct}%`;
+          let grade = 'fast';
+          let gradeLabel = '极佳';
+          if (val <= 35) {
+            grade = 'fast';
+            gradeLabel = '极佳';
+          } else if (val <= 75) {
+            grade = 'good';
+            gradeLabel = '畅通';
+          } else if (val <= 150) {
+            grade = 'normal';
+            gradeLabel = '适中';
+          } else {
+            grade = 'slow';
+            gradeLabel = '迟滞';
+          }
+          bar.className = `spark-bar ${grade}` + (isLatest ? ' latest' : '');
+          bar.title = `心跳 #${historyIdx + 1}: ${val} ms (${gradeLabel})`;
+        }
       } else {
-        bar.style.height = '25%';
-        bar.className = 'spark-bar';
-        bar.title = '';
+        bar.style.height = '18%';
+        bar.className = 'spark-bar empty';
+        bar.title = '等待心跳…';
       }
     });
+
+    if (validPings.length) {
+      container.title = `心跳延迟走势 (均值: ${avgPing}ms · 最低: ${minPing}ms · 最高: ${Math.max(...validPings)}ms)`;
+    } else if (history.length) {
+      container.title = '最近心跳: 网络连接超时或不可达';
+    }
   };
 }
 

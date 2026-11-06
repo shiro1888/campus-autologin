@@ -132,7 +132,7 @@ const durationTicker = createTicker((text) => {
   $('stTime').textContent = text;
 });
 
-const renderOptPingSparkline = createSparkline('optPingSparkline', 5);
+const renderOptPingSparkline = createSparkline('optPingSparkline', 8);
 
 
 /** 动态更新网络全链路拓扑指示器 */
@@ -775,28 +775,32 @@ function refreshStatus(cb) {
     // Ping & Latency Rating
     const pingEl = $('stPing');
     const badgeEl = $('pingBadge');
+    const hist = Array.isArray(res.pingHistory) && res.pingHistory.length ? res.pingHistory : null;
     if (res.pingMs !== undefined && res.pingMs >= 0) {
       pingEl.textContent = res.pingMs + ' ms';
       if (badgeEl) {
-        if (res.pingMs <= 50) {
+        if (res.pingMs <= 35) {
           badgeEl.className = 'latency-badge fast';
           badgeEl.textContent = '极佳';
+        } else if (res.pingMs <= 75) {
+          badgeEl.className = 'latency-badge good';
+          badgeEl.textContent = '畅通';
         } else if (res.pingMs <= 150) {
           badgeEl.className = 'latency-badge normal';
-          badgeEl.textContent = '良好';
+          badgeEl.textContent = '适中';
         } else {
           badgeEl.className = 'latency-badge slow';
-          badgeEl.textContent = '较高';
+          badgeEl.textContent = '高延迟';
         }
       }
-      renderOptPingSparkline(res.pingMs);
+      renderOptPingSparkline(hist || res.pingMs);
     } else {
       pingEl.textContent = res.reachable ? '< 10 ms' : '超时';
       if (badgeEl) {
         badgeEl.className = res.reachable ? 'latency-badge fast' : 'latency-badge slow';
         badgeEl.textContent = res.reachable ? '连通' : '超时';
       }
-      renderOptPingSparkline(res.reachable ? 8 : -1);
+      renderOptPingSparkline(hist || (res.reachable ? 8 : -1));
     }
 
     // Flow & Traffic Detail (下行 / 上行 / 总计明细)
