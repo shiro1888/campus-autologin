@@ -2079,6 +2079,11 @@ input[aria-invalid="true"] {
   width: 100%;
 }
 
+/* 运营商已由分段胶囊替代，原生下拉仅作为数据源保留 */
+.select-wrap.is-hidden {
+  display: none;
+}
+
 /* 隐藏原生 select 保持表单与无障碍兼容 */
 .custom-select-hidden {
   position: absolute !important;

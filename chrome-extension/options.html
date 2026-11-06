@@ -279,24 +279,24 @@
           <div class="field">
             <label for="isp">运营商选择 (R3 认证参数)</label>
             <div class="isp-quick-pills" id="ispQuickPills" role="radiogroup" aria-label="运营商快捷选择">
-              <button type="button" class="isp-pill active" data-isp="1">
+              <button type="button" class="isp-pill active" data-isp="1" role="radio" aria-checked="true">
                 <span class="isp-pill-name">校园用户</span>
                 <span class="isp-pill-tag">默认</span>
               </button>
-              <button type="button" class="isp-pill" data-isp="2">
+              <button type="button" class="isp-pill" data-isp="2" role="radio" aria-checked="false">
                 <span class="isp-pill-name">校园电信</span>
                 <span class="isp-pill-tag mono">@dx</span>
               </button>
-              <button type="button" class="isp-pill" data-isp="3">
+              <button type="button" class="isp-pill" data-isp="3" role="radio" aria-checked="false">
                 <span class="isp-pill-name">校园联通</span>
                 <span class="isp-pill-tag mono">@lt</span>
               </button>
-              <button type="button" class="isp-pill" data-isp="4">
+              <button type="button" class="isp-pill" data-isp="4" role="radio" aria-checked="false">
                 <span class="isp-pill-name">校园其他</span>
                 <span class="isp-pill-tag">无后缀</span>
               </button>
             </div>
-            <div class="select-wrap" style="display: none;">
+            <div class="select-wrap is-hidden">
               <select id="isp">
                 <option value="1">校园用户（默认，无后缀）</option>
                 <option value="2">校园电信（@dx）</option>
