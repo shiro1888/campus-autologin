@@ -1097,7 +1097,7 @@ function createNetworkHealthMeter(options = {}) {
  * 诊断报告标准化生成器：一键生成脱敏文本快照，便于校园网报障与排查
  */
 function generateDiagnosticSnapshot(data = {}) {
-  const version = (typeof chrome !== 'undefined' && chrome.runtime?.getManifest?.()?.version) || '1.3.0';
+  const version = (typeof chrome !== 'undefined' && chrome.runtime?.getManifest?.()?.version) || '1.0.0';
   const ispMeta = getIspMeta(data.isp || '1');
   const maskedAcc = maskAccount(data.account || '') || '未配置';
   const logs = Array.isArray(data.eventLogs) ? data.eventLogs.slice(0, 6) : [];

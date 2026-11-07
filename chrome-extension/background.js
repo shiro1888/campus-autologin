@@ -153,6 +153,15 @@ function parseGatewayDurationSec(raw) {
   return 0;
 }
 
+/** 账号脱敏（日志与调试安全防窥） */
+function maskAccount(acc) {
+  if (!acc || typeof acc !== 'string') return '';
+  const t = acc.trim();
+  if (t.length <= 4) return '****';
+  if (t.length <= 7) return t.slice(0, 2) + '****' + t.slice(-2);
+  return t.slice(0, 3) + '****' + t.slice(-4);
+}
+
 /** 从 JSONP 文本中提取 JSON 对象并解析；失败返回 null */
 function parseJsonp(text) {
   if (!text) return null;
@@ -942,7 +951,7 @@ async function autoLogin(trigger, manual) {
                message: '已手动注销，自动登录已取消', time: nowText() };
     }
 
-    console.log(tag + '未在线，开始登录：' + settings.account);
+    console.log(tag + '未在线，开始登录：' + maskAccount(settings.account));
     updateActionBadge(false, '...');
     await applyCadence();
     let r = await doLogin(settings);
