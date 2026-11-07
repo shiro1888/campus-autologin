@@ -273,7 +273,12 @@ async function getSettings() {
     initialized: !!stored.initialized,
     onlineSince: stored.onlineSince ? Number(stored.onlineSince) : null,
     pingHistory: Array.isArray(stored.pingHistory) ? stored.pingHistory : [],
-    eventLogs: Array.isArray(stored.eventLogs) ? stored.eventLogs : []
+    // 只保留对象条目：storage 可能被手改 / 旧版本残留 / 其他扩展写入 null 等垃圾元素。
+    // 这里不过滤的话，垃圾会被原样写回磁盘，且 UI 消费端（时间线 / 诊断报告）
+    // 直接读取条目字段时会抛 TypeError。
+    eventLogs: Array.isArray(stored.eventLogs)
+      ? stored.eventLogs.filter((e) => e && typeof e === 'object' && !Array.isArray(e))
+      : []
   };
   return s;
 }

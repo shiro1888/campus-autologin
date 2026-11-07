@@ -654,6 +654,174 @@ vm.runInContext(src, sandbox);
                          f"saveResult 未自行恢复运行态，心跳历史被覆盖: {data}")
         self.assertEqual(data["writeCount"], 1, "contentResult 应只触发一次 storage 写入")
 
+    def test_hydrate_drops_malformed_event_log_entries(self):
+        """storage 里的 eventLogs 混入 null / 字符串时，恢复与写回都必须剔除。
+
+        eventLogs 来自 chrome.storage.local，可能被手改、旧版本残留、或其他扩展写入。
+        hydrateState 若只校验「是不是数组」，垃圾元素会被原样写回磁盘，并继续流向
+        UI 消费端（时间线读 item.pending、诊断报告读 item.time）直接抛 TypeError。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(process.argv[1], 'utf8');
+const listeners = {};
+let storage = {
+  eventLogs: [
+    null,
+    { time: '09:00:02', message: '有效事件A', ok: true, online: true, from: '巡检', count: 1 },
+    'junk-entry',
+    undefined,
+    42,
+    { time: '09:00:01', message: '有效事件B', ok: false, online: false, from: '巡检', count: 1 }
+  ],
+  pingHistory: [], initialized: true, account: 'test', password: 'pw'
+};
+const writes = [];
+const chrome = {
+  storage: { local: {
+    get: (arg, cb) => {
+      const r = arg === null ? { ...storage } : { ...(arg || {}) };
+      if (typeof cb === 'function') { cb(r); return; }
+      return Promise.resolve(r);
+    },
+    set: (patch, cb) => {
+      writes.push(patch); Object.assign(storage, patch);
+      if (typeof cb === 'function') cb();
+      return Promise.resolve();
+    }
+  } },
+  runtime: {
+    onInstalled: { addListener: (f) => listeners.installed = f },
+    onStartup: { addListener: (f) => listeners.startup = f },
+    onMessage: { addListener: (f) => listeners.message = f },
+    getManifest: () => ({ version: 'test' }), lastError: null
+  },
+  alarms: { onAlarm: { addListener: () => {} }, get: async () => null, create: async () => {} },
+  action: { setBadgeText: () => {}, setBadgeBackgroundColor: () => {} },
+  commands: null
+};
+const sandbox = {
+  console: { log: () => {}, warn: () => {}, error: () => {} }, chrome,
+  setTimeout: (fn) => setTimeout(fn, 0), clearTimeout,
+  setInterval: () => 0, clearInterval: () => {},
+  Date, Math, JSON, Promise, Number, String, Array, Object, RegExp,
+  parseInt, parseFloat, isNaN, Boolean, Set, Map, Error,
+  TextDecoder, AbortController, Uint8Array, ArrayBuffer, URLSearchParams,
+  fetch: async () => { throw new Error('offline'); }
+};
+vm.createContext(sandbox);
+vm.runInContext(src, sandbox);
+
+(async () => {
+  await new Promise((resolve) => listeners.message(
+    { type: 'contentResult', result: { ok: true, online: true, message: '页面自动填写完成' } },
+    {}, resolve
+  ));
+  const last = writes[writes.length - 1] || {};
+  const logs = last.eventLogs || [];
+  console.log('RESULT:' + JSON.stringify({
+    len: logs.length,
+    messages: logs.map((e) => (e && e.message) || null),
+    hasJunk: logs.some((e) => !e || typeof e !== 'object' || Array.isArray(e))
+  }));
+})().catch((e) => console.log('ERROR:' + e.message));
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, os.path.join(EXT_DIR, "background.js")],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"后台脚本模拟失败:\n{res.stderr}\n{res.stdout}")
+        line = next((l for l in res.stdout.splitlines() if l.startswith("RESULT:")), None)
+        self.assertIsNotNone(line, f"未拿到模拟结果:\n{res.stdout}\n{res.stderr}")
+        data = json.loads(line[len("RESULT:"):])
+        self.assertFalse(data["hasJunk"], f"垃圾日志元素被写回磁盘: {data}")
+        self.assertEqual(data["len"], 3, f"两条有效历史 + 一条新事件，实际: {data}")
+        self.assertEqual(data["messages"][0], "页面自动填写完成")
+        self.assertEqual(data["messages"][1:], ["有效事件A", "有效事件B"],
+                         f"有效条目丢失或被重排: {data}")
+
+    def test_malformed_event_logs_do_not_break_ui_consumers(self):
+        """时间线与诊断报告必须容忍 eventLogs 里的非对象元素。
+
+        options.js 从 storage 读 eventLogs 后只做 Array.isArray 校验，就分别交给
+        createActivityTimeline.render 与 generateDiagnosticSnapshot。只要混入一个
+        null：render 读 item.pending 抛 TypeError（事件抽屉整块空白），
+        snapshot 读 item.time 抛 TypeError（「复制诊断报告」点了没反应）。
+        两者都不影响页面其余部分，因此极难被发现 —— 必须靠运行时用例锁住。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(process.argv[1], 'utf8');
+const problems = [];
+const els = {};
+const mkEl = (id) => ({
+  id, textContent: '', innerHTML: '', style: {}, dataset: {},
+  classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+  addEventListener() {}, setAttribute() {}, getAttribute() { return null; },
+  querySelectorAll() { return []; }, querySelector() { return null; }
+});
+const sandbox = {
+  console: { log() {}, warn() {}, error() {} },
+  setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {},
+  document: {
+    getElementById: (id) => (els[id] = els[id] || mkEl(id)),
+    querySelectorAll: () => [], querySelector: () => null, addEventListener() {},
+    documentElement: { setAttribute() {}, removeAttribute() {} }
+  },
+  window: { matchMedia: () => ({ matches: false, addEventListener() {} }) },
+  navigator: {},
+  chrome: {
+    runtime: { getManifest: () => ({ version: '1.0.0' }) },
+    storage: { local: { get() {}, set() {} }, onChanged: { addListener() {} } }
+  },
+  Date, Math, JSON, String, Number, Object, Array, RegExp, Set, parseInt, parseFloat, isNaN
+};
+vm.createContext(sandbox);
+vm.runInContext(src, sandbox);
+
+const VALID = {
+  time: '2026-11-07 16:00:00', message: '已在线，无需登录',
+  ok: true, online: true, from: '巡检', count: 2
+};
+
+try {
+  const tl = vm.runInContext('createActivityTimeline({ listId: "L", countBadgeId: "B" })', sandbox);
+  tl.render([null, undefined, 'junk', 42, [], VALID]);
+  if (!String(els.L.innerHTML).includes('已在线，无需登录')) {
+    problems.push('时间线未渲染出有效条目');
+  }
+  if (/undefined|NaN|\[object Object\]/.test(String(els.L.innerHTML))) {
+    problems.push('时间线渲染出脏值: ' + els.L.innerHTML);
+  }
+  if (els.B.textContent !== '日志 (1)') {
+    problems.push('时间线计数未剔除垃圾元素: ' + els.B.textContent);
+  }
+} catch (e) {
+  problems.push('时间线 render 抛异常: ' + e.message);
+}
+
+try {
+  const snap = vm.runInContext(
+    'generateDiagnosticSnapshot({ account: "13812345678", eventLogs: [null, ' + JSON.stringify(VALID) + '] })',
+    sandbox
+  );
+  if (!snap.includes('2026-11-07 16:00:00')) problems.push('诊断报告未包含有效事件');
+  if (snap.includes('null')) problems.push('诊断报告出现 null 字面量');
+} catch (e) {
+  problems.push('generateDiagnosticSnapshot 抛异常: ' + e.message);
+}
+
+console.log(problems.length ? 'PROBLEMS:' + problems.join(' | ') : 'RESULT:OK');
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, os.path.join(EXT_DIR, "common.js")],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"组件脚本模拟失败:\n{res.stderr}\n{res.stdout}")
+        self.assertIn("RESULT:OK", res.stdout,
+                      f"畸形 eventLogs 破坏了 UI 消费端:\n{res.stdout}\n{res.stderr}")
 
     def test_shared_component_degraded_paths(self):
         """运行时验证组件的降级与并发路径，而不只是「不抛异常」。

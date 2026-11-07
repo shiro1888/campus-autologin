@@ -670,6 +670,23 @@ function createConfirmModal(cfg = {}) {
 }
 
 /**
+ * 归一化事件日志数组。
+ *
+ * eventLogs 来自 chrome.storage.local，可能混入 null / 字符串 / 数字等非对象元素
+ * （用户手改、旧版本残留、其他扩展写入）。而所有消费端都是直接读取条目字段：
+ *   - 时间线抽屉 render 读 item.pending
+ *   - 诊断报告读 item.time / item.from / item.message
+ * 只要混入一个 null，两处就会抛 TypeError —— 抽屉整块空白、「复制诊断报告」
+ * 按钮点了没反应，且控制台之外没有任何提示。
+ *
+ * 本函数是这两处的唯一入口守卫：只保留真正可渲染的对象条目。
+ */
+function sanitizeEventLogs(list) {
+  if (!Array.isArray(list)) return [];
+  return list.filter((item) => item && typeof item === 'object' && !Array.isArray(item));
+}
+
+/**
  * 组件 7：实时诊断事件时间轴组件 (ActivityTimeline Component)
  * 渲染近期巡检、认证、网络波动与重连记录，支持折叠抽屉与一键复制脱敏诊断摘要。
  */
@@ -684,7 +701,7 @@ function createActivityTimeline(cfg = {}) {
 
   function render(logs) {
     if (Array.isArray(logs)) {
-      cachedLogs = logs;
+      cachedLogs = sanitizeEventLogs(logs);
     }
     const listEl = getList();
     const badgeEl = getCountBadge();
@@ -1118,7 +1135,7 @@ function generateDiagnosticSnapshot(data = {}) {
   const version = (typeof chrome !== 'undefined' && chrome.runtime?.getManifest?.()?.version) || '1.0.0';
   const ispMeta = getIspMeta(data.isp || '1');
   const maskedAcc = maskAccount(data.account || '') || '未配置';
-  const logs = Array.isArray(data.eventLogs) ? data.eventLogs.slice(0, 6) : [];
+  const logs = sanitizeEventLogs(data.eventLogs).slice(0, 6);
   // data.mac 的调用方（设置页）传的是 UI 文案「物理 MAC: AA:BB:...」而不是裸 MAC。
   // 直接交给 fmtMac 会因剥离出的十六进制位多于 12 位而判定失败、原样返回，
   // 最终报告里出现「MAC: 物理 MAC: AA:BB:...」的重复前缀。先剥掉标签再格式化。
