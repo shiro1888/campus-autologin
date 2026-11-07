@@ -1056,11 +1056,15 @@ function createNetworkHealthMeter(options = {}) {
     }
 
     if (!res.online) {
+      // score 与展示文案必须同源：此前 score 返回 45/55、text 却硬编码「50%」，
+      // 两个字段自相矛盾 —— 一旦有消费方改用 score 渲染，就会出现「评分 55、文案 50%」的分裂。
+      const score = res.manualLogout ? 45 : 55;
+      const stateText = res.manualLogout ? '已暂停' : '待认证';
       return {
-        score: res.manualLogout ? 45 : 55,
+        score,
         grade: 'wait',
-        title: res.manualLogout ? '已暂停' : '待认证',
-        text: `健康度 50% · ${res.manualLogout ? '已暂停' : '待认证'}`,
+        title: stateText,
+        text: `健康度 ${score}% · ${stateText}`,
         desc: '已连接局域网网关，互联网访问受限'
       };
     }
@@ -1115,6 +1119,10 @@ function generateDiagnosticSnapshot(data = {}) {
   const ispMeta = getIspMeta(data.isp || '1');
   const maskedAcc = maskAccount(data.account || '') || '未配置';
   const logs = Array.isArray(data.eventLogs) ? data.eventLogs.slice(0, 6) : [];
+  // data.mac 的调用方（设置页）传的是 UI 文案「物理 MAC: AA:BB:...」而不是裸 MAC。
+  // 直接交给 fmtMac 会因剥离出的十六进制位多于 12 位而判定失败、原样返回，
+  // 最终报告里出现「MAC: 物理 MAC: AA:BB:...」的重复前缀。先剥掉标签再格式化。
+  const macText = fmtMac(String(data.mac || '').replace(/^\s*(?:物理\s*)?MAC\s*[:：]\s*/i, '')) || '—';
 
   const lines = [
     `=== [校园网自动登录 诊断快照 v${version}] ===`,
@@ -1122,7 +1130,7 @@ function generateDiagnosticSnapshot(data = {}) {
     `连接状态: ${data.statusText || '—'} (健康度: ${data.healthText || '—'})`,
     `网关延迟: ${data.pingText || '—'} (网关: 172.30.100.2:80)`,
     `认证账号: ${maskedAcc} | 运营商: ${ispMeta.short} (${ispMeta.tag})`,
-    `终端地址: ${data.ip || '—'} | MAC: ${fmtMac(data.mac) || '—'}`,
+    `终端地址: ${data.ip || '—'} | MAC: ${macText}`,
     `计费流量: ${data.flowText || '—'}`,
     `保活策略: ${data.policyText || '—'}`,
     `近况事件:`,

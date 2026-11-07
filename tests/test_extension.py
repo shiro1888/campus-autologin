@@ -431,6 +431,24 @@ if (problems.length) {
         missing = [c for c in emitted if ("." + c) not in css]
         self.assertEqual(missing, [], f"options.css 缺少时间轴样式规则: {missing}")
 
+    def test_css_custom_properties_defined(self):
+        """CSS 中 var(--x) 引用的自定义属性必须在同一文件里有定义。
+
+        `var(--未定义)` 不带后备值时，整条声明会在「计算值阶段」失效，属性回退为
+        初始值 —— 边框/背景/颜色静默消失，控制台没有任何报错。
+        曾出现 `.ping-sparkline { border: 1px solid var(--border-hairline) }`，
+        而全项目从未定义 `--border-hairline`，心跳波形图的外框一直不渲染。
+        """
+        for name in ("options.css", "popup.css"):
+            with open(os.path.join(EXT_DIR, name), "r", encoding="utf-8") as f:
+                css = f.read()
+            used = set(re.findall(r"var\(\s*(--[A-Za-z0-9_-]+)", css))
+            defined = set(re.findall(r"(--[A-Za-z0-9_-]+)\s*:", css))
+            self.assertEqual(
+                sorted(used - defined), [],
+                f"{name} 引用了未定义的自定义属性（相关声明会静默失效）",
+            )
+
     def test_ping_history_written_once_with_result(self):
         """心跳历史不得每次探测单独写盘，且必须随 saveResult 的批次一起落盘。"""
         with open(os.path.join(EXT_DIR, "background.js"), "r", encoding="utf-8") as f:
@@ -847,6 +865,16 @@ if (off.score !== 0 || off.grade !== 'offline') problems.push('健康度离线�
 
 const wait = meter.evaluate({ reachable: true, online: false });
 if (wait.grade !== 'wait' || wait.score <= 0) problems.push('健康度待认证评分错误: ' + JSON.stringify(wait));
+// score 与展示文案必须同源：曾出现 score 返回 55、text 却硬编码「健康度 50%」，
+// 两个字段自相矛盾；只要消费方改用 score 取值，界面就会和真实评分对不上。
+if (!String(wait.text).includes(wait.score + '%')) {
+  problems.push('健康度文案与 score 不一致: ' + JSON.stringify(wait));
+}
+const paused = meter.evaluate({ reachable: true, online: false, manualLogout: true });
+if (paused.grade !== 'wait') problems.push('健康度已暂停档位错误: ' + JSON.stringify(paused));
+if (!String(paused.text).includes(paused.score + '%')) {
+  problems.push('健康度暂停态文案与 score 不一致: ' + JSON.stringify(paused));
+}
 
 const fast = meter.evaluate({ reachable: true, online: true, pingMs: 15 });
 if (fast.grade !== 'fast' || fast.score !== 100) problems.push('健康度极佳评分错误: ' + JSON.stringify(fast));
@@ -880,6 +908,23 @@ if (snapshot.includes(rawAccount)) problems.push('诊断快照泄露了明文完
 if (!snapshot.includes('138****5678')) problems.push('诊断快照未能正确脱敏账号');
 if (!snapshot.includes('10.10.10.1')) problems.push('诊断快照缺少 IP 信息');
 if (!snapshot.includes('极佳')) problems.push('诊断快照缺少健康度');
+
+// 设置页传给快照的是 UI 文案「物理 MAC: AA:BB:...」而不是裸 MAC。
+// fmtMac 剥离出的十六进制位会多于 12 位而判定失败、原样返回，
+// 导致报告里出现「MAC: 物理 MAC: AA:BB:...」的重复前缀。
+const macSnap = vm.runInContext(`generateDiagnosticSnapshot({
+  mac: "物理 MAC: AA:BB:CC:DD:EE:FF", account: "13812345678"
+})`, ctx);
+if (!macSnap.includes('MAC: AA:BB:CC:DD:EE:FF')) {
+  problems.push('诊断快照未正确格式化带前缀的 MAC: ' + JSON.stringify(macSnap));
+}
+if (macSnap.includes('物理 MAC:')) {
+  problems.push('诊断快照 MAC 行出现重复前缀: ' + JSON.stringify(macSnap));
+}
+const emptyMacSnap = vm.runInContext(`generateDiagnosticSnapshot({ mac: "物理 MAC: —" })`, ctx);
+if (!emptyMacSnap.includes('MAC: —')) {
+  problems.push('诊断快照空 MAC 未归一为 —: ' + JSON.stringify(emptyMacSnap));
+}
 
 // --- 4. createThemeManager ---
 const tm = vm.runInContext('createThemeManager({ toggleBtnId: "btnTheme", labelId: "themeLabel" })', ctx);
