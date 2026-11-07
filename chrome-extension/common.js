@@ -1121,7 +1121,7 @@ function generateDiagnosticSnapshot(data = {}) {
     `导出时间: ${new Date().toLocaleString()}`,
     `连接状态: ${data.statusText || '—'} (健康度: ${data.healthText || '—'})`,
     `网关延迟: ${data.pingText || '—'} (网关: 172.30.100.2:80)`,
-    `认证账号: ${maskedAcc} | 运营商: ${ispMeta.name} (${ispMeta.tag})`,
+    `认证账号: ${maskedAcc} | 运营商: ${ispMeta.short} (${ispMeta.tag})`,
     `终端地址: ${data.ip || '—'} | MAC: ${fmtMac(data.mac) || '—'}`,
     `计费流量: ${data.flowText || '—'}`,
     `保活策略: ${data.policyText || '—'}`,

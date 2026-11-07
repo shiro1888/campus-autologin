@@ -210,9 +210,15 @@ class TestExtensionStructure(unittest.TestCase):
         log_fields = set(re.findall(r"^\s*(\w+)\s*:", entry.group(1), re.M))
 
         # ---- 消费端引用 ----
-        for name, src in (("popup.js", popup), ("options.js", options)):
+        # common.js 既是生产端也是消费端（诊断快照会读 getIspMeta 的结果）。
+        # 它必须纳入扫描：曾出现修复过的 ispMeta.name 在组件搬迁时被写回来，
+        # 而当时的测试只扫 popup/options，没能拦住。
+        consumers = (("popup.js", popup, True), ("options.js", options, True),
+                     ("common.js", common, False))
+        for name, src, must_consume_ping in consumers:
             ping_refs = set(re.findall(r"\bping(?:Info|Meta)\.(\w+)", src))
-            self.assertTrue(ping_refs, f"{name} 未消费 classifyPing 结果")
+            if must_consume_ping:
+                self.assertTrue(ping_refs, f"{name} 未消费 classifyPing 结果")
             bad = ping_refs - ping_fields
             self.assertFalse(bad, f"{name} 引用了 classifyPing 不存在的字段: {bad}（会导致 undefined 写入 DOM）")
 
@@ -229,8 +235,10 @@ class TestExtensionStructure(unittest.TestCase):
             bad = isp_refs - isp_fields
             self.assertFalse(bad, f"{name} 引用了 ISP 元数据不存在的字段: {bad}")
 
-        # 事件日志：common.js 时间轴用 item.*，options.js 诊断报告用 l.*
+        # 事件日志：时间轴用 item.*，诊断报告用 l.*（两者现在都在 common.js，
+        # options.js 仍保留一份调用点，一并扫描）
         log_refs = set(re.findall(r"\bitem\.(\w+)", common))
+        log_refs |= set(re.findall(r"\bl\.(\w+)", common))
         log_refs |= set(re.findall(r"\bl\.(\w+)", options))
         self.assertTrue(log_refs, "未找到事件日志字段消费点")
         bad = log_refs - log_fields
