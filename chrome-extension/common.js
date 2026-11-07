@@ -510,6 +510,8 @@ function createCopyTrigger(options = {}) {
       return;
     }
 
+    // 两参数形式：onRejected 只处理 writeText 本身的失败。若用链式 .catch，
+    // 成功回调里任何 DOM/回调异常也会被误当成「复制失败」。
     navigator.clipboard.writeText(text).then(() => {
       if (timer) clearTimeout(timer);
       if (feedbackEl) feedbackEl.classList.add('copied');
@@ -545,10 +547,12 @@ function createCopyTrigger(options = {}) {
         }
         timer = null;
       }, duration);
-    }).catch((err) => {
-      if (typeof onError === 'function') {
-        onError(err || text);
-      }
+    }, (err) => {
+      // 降级契约：无论「API 不可用」还是「写入被拒」，onError 的第一个参数
+      // 都必须是**原始文本**。消费端（popup）靠它把值显示出来供手动复制；
+      // 若这里把 Error 对象传过去，用户看到的会是 "Error: NotAllowedError..."。
+      // 原始错误作为第二个参数保留，供需要的调用方诊断。
+      if (typeof onError === 'function') onError(text, err);
     });
   }
 
@@ -621,6 +625,14 @@ function createConfirmModal(cfg = {}) {
     const overlay = getOverlay();
     if (!overlay) {
       return Promise.resolve(window.confirm(opts.desc || opts.title || '确定执行此操作吗？'));
+    }
+
+    // 已有模态框在等待时（快速双击触发第二次 open），先以「取消」结算上一次，
+    // 否则 activeResolve 被覆盖，第一个 Promise 会永久悬挂、其 .then 永不执行。
+    if (activeResolve) {
+      const prev = activeResolve;
+      activeResolve = null;
+      prev(false);
     }
 
     lastFocused = document.activeElement;

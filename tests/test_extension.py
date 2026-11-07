@@ -525,5 +525,107 @@ vm.runInContext(src, sandbox);
         self.assertEqual(data["writeCount"], 1, "探测与结果写入不应拆成多次 set")
 
 
+    def test_shared_component_degraded_paths(self):
+        """运行时验证组件的降级与并发路径，而不只是「不抛异常」。
+
+        覆盖两个真实缺陷：
+        1. 剪贴板写入被拒时，onError 必须收到原始文本（popup 靠它显示明文
+           供手动复制），而不是 Error 对象；且 API 不可用分支契约一致。
+        2. 连续两次 confirm() 不得让第一个 Promise 永久悬挂。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(process.argv[1], 'utf8');
+const problems = [];
+
+function makeCtx(clipboard) {
+  const els = {}, handlers = {};
+  const mk = (id) => ({
+    id, textContent: '', innerHTML: '', dataset: {}, style: {},
+    classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+      contains(c) { return this._s.has(c); }, toggle() {} },
+    setAttribute() {}, getAttribute() { return null; },
+    addEventListener(t, f) { (handlers[id + ':' + t] = handlers[id + ':' + t] || []).push(f); },
+    querySelector() { return null; }, querySelectorAll() { return []; }, focus() {}
+  });
+  for (const id of ['confirmModalOverlay', 'confirmModalTitle', 'confirmModalDesc',
+                    'btnModalConfirm', 'btnModalCancel', 'copyTarget']) els[id] = mk(id);
+  const ctx = {
+    console, setTimeout: (f) => { if (typeof f === 'function') f(); return 1; },
+    clearTimeout() {}, setInterval: () => 1, clearInterval() {},
+    document: { getElementById: (id) => els[id] || null, addEventListener() {},
+      querySelectorAll() { return []; }, querySelector() { return null; },
+      documentElement: { setAttribute() {} } },
+    window: {}, navigator: { clipboard }, Element: function () {},
+    Date, Math, JSON, Promise, String, Number, Object, Array, RegExp, Set,
+    parseInt, parseFloat, isNaN
+  };
+  vm.createContext(ctx);
+  vm.runInContext(src, ctx);
+  return { ctx, els, handlers };
+}
+
+(async () => {
+  // --- 1a. writeText 被拒：onError 首参必须是原文 ---
+  const rejectEnv = makeCtx({ writeText: () => Promise.reject(new Error('NotAllowedError')) });
+  let rejectedArg = '__NOT_CALLED__';
+  rejectEnv.ctx.__onError = (v) => { rejectedArg = v; };
+  vm.runInContext(
+    'createCopyTrigger({target:"copyTarget",getText:()=>"10.20.30.40",onError:__onError}).trigger()',
+    rejectEnv.ctx);
+  await Promise.resolve(); await Promise.resolve();
+  if (rejectedArg !== '10.20.30.40')
+    problems.push('writeText 被拒时 onError 首参不是原文: ' + String(rejectedArg));
+
+  // --- 1b. clipboard API 不可用：契约必须一致 ---
+  const absentEnv = makeCtx(null);
+  let absentArg = '__NOT_CALLED__';
+  absentEnv.ctx.__onError = (v) => { absentArg = v; };
+  vm.runInContext(
+    'createCopyTrigger({target:"copyTarget",getText:()=>"10.20.30.40",onError:__onError}).trigger()',
+    absentEnv.ctx);
+  if (absentArg !== '10.20.30.40')
+    problems.push('API 不可用时 onError 首参不是原文: ' + String(absentArg));
+
+  // --- 1c. 成功路径不得误触发 onError ---
+  const okEnv = makeCtx({ writeText: () => Promise.resolve() });
+  let copied = false, errored = false;
+  okEnv.ctx.__onCopied = () => { copied = true; };
+  okEnv.ctx.__onError = () => { errored = true; };
+  vm.runInContext(
+    'createCopyTrigger({target:"copyTarget",getText:()=>"10.20.30.40",onSuccess:__onCopied,onError:__onError}).trigger()',
+    okEnv.ctx);
+  await Promise.resolve(); await Promise.resolve();
+  if (!copied) problems.push('复制成功但 onSuccess 未调用');
+  if (errored) problems.push('复制成功却误触发了 onError');
+
+  // --- 2. 连续两次 confirm 不得悬挂第一个 Promise ---
+  const modalEnv = makeCtx(null);
+  let first = false, second = false, confirmCalls = 0;
+  modalEnv.ctx.__onConfirm = () => { confirmCalls++; };
+  const modal = vm.runInContext('createConfirmModal({overlayId:"confirmModalOverlay"})', modalEnv.ctx);
+  modal.open({ title: 'A', onConfirm: modalEnv.ctx.__onConfirm }).then(() => { first = true; });
+  modal.open({ title: 'B', onConfirm: modalEnv.ctx.__onConfirm }).then(() => { second = true; });
+  modalEnv.els.confirmModalOverlay.classList.add('open');
+  (modalEnv.handlers['btnModalConfirm:click'] || []).forEach((f) => f({}));
+  await Promise.resolve(); await Promise.resolve();
+  if (!first) problems.push('连续 confirm 后第一个 Promise 永久悬挂');
+  if (!second) problems.push('连续 confirm 后第二个 Promise 未结算');
+  if (confirmCalls !== 1) problems.push('onConfirm 执行次数异常: ' + confirmCalls);
+
+  console.log(problems.length ? 'COMPONENT_PROBLEMS:\n' + problems.join('\n') : 'COMPONENTS_OK');
+})().catch((e) => console.log('COMPONENT_PROBLEMS: 运行异常 ' + e.message));
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, os.path.join(EXT_DIR, "common.js")],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"组件模拟失败:\n{res.stderr}\n{res.stdout}")
+        self.assertNotIn("COMPONENT_PROBLEMS", res.stdout,
+                         f"组件降级/并发路径有缺陷:\n{res.stdout}")
+        self.assertIn("COMPONENTS_OK", res.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
