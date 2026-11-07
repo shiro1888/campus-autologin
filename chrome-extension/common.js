@@ -58,6 +58,16 @@ function getStatusIconSvg(kind, size = 14) {
 }
 
 /**
+ * Toast 图标种类归一化：ok / err / warn 直通，其余（含未知 kind）一律 info。
+ * 此前 createToastManager.show() 用「ok/err 二选一、剩余全 info」的三元映射，
+ * warn 命中的是 getStatusIconSvg 的 info 分支（ⓘ），警告三角分支形同虚设——
+ * 空凭据保存提示等 warn 场景只有琥珀色样式、没有警示图标。
+ */
+function toastIconKind(kind) {
+  return (kind === 'ok' || kind === 'err' || kind === 'warn') ? kind : 'info';
+}
+
+/**
  * 把分钟数格式化为人类可读的字符串
  * 示例: 1/60 -> "1 秒", 0.5 -> "30 秒", 5 -> "5 分钟"
  */
@@ -946,7 +956,7 @@ function createToastManager(options = {}) {
       singleMsgBox.className = `msg-box show ${kind}`;
       singleTextEl.textContent = norm;
       if (singleIconEl) {
-        singleIconEl.innerHTML = getStatusIconSvg(kind === 'ok' ? 'ok' : (kind === 'err' ? 'err' : 'info'), 13);
+        singleIconEl.innerHTML = getStatusIconSvg(toastIconKind(kind), 13);
       }
       if (duration && kind !== 'err') {
         singleTimer = setTimeout(() => {
@@ -964,7 +974,7 @@ function createToastManager(options = {}) {
 
     const iconSpan = document.createElement('span');
     iconSpan.className = 'toast-icon';
-    iconSpan.innerHTML = getStatusIconSvg(kind === 'ok' ? 'ok' : (kind === 'err' ? 'err' : 'info'), 16);
+    iconSpan.innerHTML = getStatusIconSvg(toastIconKind(kind), 16);
 
     const msgSpan = document.createElement('span');
     msgSpan.className = 'toast-msg';
