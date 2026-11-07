@@ -77,7 +77,7 @@
           </button>
         </div>
 
-        <span class="gw-route-pill" id="popGwTag" title="Dr.COM ePortal 认证网关地址">
+        <span class="gw-route-pill" id="popGwTag" role="button" tabindex="0" title="点击探测网关响应状态 (172.30.100.2)">
           <span class="gw-route-dot"></span>
           <span>172.30.100.2</span>
         </span>
@@ -131,12 +131,12 @@
         <div class="dock-value" id="popPing">—</div>
       </div>
 
-      <!-- 4: 当前账号 (安全认证身份徽章) -->
+      <!-- 4: 当前账号 (安全认证身份徽章 + 内嵌直选面板组件) -->
       <div class="dock-item" id="accountDockItem" title="当前登录上网账号与运营商">
         <div class="dock-head">
           <svg class="dock-icon blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           <span>认证账号</span>
-          <span class="isp-badge" id="accountIsp" role="button" tabindex="0" title="点击可快捷切换运营商 (校园/电信/联通/其他)">校园</span>
+          <span class="isp-badge" id="accountIsp" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" title="点击展开运营商直选面板 (校园/电信/联通/其他)">校园</span>
         </div>
         <div class="dock-value-row">
           <div class="dock-value mono ellipsis" id="account" title="点击切换自习室防窥模式">—</div>
@@ -153,6 +153,13 @@
               </svg>
             </button>
           </div>
+        </div>
+        <!-- In-Card ISP Quick-Select Sheet Component -->
+        <div class="isp-quick-sheet" id="ispQuickSheet" role="radiogroup" aria-label="快捷选择运营商" aria-hidden="true">
+          <button type="button" class="isp-sheet-btn active" data-isp="1" role="radio" aria-checked="true">校园</button>
+          <button type="button" class="isp-sheet-btn" data-isp="2" role="radio" aria-checked="false">电信</button>
+          <button type="button" class="isp-sheet-btn" data-isp="3" role="radio" aria-checked="false">联通</button>
+          <button type="button" class="isp-sheet-btn" data-isp="4" role="radio" aria-checked="false">其他</button>
         </div>
       </div>
     </section>

@@ -88,7 +88,7 @@
 
     <!-- Live Network Route Topology Pipeline (动态全链路拓扑指示器) -->
     <div class="network-topology-strip" id="networkTopology">
-      <div class="topo-step topo-client">
+      <div class="topo-step topo-client" id="topoNodeClient" role="button" tabindex="0" title="点击复制本机局域网 IP">
         <div class="topo-badge-icon blue">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           <span class="topo-beacon-dot"></span>
@@ -107,7 +107,7 @@
         </div>
       </div>
 
-      <div class="topo-step topo-gateway">
+      <div class="topo-step topo-gateway" id="topoNodeGateway" role="button" tabindex="0" title="点击在新标签页打开校园网门户 (172.30.100.2)">
         <div class="topo-badge-icon emerald">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
           <span class="topo-beacon-dot"></span>
@@ -126,7 +126,7 @@
         </div>
       </div>
 
-      <div class="topo-step topo-internet">
+      <div class="topo-step topo-internet" id="topoNodeInternet" role="button" tabindex="0" title="点击立即刷新全链路连通状态">
         <div class="topo-badge-icon purple">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           <span class="topo-beacon-dot"></span>
@@ -206,16 +206,40 @@
         </div>
       </div>
 
-      <div class="stat-card full-span">
-        <div class="stat-label">
-          <div class="stat-badge gray">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <div class="stat-card full-span" id="statLogCard">
+        <div class="stat-log-main-row">
+          <div class="stat-label">
+            <div class="stat-badge gray">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <span>上次检查响应与保活策略</span>
           </div>
-          <span>上次检查响应与保活策略</span>
+          <div class="stat-log-group">
+            <div class="stat-val note" id="stLast">—</div>
+            <span class="stat-policy-pill" id="stPolicyPill" title="当前生效的后台保活巡检策略">⚡ 自适应保活 · 10秒 / 1秒</span>
+            <button type="button" class="log-drawer-toggle" id="btnToggleLogDrawer" aria-expanded="false" title="展开/收起巡检事件流时间轴">
+              <span id="logCountBadge">日志</span>
+              <svg class="drawer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </div>
         </div>
-        <div class="stat-log-group">
-          <div class="stat-val note" id="stLast">—</div>
-          <span class="stat-policy-pill" id="stPolicyPill" title="当前生效的后台保活巡检策略">⚡ 自适应保活 · 10秒 / 1秒</span>
+
+        <!-- Component: Collapsible Live Diagnostic Activity Timeline Drawer -->
+        <div class="log-timeline-drawer" id="logTimelineDrawer" aria-hidden="true">
+          <div class="log-drawer-toolbar">
+            <span class="log-drawer-title">后台巡检与认证事件流（连续相同状态已智能折叠）</span>
+            <div class="log-drawer-actions">
+              <button type="button" class="log-action-btn" id="btnCopyDiagnostic" title="复制脱敏后的网络诊断快照到剪贴板">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>复制诊断报告</span>
+              </button>
+              <button type="button" class="log-action-btn danger" id="btnClearLogs" title="清空历史事件流记录">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                <span>清空</span>
+              </button>
+            </div>
+          </div>
+          <div class="log-timeline-list" id="logTimelineList"></div>
         </div>
       </div>
     </div>
@@ -483,6 +507,25 @@
     </div>
 
   </form>
+
+  <!-- Component: Glassmorphic Confirmation Modal -->
+  <div class="modal-overlay" id="confirmModalOverlay" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon-badge danger">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="modal-title-wrap">
+          <h3 id="confirmModalTitle">恢复出厂默认设置？</h3>
+          <p id="confirmModalDesc">此操作将清空已保存的校园网账号与密码，并将所有轮询与自动化开关恢复为推荐默认值。</p>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-modal-cancel" id="btnModalCancel">取消</button>
+        <button type="button" class="btn-modal-confirm danger" id="btnModalConfirm">确认重置</button>
+      </div>
+    </div>
+  </div>
 
 </div>
 

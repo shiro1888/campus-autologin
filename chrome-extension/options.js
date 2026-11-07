@@ -127,12 +127,33 @@ function updateAccountMaskDisplay() {
   }
 }
 
-/** 动态在线计时器 (秒表实时跳动) */
+/** 动态在线计时器与可视化组件 (来自 common.js 组件库) */
 const durationTicker = createTicker((text) => {
   $('stTime').textContent = text;
 });
 
 const renderOptPingSparkline = createSparkline('optPingSparkline', 8);
+
+const optFlowMeter = createFlowMeter({
+  wrapId: 'optFlowBarWrap',
+  dlId: 'optFlowBarDl',
+  ulId: 'optFlowBarUl'
+});
+
+const activityTimeline = createActivityTimeline({
+  drawerId: 'logTimelineDrawer',
+  toggleBtnId: 'btnToggleLogDrawer',
+  countBadgeId: 'logCountBadge',
+  listId: 'logTimelineList'
+});
+
+const confirmModal = createConfirmModal({
+  overlayId: 'confirmModalOverlay',
+  titleId: 'confirmModalTitle',
+  descId: 'confirmModalDesc',
+  cancelBtnId: 'btnModalCancel',
+  confirmBtnId: 'btnModalConfirm'
+});
 
 
 /** 动态更新网络全链路拓扑指示器 */
@@ -245,17 +266,6 @@ function initTheme() {
 }
 
 
-
-/** HTML 特殊字符转义 */
-function escapeHtml(str) {
-  return String(str || '').replace(/[&<>"']/g, (m) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[m]));
-}
 
 /** 格式化下拉选项展示内容（提取括号内的提示并转为美观微型徽章） */
 function formatOptionContent(text) {
@@ -662,7 +672,7 @@ function refreshStatus(cb) {
     }, remaining);
   };
 
-  chrome.storage.local.get(['lastResult'], (s) => {
+  chrome.storage.local.get(['lastResult', 'eventLogs'], (s) => {
     const r = s && s.lastResult;
     // 逐字段兜底：lastResult 可能来自旧版本或手改，缺字段时直接相加会显示成
     // 「12345 · undefined」；而对象经 String() 会变成 "[object Object]"，同样难看。
@@ -671,6 +681,7 @@ function refreshStatus(cb) {
     const t = text(r && r.time);
     const m = text(r && r.message);
     $('stLast').textContent = [t, m].filter(Boolean).join(' · ') || '暂无记录';
+    activityTimeline.render((s && Array.isArray(s.eventLogs)) ? s.eventLogs : []);
   });
 
   chrome.runtime.sendMessage({ type: 'status' }, (res) => {
@@ -701,9 +712,10 @@ function refreshStatus(cb) {
       renderOptPingSparkline(-1);
       $('stFlow').textContent = '—';
       $('stFlowDetail').textContent = '流量明细: —';
+      optFlowMeter.reset();
       $('stStime').textContent = '上线时间: —';
       $('btnLogoutNow').disabled = true;
-      $('btnLogoutNow').classList.remove('confirming');
+      logoutConfirmBtn.reset();
       updateTopology(null);
       if (cb) cb();
       return;
@@ -715,49 +727,7 @@ function refreshStatus(cb) {
     $('stMac').textContent = raw.ss1 ? ('物理 MAC: ' + fmtMac(raw.ss1)) : '物理 MAC: —';
 
     if (res.online) {
-      let durationInput = null;
-      let stimeDisplay = '上线时间: —';
-
-      const now = Date.now();
-      const localSince = res.onlineSince ? Number(res.onlineSince) : null;
-
-      if (localSince && Number.isFinite(localSince) && localSince <= now) {
-        durationInput = localSince;
-        stimeDisplay = '本次连通: ' + new Date(localSince).toLocaleTimeString();
-      } else if (raw.stime) {
-        const stimeDate = new Date(String(raw.stime).replace(/-/g, '/'));
-        const stimeMs = stimeDate.getTime();
-        const isStimeValid = Number.isFinite(stimeMs) && !isNaN(stimeMs);
-        const isSameDay = isStimeValid && new Date().toDateString() === stimeDate.toDateString();
-
-        const MAX_SESSION_SEC = 90 * 86400; // 90 天合理上限（过滤 4294967295 / 0xFFFFFFFF 哨兵值）
-        const parseSec = (v) => {
-          const n = parseInt(v, 10);
-          return (Number.isFinite(n) && n > 0 && n < MAX_SESSION_SEC) ? n : 0;
-        };
-        const validSec = parseSec(raw.actt) || parseSec(raw.oltime);
-
-        if (validSec) {
-          durationInput = validSec;
-          stimeDisplay = `活跃在线: ${fmtDuration(validSec)}`;
-        } else if (isSameDay) {
-          durationInput = raw.stime;
-          stimeDisplay = '上线时间: ' + raw.stime;
-        } else if (isStimeValid && (now - stimeMs) > 16 * 3600 * 1000) {
-          durationInput = Date.now();
-          stimeDisplay = '本次在线中';
-        } else if (isStimeValid) {
-          durationInput = raw.stime;
-          stimeDisplay = '上线时间: ' + raw.stime;
-        }
-      } else if (raw.actt && parseInt(raw.actt, 10) > 0 && parseInt(raw.actt, 10) < 90 * 86400) {
-        durationInput = parseInt(raw.actt, 10);
-        stimeDisplay = '网关活跃在线计时';
-      } else if (raw.oltime && parseInt(raw.oltime, 10) > 0 && parseInt(raw.oltime, 10) < 90 * 86400) {
-        durationInput = parseInt(raw.oltime, 10);
-        stimeDisplay = '网关在线计时';
-      }
-
+      const { durationInput, stimeDisplay } = resolveSessionDuration(res, raw);
       if (durationInput != null) {
         durationTicker.start(durationInput);
         $('stStime').textContent = stimeDisplay;
@@ -776,52 +746,18 @@ function refreshStatus(cb) {
     const pingEl = $('stPing');
     const badgeEl = $('pingBadge');
     const hist = Array.isArray(res.pingHistory) && res.pingHistory.length ? res.pingHistory : null;
-    if (res.pingMs !== undefined && res.pingMs >= 0) {
-      pingEl.textContent = res.pingMs + ' ms';
-      if (badgeEl) {
-        if (res.pingMs <= 35) {
-          badgeEl.className = 'latency-badge fast';
-          badgeEl.textContent = '极佳';
-        } else if (res.pingMs <= 75) {
-          badgeEl.className = 'latency-badge good';
-          badgeEl.textContent = '畅通';
-        } else if (res.pingMs <= 150) {
-          badgeEl.className = 'latency-badge normal';
-          badgeEl.textContent = '适中';
-        } else {
-          badgeEl.className = 'latency-badge slow';
-          badgeEl.textContent = '高延迟';
-        }
-      }
-      renderOptPingSparkline(hist || res.pingMs);
-    } else {
-      pingEl.textContent = res.reachable ? '< 10 ms' : '超时';
-      if (badgeEl) {
-        badgeEl.className = res.reachable ? 'latency-badge fast' : 'latency-badge slow';
-        badgeEl.textContent = res.reachable ? '连通' : '超时';
-      }
-      renderOptPingSparkline(hist || (res.reachable ? 8 : -1));
+    const pingMeta = classifyPing(res.pingMs, res.reachable);
+    pingEl.textContent = pingMeta.text;
+    if (badgeEl) {
+      badgeEl.className = 'latency-badge ' + pingMeta.tier;
+      badgeEl.textContent = pingMeta.label;
     }
+    renderOptPingSparkline(hist || pingMeta.sparkVal);
 
     // Flow & Traffic Detail (下行 / 上行 / 总计明细)
-    const optFlowWrap = $('optFlowBarWrap');
-    const optFlowDl = $('optFlowBarDl');
-    const optFlowUl = $('optFlowBarUl');
     if (raw.flow !== undefined) {
       $('stFlow').textContent = fmtFlow(raw.flow);
-      const dl = parseFloat(raw.actdf) || 0;
-      const ul = parseFloat(raw.actuf) || 0;
-      const total = dl + ul;
-      if (total > 0 && optFlowDl && optFlowUl && optFlowWrap) {
-        const dlPct = Math.max(6, Math.min(94, Math.round((dl / total) * 100)));
-        const ulPct = 100 - dlPct;
-        optFlowDl.style.width = dlPct + '%';
-        optFlowUl.style.width = ulPct + '%';
-        optFlowWrap.style.display = 'flex';
-        optFlowWrap.title = `下载 ${dlPct}% (${fmtFlow(dl)}) · 上传 ${ulPct}% (${fmtFlow(ul)})`;
-      } else if (optFlowWrap) {
-        optFlowWrap.style.display = 'none';
-      }
+      optFlowMeter.update(raw);
       const sub = [];
       if (raw.actdf !== undefined && raw.actuf !== undefined) {
         sub.push(`↓ ${fmtFlow(raw.actdf)} · ↑ ${fmtFlow(raw.actuf)}`);
@@ -830,7 +766,7 @@ function refreshStatus(cb) {
     } else {
       $('stFlow').textContent = res.online ? '计量中' : '—';
       $('stFlowDetail').textContent = '流量明细: —';
-      if (optFlowWrap) optFlowWrap.style.display = 'none';
+      optFlowMeter.reset();
     }
 
     if (!res.reachable) {
@@ -867,7 +803,7 @@ function refreshStatus(cb) {
     const logoutBtn = $('btnLogoutNow');
     if (logoutBtn) {
       logoutBtn.disabled = !res.online;
-      if (!res.online) logoutBtn.classList.remove('confirming');
+      if (!res.online) logoutConfirmBtn.reset();
     }
 
     updateTopology(res);
@@ -1055,115 +991,147 @@ $('btnLoginNow').addEventListener('click', () => {
   }
 });
 
-// --- 点击本机 IP 卡片快速单项复制 ---
-const cardStatIp = $('cardStatIp');
-if (cardStatIp) {
-  cardStatIp.addEventListener('click', (e) => {
-    const pill = $('ipCopyPill');
-    if (pill && pill.classList.contains('copied')) return;
-    const ip = $('stIp').textContent.trim();
-    if (ip && ip !== '—' && ip !== '正在获取…' && ip !== '未获取到') {
-      navigator.clipboard.writeText(ip).then(() => {
-        showToast('已复制本机 IP: ' + ip, 'ok');
-        if (pill) {
-          pill.textContent = '已复制 ✓';
-          pill.classList.add('copied');
-          setTimeout(() => {
-            pill.textContent = '点击复制';
-            pill.classList.remove('copied');
-          }, 1500);
-        }
-      }).catch(() => {
-        showToast('复制失败', 'err');
-      });
-    }
-  });
-  cardStatIp.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      cardStatIp.click();
-    }
-  });
-}
+// --- 点击本机 IP 卡片快速单项复制 (Component: createCopyTrigger) ---
+createCopyTrigger({
+  triggerEl: $('cardStatIp'),
+  badgeEl: $('ipCopyPill'),
+  getText: () => {
+    const ip = $('stIp')?.textContent?.trim();
+    return (ip && ip !== '—' && ip !== '正在获取…' && ip !== '未获取到') ? ip : '';
+  },
+  onCopied: (ip) => showToast('已复制本机 IP: ' + ip, 'ok'),
+  onError: () => showToast('复制失败', 'err')
+});
 
-// --- 点击物理 MAC 快捷复制 ---
-const stMac = $('stMac');
-if (stMac) {
-  stMac.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const txt = stMac.textContent;
+// --- 点击物理 MAC 快捷复制 (Component: createCopyTrigger) ---
+createCopyTrigger({
+  triggerEl: $('stMac'),
+  stopPropagation: true,
+  getText: () => {
+    const txt = $('stMac')?.textContent || '';
     const match = txt.match(/([0-9a-fA-F:-]{12,17})/);
-    if (match && match[1]) {
-      navigator.clipboard.writeText(match[1]).then(() => {
-        showToast('已复制物理 MAC: ' + match[1], 'ok');
-      }).catch(() => {
-        showToast('复制失败', 'err');
-      });
-    }
-  });
-  stMac.addEventListener('keydown', (e) => {
+    return (match && match[1]) ? match[1] : '';
+  },
+  onCopied: (mac) => showToast('已复制物理 MAC: ' + mac, 'ok'),
+  onError: () => showToast('复制失败', 'err')
+});
+
+// --- 全链路拓扑节点交互组件 (Component: Interactive Topology Nodes) ---
+function bindInteractiveNode(nodeEl, actionFn) {
+  if (!nodeEl) return;
+  nodeEl.addEventListener('click', actionFn);
+  nodeEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      stMac.click();
+      actionFn();
     }
   });
 }
 
-// --- 顶部快捷：注销下线 (防误触二次确认) ---
-let optLogoutTimer = null;
-$('btnLogoutNow').addEventListener('click', () => {
-  const btn = $('btnLogoutNow');
-  if (btn.disabled) return;
-  const span = btn.querySelector('span');
-
-  if (!btn.classList.contains('confirming')) {
-    btn.classList.add('confirming');
-    if (span) span.textContent = '确认注销？';
-    showToast('再次点击「确认注销」即可断开校园网连接', 'info');
-    optLogoutTimer = setTimeout(() => {
-      btn.classList.remove('confirming');
-      if (span) span.textContent = '注销下线';
-    }, 3500);
-    return;
+bindInteractiveNode($('topoNodeClient'), () => {
+  const ip = $('stIp')?.textContent?.trim();
+  if (ip && ip !== '—' && ip !== '正在获取…' && ip !== '未获取到') {
+    $('cardStatIp')?.click();
+  } else {
+    refreshStatus(() => showToast('已刷新终端节点状态', 'info'));
   }
+});
 
-  // 确认注销
-  clearTimeout(optLogoutTimer);
-  btn.classList.remove('confirming');
-  if (span) span.textContent = '注销下线';
-  btn.disabled = true;
-  showToast('正在请求注销下线…', 'info');
-
-  chrome.runtime.sendMessage({ type: 'logout' }, (res) => {
-    btn.disabled = false;
-    if (chrome.runtime.lastError || !res) {
-      showToast('注销超时，请到门户手动注销', 'err');
-      return;
-    }
-    showToast(res.message || '注销完成', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));
-    refreshStatus();
+bindInteractiveNode($('topoNodeGateway'), () => {
+  refreshStatus(() => {
+    const pingText = $('stPing')?.textContent || '—';
+    showToast(`已完成网关探测 · 当前延迟 ${pingText}`, 'info');
   });
 });
 
-// --- 恢复默认设置 ---
-$('btnResetDefaults').addEventListener('click', () => {
-  if (!confirm('确定要将所有设置恢复为默认值吗？\n（账号和密码会被清空，需要你重新填写）')) {
-    return;
+bindInteractiveNode($('topoNodeInternet'), () => {
+  if ($('statusWidget')?.classList.contains('hero-on')) {
+    refreshStatus(() => showToast('外网链路畅通 · 状态已同步', 'ok'));
+  } else {
+    $('btnLoginNow')?.click();
   }
-  // 一并清除全部运行态标记：解除「手动注销暂停」、重置退避计数、
-  // 清掉「凭据类错误」标记（否则用户改好密码后点恢复默认，仍会被低频重试挡着）。
-  chrome.storage.local.set({
-    ...DEFAULTS,
-    manualLogout: false,
-    unreachableStreak: 0,
-    connState: 'unknown',
-    authError: false,
-    onlineSince: null
-  }, () => {
-    $('btnSave').classList.remove('has-changes');
-    load();
-    chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => { void chrome.runtime.lastError; });
-    showToast('已恢复为默认配置，请重新填写账号密码。', 'ok');
+});
+
+// --- 巡检事件流抽屉操作：复制脱敏诊断报告 & 清空日志 ---
+$('btnCopyDiagnostic')?.addEventListener('click', () => {
+  chrome.storage.local.get(['eventLogs', 'lastResult'], (s) => {
+    const ispMeta = getIspMeta($('isp')?.value || '1');
+    const maskedAcc = maskAccount($('account')?.value?.trim() || '') || '未配置';
+    const logs = Array.isArray(s.eventLogs) ? s.eventLogs.slice(0, 5) : [];
+    const lines = [
+      `[校园网自动登录 诊断快照 v${chrome.runtime?.getManifest?.()?.version || '1.3.0'}]`,
+      `时间: ${new Date().toLocaleString()}`,
+      `状态: ${$('stOnline')?.textContent || '—'} | 延迟: ${$('stPing')?.textContent || '—'}`,
+      `账号: ${maskedAcc} | 运营商: ${ispMeta.name} (${ispMeta.tag})`,
+      `本机IP: ${$('stIp')?.textContent || '—'} | 流量: ${$('stFlow')?.textContent || '—'} (${$('stFlowDetail')?.textContent || '—'})`,
+      `策略: ${$('stPolicyPill')?.textContent || '—'}`,
+      `最近事件: ${logs.length ? logs.map((l) => `${l.time} [${l.trigger || '巡检'}] ${l.message}${l.count > 1 ? ' ×' + l.count : ''}`).join(' ; ') : '暂无'}`
+    ];
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      showToast('已复制脱敏诊断报告到剪贴板', 'ok');
+    }).catch(() => {
+      showToast('复制诊断报告失败', 'err');
+    });
+  });
+});
+
+$('btnClearLogs')?.addEventListener('click', () => {
+  chrome.runtime.sendMessage({ type: 'clearLogs' }, () => {
+    void chrome.runtime.lastError;
+    activityTimeline.render([]);
+    showToast('已清空历史事件流记录', 'info');
+  });
+});
+
+// --- 顶部快捷：注销下线 (Component: createConfirmButton) ---
+const logoutConfirmBtn = createConfirmButton({
+  btnEl: $('btnLogoutNow'),
+  labelSelector: 'span',
+  idleText: '注销下线',
+  confirmText: '确认注销？',
+  timeoutMs: 3500,
+  onArmed: () => {
+    showToast('再次点击「确认注销」即可断开校园网连接', 'info');
+  },
+  onConfirm: (btn) => {
+    btn.disabled = true;
+    showToast('正在请求注销下线…', 'info');
+
+    chrome.runtime.sendMessage({ type: 'logout' }, (res) => {
+      btn.disabled = false;
+      if (chrome.runtime.lastError || !res) {
+        showToast('注销超时，请到门户手动注销', 'err');
+        return;
+      }
+      showToast(res.message || '注销完成', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));
+      refreshStatus();
+    });
+  }
+});
+
+// --- 恢复默认设置 (Component: createConfirmModal) ---
+$('btnResetDefaults').addEventListener('click', () => {
+  confirmModal.open({
+    title: '恢复出厂默认设置？',
+    desc: '此操作将清空已保存的校园网账号与密码，并将所有轮询与自动化开关恢复为推荐默认值。',
+    confirmText: '确认重置',
+    onConfirm: () => {
+      // 一并清除全部运行态标记：解除「手动注销暂停」、重置退避计数、
+      // 清掉「凭据类错误」标记（否则用户改好密码后点恢复默认，仍会被低频重试挡着）。
+      chrome.storage.local.set({
+        ...DEFAULTS,
+        manualLogout: false,
+        unreachableStreak: 0,
+        connState: 'unknown',
+        authError: false,
+        onlineSince: null
+      }, () => {
+        $('btnSave').classList.remove('has-changes');
+        load();
+        chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => { void chrome.runtime.lastError; });
+        showToast('已恢复为默认配置，请重新填写账号密码。', 'ok');
+      });
+    }
   });
 });
 
@@ -1362,9 +1330,22 @@ $('btnToggleMask')?.addEventListener('click', (e) => {
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.privacyMask) {
+  if (area !== 'local') return;
+  if (changes.privacyMask) {
     isMasked = !!changes.privacyMask.newValue;
     updateAccountMaskDisplay();
+  }
+  if (changes.lastResult) {
+    const r = changes.lastResult.newValue;
+    const text = (v) => (typeof v === 'string' || typeof v === 'number') ? String(v) : '';
+    const t = text(r && r.time);
+    const m = text(r && r.message);
+    if ($('stLast')) {
+      $('stLast').textContent = [t, m].filter(Boolean).join(' · ') || '暂无记录';
+    }
+  }
+  if (changes.eventLogs) {
+    activityTimeline.render(Array.isArray(changes.eventLogs.newValue) ? changes.eventLogs.newValue : []);
   }
 });
 

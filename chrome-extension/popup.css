@@ -778,6 +778,20 @@ body {
   padding: 4px 9px;
   border-radius: var(--radius-pill);
   white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.22s var(--ease-spring);
+}
+
+.gw-route-pill:hover {
+  background: var(--bg-card);
+  border-color: var(--border-subtle);
+  color: var(--text-main);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
+}
+
+.gw-route-pill:active {
+  transform: scale(0.95);
 }
 
 .gw-route-dot {
@@ -1453,6 +1467,68 @@ body {
   0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
   50% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2); }
   100% { box-shadow: var(--shadow-dock); }
+}
+
+/* ==========================================================================
+   In-Card ISP Quick-Select Sheet Component (内嵌式运营商直选抽屉面板)
+   ========================================================================== */
+.isp-quick-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: var(--bg-dock);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  padding: 6px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(8px) scale(0.96);
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.22s var(--ease-spring),
+              visibility 0.2s;
+}
+
+.isp-quick-sheet.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.isp-sheet-btn {
+  border: 1px solid var(--border-hairline);
+  background: var(--bg-card-subtle);
+  color: var(--text-muted);
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s var(--ease-spring);
+  padding: 0 4px;
+}
+
+.isp-sheet-btn:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border-subtle));
+  color: var(--primary);
+  background: var(--bg-card);
+}
+
+.isp-sheet-btn:active {
+  transform: scale(0.94);
+}
+
+.isp-sheet-btn.active {
+  background: var(--primary-gradient);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 38%, transparent);
 }
 
 /* ==========================================================================

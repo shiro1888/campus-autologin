@@ -145,6 +145,25 @@ class TestExtensionStructure(unittest.TestCase):
                 has_rel = 'rel="noopener noreferrer"' in at or 'rel="noreferrer noopener"' in at
                 self.assertTrue(has_rel, f"Link missing noopener noreferrer in {html_name}: {at}")
 
+    def test_common_component_exports(self):
+        """common.js 必须导出所有共享 UI 组件与状态计算函数，且无重复内联实现。"""
+        with open(os.path.join(EXT_DIR, "common.js"), "r", encoding="utf-8") as f:
+            common_js = f.read()
+        expected_functions = (
+            "createTicker",
+            "createSparkline",
+            "createFlowMeter",
+            "createConfirmButton",
+            "createCopyTrigger",
+            "createConfirmModal",
+            "createActivityTimeline",
+            "classifyPing",
+            "resolveSessionDuration",
+            "getIspMeta",
+        )
+        for fn in expected_functions:
+            self.assertIn(f"function {fn}", common_js, f"common.js missing component function: {fn}")
+
 
 if __name__ == "__main__":
     unittest.main()

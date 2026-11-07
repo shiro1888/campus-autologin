@@ -260,7 +260,9 @@ async function getSettings() {
     // 上次的连接状态，便于 SW 重启后退避不归零
     connState: CONN_STATES.indexOf(stored.connState) !== -1 ? stored.connState : 'unknown',
     initialized: !!stored.initialized,
-    onlineSince: stored.onlineSince ? Number(stored.onlineSince) : null
+    onlineSince: stored.onlineSince ? Number(stored.onlineSince) : null,
+    pingHistory: Array.isArray(stored.pingHistory) ? stored.pingHistory : [],
+    eventLogs: Array.isArray(stored.eventLogs) ? stored.eventLogs : []
   };
   return s;
 }
@@ -288,6 +290,14 @@ async function hydrateState() {
     unreachableStreak = Math.max(unreachableStreak, s.unreachableStreak);
     lastPersistedStreak = s.unreachableStreak;
     if (s.onlineSince) onlineSince = s.onlineSince;
+    if (Array.isArray(s.pingHistory) && s.pingHistory.length && !pingHistory.length) {
+      s.pingHistory.slice(-MAX_PING_HISTORY).forEach((v) => {
+        if (typeof v === 'number' && Number.isFinite(v)) pingHistory.push(v);
+      });
+    }
+    if (Array.isArray(s.eventLogs) && s.eventLogs.length && !eventLogs.length) {
+      eventLogs = s.eventLogs.slice(0, MAX_EVENT_LOGS);
+    }
   } catch (e) {
     // 忽略，按默认值继续
   }
@@ -328,10 +338,35 @@ function updateActionBadge(online, text) {
   }
 }
 
-/** 把结果写入 storage（popup / options 直接读这里） */
-async function saveResult(result) {
+const MAX_EVENT_LOGS = 15;
+let eventLogs = [];
+
+/** 把结果写入 storage（popup / options 直接读这里，并维护去重事件时间轴日志） */
+async function saveResult(result, trigger) {
   try {
-    await chrome.storage.local.set({ lastResult: result });
+    if (result && result.message) {
+      const entry = {
+        time: result.time || nowText(),
+        message: String(result.message),
+        ok: !!result.ok,
+        online: !!result.online,
+        pending: !!(result.pending || result.state === 'submitted'),
+        from: String(trigger || result.from || '后台巡检'),
+        count: 1
+      };
+      const head = eventLogs[0];
+      if (head && head.message === entry.message && head.ok === entry.ok && head.online === entry.online) {
+        head.time = entry.time;
+        head.from = entry.from;
+        head.count = (Number(head.count) || 1) + 1;
+      } else {
+        eventLogs.unshift(entry);
+        if (eventLogs.length > MAX_EVENT_LOGS) {
+          eventLogs = eventLogs.slice(0, MAX_EVENT_LOGS);
+        }
+      }
+    }
+    await chrome.storage.local.set({ lastResult: result, eventLogs: eventLogs });
     updateActionBadge(result && result.online);
   } catch (e) {
     // 忽略
@@ -365,6 +400,7 @@ function recordPingHistory(ms) {
     if (pingHistory.length > MAX_PING_HISTORY) {
       pingHistory.shift();
     }
+    setState({ pingHistory: pingHistory.slice() });
   }
 }
 
@@ -607,7 +643,7 @@ async function _doLogoutInternal() {
     // 也得不到真实在线状态，不能把它当成「已下线」。
     const res = fail('门户返回的不是认证数据，无法执行注销（可能处于强制登录网络）', false);
     res.state = 'unknown';
-    await saveResult(res);
+    await saveResult(res, '手动注销');
     return res;
   }
   const raw = st.raw || {};
@@ -656,7 +692,7 @@ async function _doLogoutInternal() {
     connState = 'unreachable';
     const res = fail('注销请求已提交，但当前网关不可达，无法确认是否成功下线', false);
     res.state = 'unknown';
-    await saveResult(res);
+    await saveResult(res, '手动注销');
     await ensureAlarm();
     console.log('[logout] 网关不可达，无法确认注销结果');
     return res;
@@ -669,7 +705,7 @@ async function _doLogoutInternal() {
     connState = 'unparseable';
     const res = fail('注销请求已提交，但无法确认是否成功下线（门户返回非认证数据）', false);
     res.state = 'unknown';
-    await saveResult(res);
+    await saveResult(res, '手动注销');
     await ensureAlarm();
     console.log('[logout] 门户返回非认证数据，无法确认注销结果');
     return res;
@@ -682,7 +718,7 @@ async function _doLogoutInternal() {
     unreachableStreak = 0;
     connState = 'offline';
     const res = ok('已注销下线（自动登录已暂停，点「立即登录」可恢复）', false);
-    await saveResult(res);
+    await saveResult(res, '手动注销');
     // 需先落盘 manualLogout=true，ensureAlarm 才会按暂停态选空闲间隔
     await ensureAlarm();
     console.log('[logout] 已注销，自动登录暂停中');
@@ -698,7 +734,7 @@ async function _doLogoutInternal() {
     console.log('[logout] 会话未清除，但仍保持注销暂停以避免被立刻登回');
   }
   await updateConnState(stAfter);
-  await saveResult(res);
+  await saveResult(res, '手动注销');
   await applyCadence();
   return res;
 }
@@ -832,7 +868,7 @@ async function autoLogin(trigger, manual) {
     // 1) 未配置账号密码时不空转：否则新装插件（凭据默认为空）会每秒请求门户
     if (!String(settings.account || '').trim() || !String(settings.password || '')) {
       const r = fail('尚未配置账号密码，请点击插件图标 → 设置', false);
-      await saveResult(r);
+      await saveResult(r, trigger);
       console.log(tag + '未配置账号密码，跳过（等待用户在设置页填写）');
       await ensureAlarm();
       return r;
@@ -871,7 +907,7 @@ async function autoLogin(trigger, manual) {
     // 不可登录的三种情况（互斥）：已在线 / 拿不到门户数据 / 门户连不上
     if (st.online || st.unparseable || !st.reachable) {
       const r = st.online ? ok('已在线，无需登录', true) : fail(st.message, false);
-      await saveResult(r);
+      await saveResult(r, trigger);
       console.log(tag + (st.online ? '已在线，跳过登录'
         : (st.unparseable ? '门户返回非认证数据' : '网络连接失败') + '（连续第 ' + unreachableStreak + ' 次）'));
       await applyCadence();
@@ -900,7 +936,7 @@ async function autoLogin(trigger, manual) {
     if ((await getSettings()).manualLogout) {
       console.log(tag + '登录期间用户已注销，补发注销以尊重用户意图');
       const lr = await runLogoutOnce();
-      await saveResult(lr);
+      await saveResult(lr, '手动注销');
       return lr;
     }
 
@@ -935,7 +971,7 @@ async function autoLogin(trigger, manual) {
         : '已恢复正常重试节奏'));
     }
 
-    await saveResult(r);
+    await saveResult(r, trigger);
     console.log(tag + r.message);
     await applyCadence();
     return r;
@@ -943,7 +979,7 @@ async function autoLogin(trigger, manual) {
     // 兜底：任何未预期错误都不能让 Service Worker 挂掉
     const r = fail('发生未知错误：' + (e && e.message ? e.message : String(e)), false);
     try {
-      await saveResult(r);
+      await saveResult(r, trigger);
     } catch (e2) {
       // 忽略
     }
@@ -1139,7 +1175,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'status') {
     // 附带 manualLogout, running 与 onlineSince 状态，让 popup 与内容脚本一次拿全，避免并发竞态
-    Promise.all([checkStatus(), getSettings()])
+    hydrateState()
+      .then(() => Promise.all([checkStatus(), getSettings()]))
       .then(async ([st, s]) => {
         let curOnlineSince = onlineSince || s.onlineSince || null;
         if (st.online && !curOnlineSince) {
@@ -1188,8 +1225,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         unreachableStreak = s.unreachableStreak;
         lastPersistedStreak = s.unreachableStreak;
         onlineSince = s.onlineSince || null;
+        if (Array.isArray(s.eventLogs)) {
+          eventLogs = s.eventLogs.slice(0, MAX_EVENT_LOGS);
+        }
         return ensureAlarm();
       })
+      .then(() => sendResponse({ ok: true }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+
+  if (msg.type === 'clearLogs') {
+    eventLogs = [];
+    setState({ eventLogs: [] })
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }));
     return true;
