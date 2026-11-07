@@ -3874,7 +3874,8 @@ select:focus-visible,
   flex-shrink: 0;
 }
 
-.timeline-trigger {
+/* 与 common.js 的 createActivityTimeline 输出类名保持一致（数据字段为 from） */
+.timeline-from {
   font-size: 10px;
   font-weight: 600;
   padding: 1px 6px;

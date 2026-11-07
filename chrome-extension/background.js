@@ -119,8 +119,10 @@ let lastPersistedStreak = -1;
 // 当前闹钟周期（分钟），用于判断是否需要重建定时器
 let lastAlarmPeriod = null;
 
-// 是否已从 storage 恢复过运行态（见 hydrateState）
-let hydrated = false;
+// 运行态恢复的共享 Promise（见 hydrateState）。缓存 Promise 而非布尔标志，
+// 是为了让并发调用者等待同一次恢复完成：布尔标志在 await 之前就被置位，
+// 第二个调用者会误以为恢复已完成，拿到仍是空的 eventLogs / pingHistory。
+let hydrationPromise = null;
 
 // ---------------------------------------------------------------------------
 // 小工具
@@ -281,26 +283,28 @@ async function setState(patch) {
  * （connState / unreachableStreak / onlineSince）每次唤醒都归零；不恢复的话退避计数会被不断
  * 清零、闹钟退回基础间隔，指数退避就形同虚设。只在首次唤醒时恢复一次。
  */
-async function hydrateState() {
-  if (hydrated) return;
-  hydrated = true;
-  try {
-    const s = await getSettings();
-    if (connState === 'unknown') connState = s.connState;
-    unreachableStreak = Math.max(unreachableStreak, s.unreachableStreak);
-    lastPersistedStreak = s.unreachableStreak;
-    if (s.onlineSince) onlineSince = s.onlineSince;
-    if (Array.isArray(s.pingHistory) && s.pingHistory.length && !pingHistory.length) {
-      s.pingHistory.slice(-MAX_PING_HISTORY).forEach((v) => {
-        if (typeof v === 'number' && Number.isFinite(v)) pingHistory.push(v);
-      });
+function hydrateState() {
+  if (hydrationPromise) return hydrationPromise;
+  hydrationPromise = (async () => {
+    try {
+      const s = await getSettings();
+      if (connState === 'unknown') connState = s.connState;
+      unreachableStreak = Math.max(unreachableStreak, s.unreachableStreak);
+      lastPersistedStreak = s.unreachableStreak;
+      if (s.onlineSince) onlineSince = s.onlineSince;
+      if (Array.isArray(s.pingHistory) && s.pingHistory.length && !pingHistory.length) {
+        s.pingHistory.slice(-MAX_PING_HISTORY).forEach((v) => {
+          if (typeof v === 'number' && Number.isFinite(v)) pingHistory.push(v);
+        });
+      }
+      if (Array.isArray(s.eventLogs) && s.eventLogs.length && !eventLogs.length) {
+        eventLogs = s.eventLogs.slice(0, MAX_EVENT_LOGS);
+      }
+    } catch (e) {
+      // 忽略，按默认值继续
     }
-    if (Array.isArray(s.eventLogs) && s.eventLogs.length && !eventLogs.length) {
-      eventLogs = s.eventLogs.slice(0, MAX_EVENT_LOGS);
-    }
-  } catch (e) {
-    // 忽略，按默认值继续
-  }
+  })();
+  return hydrationPromise;
 }
 
 function clampInterval(v) {
@@ -343,6 +347,10 @@ let eventLogs = [];
 
 /** 把结果写入 storage（popup / options 直接读这里，并维护去重事件时间轴日志） */
 async function saveResult(result, trigger) {
+  // 所有写日志的入口统一先恢复运行态。MV3 的 SW 随时被回收，冷启动后第一个消息
+  // 若直接是 logout / contentResult（在 onStartup、status 之前到达），模块级
+  // eventLogs 仍是空数组，直接 set 会把磁盘上的历史日志整段覆盖成 1 条。
+  await hydrateState();
   try {
     if (result && result.message) {
       const entry = {
@@ -366,7 +374,13 @@ async function saveResult(result, trigger) {
         }
       }
     }
-    await chrome.storage.local.set({ lastResult: result, eventLogs: eventLogs });
+    // 心跳历史与结果同批落盘：掉线时 1 秒巡检节奏下，若 recordPingHistory 每次
+    // 单独 setState，会多出约每秒 1 次写盘；合并后不增加额外 I/O。
+    await chrome.storage.local.set({
+      lastResult: result,
+      eventLogs: eventLogs,
+      pingHistory: getPingHistory()
+    });
     updateActionBadge(result && result.online);
   } catch (e) {
     // 忽略
@@ -400,7 +414,9 @@ function recordPingHistory(ms) {
     if (pingHistory.length > MAX_PING_HISTORY) {
       pingHistory.shift();
     }
-    setState({ pingHistory: pingHistory.slice() });
+    // 只更新内存。落盘由 saveResult() 随巡检结果同批完成（见其 set 调用），
+    // status 消息则通过 checkStatus() 的返回值直接把历史带给 popup / options。
+    // 这样避免了每次探测单独写一次 storage。
   }
 }
 
@@ -409,6 +425,10 @@ function getPingHistory() {
 }
 
 async function checkStatus() {
+  // 探测会写入心跳历史，必须先恢复运行态，否则冷启动首条消息（如 logout）会让
+  // pingHistory 先被塞进一条新值，hydrateState 的 !pingHistory.length 判断失效，
+  // 磁盘上的历史心跳就被跳过恢复、随后又被写回覆盖。
+  await hydrateState();
   const url = URL_CHKSTATUS + '?callback=dr1001&v=' + rand() + '&lang=zh&jsVersion=' + JS_VERSION;
   const t0 = Date.now();
   let text;

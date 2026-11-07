@@ -357,6 +357,31 @@ for (const [htmlFile, jsFile, label] of [
   } catch (e) {
     problems.push(`[${label}] 顶层执行异常: ${e.message}`);
   }
+
+  // 断言真的走完了 online 渲染路径且写入了具体正确值。
+  // 只断言「不抛异常」会漏掉字段名写错这类静默值缺陷；若 mock 退化到
+  // !reachable 分支，这些断言会立刻失败，避免测试假绿。
+  const el = (id) => env._elements[id];
+  const expect = (id, prop, check, desc) => {
+    const node = el(id);
+    if (!node) { problems.push(`[${label}] 缺少 #${id} 元素`); return; }
+    const v = node[prop];
+    if (typeof v !== 'string' || !check(v))
+      problems.push(`[${label}] #${id}.${prop} 期望 ${desc}，实际: ${JSON.stringify(v)}`);
+  };
+  if (label === 'options') {
+    expect('stStime', 'textContent', (v) => /^本次连通: \S/.test(v), '本次连通: <时间>');
+    expect('pingBadge', 'className', (v) => /^latency-badge (fast|good|normal|slow)$/.test(v), 'latency-badge <有效等级>');
+    expect('stPing', 'textContent', (v) => v === '42 ms', '42 ms');
+    expect('stIp', 'textContent', (v) => v === '10.0.0.1', '10.0.0.1');
+    expect('stFlow', 'textContent', (v) => v === '1.0 MB', '1.0 MB');
+  } else {
+    expect('popPing', 'textContent', (v) => v === '42 ms', '42 ms');
+    expect('popPing', 'className', (v) => /^dock-value mono ping-(fast|good|normal|slow)$/.test(v), 'ping-<有效等级>');
+    expect('statusTitle', 'textContent', (v) => v === '已在线 · 认证通过', '已在线 · 认证通过');
+    expect('localIp', 'textContent', (v) => v === '10.0.0.1', '10.0.0.1');
+  }
+
   // 触发所有已注册的 click 回调，覆盖交互分支（字段错名常藏在这里）
   for (const id of Object.keys(env._elements)) {
     try { env._elements[id]._fire('click'); }
@@ -380,6 +405,124 @@ if (problems.length) {
         self.assertNotIn("DOM_PROBLEMS", res.stdout,
                          f"脚本把 undefined 写入 DOM 或交互回调抛异常:\n{res.stdout}")
         self.assertIn("ALL_SCRIPTS_OK", res.stdout)
+
+    def test_timeline_css_class_matches_component_output(self):
+        """组件库生成的 class 必须在 CSS 中有对应规则，否则胶囊样式静默丢失。"""
+        with open(os.path.join(EXT_DIR, "common.js"), "r", encoding="utf-8") as f:
+            common = f.read()
+        with open(os.path.join(EXT_DIR, "options.css"), "r", encoding="utf-8") as f:
+            css = f.read()
+        emitted = set(re.findall(r'class="(timeline-[a-z-]+)"', common))
+        self.assertTrue(emitted, "未找到时间轴组件输出的类名")
+        missing = [c for c in emitted if ("." + c) not in css]
+        self.assertEqual(missing, [], f"options.css 缺少时间轴样式规则: {missing}")
+
+    def test_ping_history_written_once_with_result(self):
+        """心跳历史不得每次探测单独写盘，且必须随 saveResult 的批次一起落盘。"""
+        with open(os.path.join(EXT_DIR, "background.js"), "r", encoding="utf-8") as f:
+            bg = f.read()
+        record = re.search(r"function recordPingHistory\(ms\) \{(.*?)\n\}", bg, re.S)
+        self.assertTrue(record, "未找到 recordPingHistory")
+        self.assertNotIn("setState", record.group(1),
+                         "recordPingHistory 不应单独写 storage（掉线 1 秒巡检会造成额外写盘）")
+        save = re.search(r"async function saveResult\(result, trigger\) \{(.*?)\n\}", bg, re.S)
+        self.assertTrue(save, "未找到 saveResult")
+        self.assertIn("pingHistory: getPingHistory()", save.group(1),
+                      "saveResult 必须把 pingHistory 与 lastResult/eventLogs 同批写入")
+
+    def test_background_cold_start_preserves_event_logs(self):
+        """运行时验证 SW 冷启动后的运行态恢复与写盘合并。
+
+        MV3 的 service worker 会被回收。冷启动后若先探测（logout 的首步）、
+        再写日志（contentResult），存在两类静默数据损坏：
+        1. 模块级 eventLogs 为空时直接 set，会把磁盘历史覆盖成 1 条；
+        2. 探测先写入一条心跳，hydrateState 的 !pingHistory.length 判断失效，
+           磁盘上的历史心跳被跳过恢复、随后又被写回覆盖。
+        同时校验心跳不再单独写盘（掉线 1 秒巡检下会多出约每秒 1 次 I/O）。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(process.argv[1], 'utf8');
+const listeners = {};
+let storage = {
+  eventLogs: [
+    { time: '09:00:03', message: '事件A', ok: true, online: true, from: '巡检', count: 1 },
+    { time: '09:00:02', message: '事件B', ok: true, online: true, from: '巡检', count: 1 },
+    { time: '09:00:01', message: '事件C', ok: false, online: false, from: '巡检', count: 1 }
+  ],
+  pingHistory: [11, 22, 33], initialized: true, account: 'test', password: 'pw'
+};
+const writes = [];
+const chrome = {
+  storage: { local: {
+    get: (arg, cb) => {
+      const r = arg === null ? { ...storage } : { ...(arg || {}) };
+      if (typeof cb === 'function') { cb(r); return; }
+      return Promise.resolve(r);
+    },
+    set: (patch, cb) => {
+      writes.push(patch); Object.assign(storage, patch);
+      if (typeof cb === 'function') cb();
+      return Promise.resolve();
+    }
+  } },
+  runtime: {
+    onInstalled: { addListener: (f) => listeners.installed = f },
+    onStartup: { addListener: (f) => listeners.startup = f },
+    onMessage: { addListener: (f) => listeners.message = f },
+    getManifest: () => ({ version: 'test' }), lastError: null
+  },
+  alarms: { onAlarm: { addListener: () => {} }, get: async () => null, create: async () => {} },
+  action: { setBadgeText: () => {}, setBadgeBackgroundColor: () => {} },
+  commands: null
+};
+const sandbox = {
+  console: { log: () => {}, warn: () => {}, error: () => {} }, chrome,
+  setTimeout: (fn) => setTimeout(fn, 0), clearTimeout,
+  setInterval: () => 0, clearInterval: () => {},
+  Date, Math, JSON, Promise, Number, String, Array, Object, RegExp,
+  parseInt, parseFloat, isNaN, Boolean, Set, Map, Error,
+  TextDecoder, AbortController, Uint8Array, ArrayBuffer, URLSearchParams,
+  // 探测失败也仍会记录一次心跳（-1），足以覆盖「先探测再写日志」的冷启动路径
+  fetch: async () => { throw new Error('offline'); }
+};
+vm.createContext(sandbox);
+vm.runInContext(src, sandbox);
+
+(async () => {
+  // 冷启动：不触发 onInstalled / onStartup / status
+  await vm.runInContext('checkStatus()', sandbox);
+  await new Promise((resolve) => listeners.message(
+    { type: 'contentResult', result: { ok: true, online: true, message: '页面自动填写完成' } },
+    {}, resolve
+  ));
+  const last = writes[writes.length - 1] || {};
+  const ping = last.pingHistory || [];
+  console.log('RESULT:' + JSON.stringify({
+    writeCount: writes.length,
+    eventLogsLen: (last.eventLogs || []).length,
+    firstMsg: (last.eventLogs || [])[0] && last.eventLogs[0].message,
+    hasPingHistory: Array.isArray(last.pingHistory),
+    pingPreserved: ping.indexOf(11) !== -1 && ping.indexOf(22) !== -1 && ping.indexOf(33) !== -1
+  }));
+})().catch((e) => console.log('ERROR:' + e.message));
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, os.path.join(EXT_DIR, "background.js")],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"后台脚本模拟失败:\n{res.stderr}\n{res.stdout}")
+        line = next((l for l in res.stdout.splitlines() if l.startswith("RESULT:")), None)
+        self.assertIsNotNone(line, f"未拿到模拟结果:\n{res.stdout}\n{res.stderr}")
+        data = json.loads(line[len("RESULT:"):])
+        # 3 条历史 + 1 条新事件；修复前会退化成 1 条
+        self.assertEqual(data["eventLogsLen"], 4,
+                         f"冷启动后历史日志被覆盖: {data}")
+        self.assertEqual(data["firstMsg"], "页面自动填写完成")
+        self.assertTrue(data["hasPingHistory"], "心跳历史未随结果同批落盘")
+        self.assertTrue(data["pingPreserved"], "冷启动先探测后写日志，历史心跳被覆盖丢失")
+        self.assertEqual(data["writeCount"], 1, "探测与结果写入不应拆成多次 set")
 
 
 if __name__ == "__main__":
