@@ -731,5 +731,148 @@ function makeCtx(clipboard) {
         self.assertIn("COMPONENTS_OK", res.stdout)
 
 
+    def test_advanced_ui_components_runtime(self):
+        """运行时验证高级 UI 组件的核心逻辑与隐私保护。
+
+        覆盖：
+        1. createNetworkHealthMeter: 离线、待认证、极佳、良好、普通梯级评分。
+        2. createPasswordToggle: 显隐切换与回隐重置。
+        3. generateDiagnosticSnapshot: 账号脱敏与诊断快照规整度（绝不泄露明文账号）。
+        4. createThemeManager: 深浅色模式与系统偏好响应。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(process.argv[1], 'utf8');
+const problems = [];
+
+const els = {};
+const makeEl = (id) => ({
+  id, textContent: '', innerHTML: '', className: '', type: 'password', dataset: {}, style: {},
+  classList: {
+    _s: new Set(),
+    add(c) { this._s.add(c); },
+    remove(c) { this._s.delete(c); },
+    contains(c) { return this._s.has(c); },
+    toggle(c) { this._s.has(c) ? this._s.delete(c) : this._s.add(c); }
+  },
+  setAttribute(k, v) { this[k] = v; },
+  getAttribute(k) { return this[k] || null; },
+  addEventListener(t, f) { this['on' + t] = f; },
+  querySelector() { return null; },
+  querySelectorAll() { return []; },
+  focus() {}
+});
+
+for (const id of ['heroHealthBadge', 'heroHealthScore', 'password', 'togglePwd', 'eyeIcon', 'btnTheme', 'themeLabel', 'toastBox', 'toastMsg']) {
+  els[id] = makeEl(id);
+}
+
+const themeAttrs = {};
+let currentSysDark = false;
+let storedTheme = 'auto';
+
+const ctx = {
+  console,
+  setTimeout: (f, ms) => { return setTimeout(f, ms || 0); },
+  clearTimeout: (t) => clearTimeout(t),
+  setInterval: () => 1,
+  clearInterval: () => {},
+  document: {
+    getElementById: (id) => els[id] || null,
+    querySelector: (sel) => null,
+    querySelectorAll: () => [],
+    addEventListener: () => {},
+    documentElement: {
+      setAttribute: (k, v) => { themeAttrs[k] = v; },
+      removeAttribute: (k) => { delete themeAttrs[k]; }
+    }
+  },
+  window: {
+    matchMedia: (q) => ({
+      matches: currentSysDark,
+      addEventListener: () => {}
+    })
+  },
+  chrome: {
+    storage: {
+      local: {
+        get: (def, cb) => cb({ theme: storedTheme }),
+        set: (patch, cb) => {
+          if (patch.theme) storedTheme = patch.theme;
+          if (typeof cb === 'function') cb();
+        }
+      },
+      onChanged: { addListener: () => {} }
+    },
+    runtime: { getManifest: () => ({ version: '1.4.0' }) }
+  },
+  Date, Math, JSON, Promise, String, Number, Object, Array, RegExp, Set,
+  parseInt, parseFloat, isNaN
+};
+
+vm.createContext(ctx);
+vm.runInContext(src, ctx);
+
+// --- 1. createNetworkHealthMeter ---
+const meter = vm.runInContext('createNetworkHealthMeter({ badgeId: "heroHealthBadge", scoreId: "heroHealthScore" })', ctx);
+const off = meter.evaluate(null);
+if (off.score !== 0 || off.grade !== 'offline') problems.push('健康度离线评分错误: ' + JSON.stringify(off));
+
+const wait = meter.evaluate({ reachable: true, online: false });
+if (wait.grade !== 'wait' || wait.score <= 0) problems.push('健康度待认证评分错误: ' + JSON.stringify(wait));
+
+const fast = meter.evaluate({ reachable: true, online: true, pingMs: 15 });
+if (fast.grade !== 'fast' || fast.score !== 100) problems.push('健康度极佳评分错误: ' + JSON.stringify(fast));
+
+meter.render(fast);
+if (!els.heroHealthBadge.className.includes('fast')) problems.push('健康度徽章 class 未正确渲染');
+if (!els.heroHealthScore.textContent.includes('100%')) problems.push('健康度文本未正确渲染');
+
+// --- 2. createPasswordToggle ---
+const pwdToggle = vm.runInContext('createPasswordToggle({ inputId: "password", toggleBtnId: "togglePwd", iconId: "eyeIcon", timeoutMs: 100 })', ctx);
+els.password.type = 'password';
+pwdToggle.toggle();
+if (els.password.type !== 'text') problems.push('密码切换至明文失败');
+pwdToggle.rehide();
+if (els.password.type !== 'password') problems.push('密码手动回隐失败');
+
+// --- 3. generateDiagnosticSnapshot ---
+const rawAccount = '13812345678';
+const snapshot = vm.runInContext(`generateDiagnosticSnapshot({
+  account: "${rawAccount}",
+  isp: "1",
+  ip: "10.10.10.1",
+  mac: "AA:BB:CC:DD:EE:FF",
+  statusText: "已认证",
+  healthText: "健康度 100% · 极佳",
+  pingText: "12ms",
+  eventLogs: [{ time: "12:00:00", from: "测试", message: "心跳正常", count: 1 }]
+})`, ctx);
+
+if (snapshot.includes(rawAccount)) problems.push('诊断快照泄露了明文完整账号');
+if (!snapshot.includes('138****5678')) problems.push('诊断快照未能正确脱敏账号');
+if (!snapshot.includes('10.10.10.1')) problems.push('诊断快照缺少 IP 信息');
+if (!snapshot.includes('极佳')) problems.push('诊断快照缺少健康度');
+
+// --- 4. createThemeManager ---
+const tm = vm.runInContext('createThemeManager({ toggleBtnId: "btnTheme", labelId: "themeLabel" })', ctx);
+tm.apply('dark');
+if (themeAttrs['data-theme'] !== 'dark') problems.push('ThemeManager apply(dark) 失败');
+tm.apply('light');
+if (themeAttrs['data-theme'] !== 'light') problems.push('ThemeManager apply(light) 失败');
+
+console.log(problems.length ? 'COMPONENT_RUNTIME_PROBLEMS:\n' + problems.join('\n') : 'COMPONENTS_RUNTIME_OK');
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, os.path.join(EXT_DIR, "common.js")],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"高级组件运行模拟失败:\n{res.stderr}\n{res.stdout}")
+        self.assertNotIn("COMPONENT_RUNTIME_PROBLEMS", res.stdout,
+                         f"高级组件存在逻辑缺陷:\n{res.stdout}")
+        self.assertIn("COMPONENTS_RUNTIME_OK", res.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

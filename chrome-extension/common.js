@@ -1075,8 +1075,8 @@ function createNetworkHealthMeter(options = {}) {
     };
   }
 
-  function render(res) {
-    const data = evaluate(res);
+  function render(resOrData) {
+    const data = (resOrData && typeof resOrData.grade === 'string') ? resOrData : evaluate(resOrData);
     if (badgeEl) {
       badgeEl.className = `hero-health-pill ${data.grade}`;
       badgeEl.title = `${data.text} (${data.desc})`;
