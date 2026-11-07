@@ -873,6 +873,82 @@ console.log(problems.length ? 'COMPONENT_RUNTIME_PROBLEMS:\n' + problems.join('\
                          f"高级组件存在逻辑缺陷:\n{res.stdout}")
         self.assertIn("COMPONENTS_RUNTIME_OK", res.stdout)
 
+    def test_no_hardcoded_user_credentials(self):
+        """项目中严禁残留或硬编码用户任何真实手机号与密码凭据。"""
+        banned_tokens = [
+            "".join(["178", "7625", "6759"]),
+            "".join(["hsr", "007", "007"])
+        ]
+        scanned_count = 0
+        for root, dirs, files in os.walk(PROJECT_DIR):
+            if ".git" in root or "__pycache__" in root:
+                continue
+            for file in files:
+                if not file.endswith((".js", ".html", ".css", ".json", ".py", ".md", ".txt")):
+                    continue
+                path = os.path.join(root, file)
+                scanned_count += 1
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                for token in banned_tokens:
+                    self.assertNotIn(token, content, f"文件 {file} 存在真实凭据残留！")
+        self.assertGreater(scanned_count, 5, "扫描的文件数量异常过少")
+
+    def test_jsonp_parser_resilience(self):
+        """验证 JSONP 解析器的多态容错能力与防御边界。"""
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(process.argv[1], 'utf8');
+const problems = [];
+const chrome = {
+  storage: { local: { get: (def, cb) => (cb ? cb({}) : Promise.resolve({})), set: (p, cb) => (cb ? cb() : Promise.resolve()) } },
+  runtime: {
+    onInstalled: { addListener: () => {} },
+    onStartup: { addListener: () => {} },
+    onMessage: { addListener: () => {} },
+    getManifest: () => ({ version: '1.4.0' }),
+    lastError: null
+  },
+  alarms: { onAlarm: { addListener: () => {} }, get: async () => null, create: async () => {} },
+  action: { setBadgeText: () => {}, setBadgeBackgroundColor: () => {} },
+  commands: { onCommand: { addListener: () => {} } },
+  webNavigation: { onCommitted: { addListener: () => {} }, onErrorOccurred: { addListener: () => {} } }
+};
+const ctx = {
+  console,
+  chrome,
+  setTimeout: () => 1,
+  clearTimeout: () => {},
+  setInterval: () => 1,
+  clearInterval: () => {},
+  Date, Math, JSON, String, Number, Array, Object, RegExp, Boolean
+};
+vm.createContext(ctx);
+vm.runInContext(src, ctx);
+
+const parse = (text) => vm.runInContext(`parseJsonp(${JSON.stringify(text)})`, ctx);
+
+if (parse(null) !== null) problems.push('parseJsonp(null) 未返回 null');
+if (parse('') !== null) problems.push('parseJsonp("") 未返回 null');
+if (parse('<html><body>error</body></html>') !== null) problems.push('HTML 响应未被过滤为 null');
+if (parse('dr1001({corrupted})') !== null) problems.push('损坏 JSON 未被安全捕获为 null');
+
+const okRes = parse('dr1001({"result":1,"message":"success"})');
+if (!okRes || okRes.result !== 1 || okRes.message !== 'success') {
+  problems.push('正常 JSONP 解析失败: ' + JSON.stringify(okRes));
+}
+
+console.log(problems.length ? 'JSONP_PROBLEMS:\n' + problems.join('\n') : 'JSONP_OK');
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, os.path.join(EXT_DIR, "background.js")],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"JSONP 解析模拟失败:\n{res.stderr}\n{res.stdout}")
+        self.assertNotIn("JSONP_PROBLEMS", res.stdout, f"JSONP 解析器存在隐患:\n{res.stdout}")
+        self.assertIn("JSONP_OK", res.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
