@@ -771,3 +771,590 @@ function initAccent(callback) {
     }
   }
 }
+
+/**
+ * 组件 9：深浅色主题模式管理组件 (ThemeManager Component)
+ * 统一管理 auto/dark/light 状态轮转、系统偏好跟随、存储持久化与多端无缝响应。
+ */
+function createThemeManager(options = {}) {
+  const toggleBtn = $(options.toggleBtnId || options.btnId);
+  const labelEl = $(options.labelId);
+  let currentPref = 'auto';
+
+  function apply(theme) {
+    currentPref = theme || 'auto';
+    const sysDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const effective = currentPref === 'auto' ? (sysDark ? 'dark' : 'light') : currentPref;
+
+    if (effective === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else if (effective === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+
+    if (labelEl) {
+      labelEl.textContent = currentPref === 'dark' ? '深色' : (currentPref === 'light' ? '浅色' : '自动');
+    }
+
+    if (typeof options.onChange === 'function') {
+      options.onChange(currentPref, effective);
+    }
+  }
+
+  function cycle() {
+    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
+    chrome.storage.local.get({ theme: 'auto' }, (s) => {
+      const cur = (s && s.theme) || 'auto';
+      let next = 'dark';
+      if (options.supportAuto !== false) {
+        next = cur === 'auto' ? 'dark' : (cur === 'dark' ? 'light' : 'auto');
+      } else {
+        if (cur === 'dark') next = 'light';
+        else if (cur === 'light') next = 'dark';
+        else {
+          const sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          next = sysDark ? 'light' : 'dark';
+        }
+      }
+      chrome.storage.local.set({ theme: next }, () => {
+        apply(next);
+        if (typeof options.onNotify === 'function') {
+          const map = { auto: '跟随系统', dark: '深色模式', light: '浅色模式' };
+          options.onNotify(`已切换至 ${map[next] || next}`);
+        }
+      });
+    });
+  }
+
+  function init() {
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get({ theme: 'auto' }, (s) => {
+        apply(s && s.theme);
+      });
+
+      if (chrome.storage.onChanged) {
+        chrome.storage.onChanged.addListener((changes, area) => {
+          if (area === 'local' && changes.theme) {
+            apply(changes.theme.newValue);
+          }
+        });
+      }
+    }
+
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (currentPref === 'auto') {
+          apply('auto');
+        }
+      });
+    }
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', cycle);
+    }
+  }
+
+  init();
+
+  return {
+    apply,
+    cycle,
+    getCurrent: () => currentPref
+  };
+}
+
+/**
+ * 组件 10：统一通知气泡与轻量 Toast 胶囊组件 (ToastManager Component)
+ * 适配 options 控制中心（多条垂直堆叠）与 popup 弹窗（内嵌微胶囊）。
+ */
+function createToastManager(options = {}) {
+  const container = $(options.containerId) || $(options.container);
+  const singleMsgBox = $(options.boxId);
+  const singleTextEl = $(options.textId);
+  const singleIconEl = $(options.iconId);
+  let singleTimer = null;
+
+  function dismiss(toastEl) {
+    if (!toastEl || toastEl._dismissing) return;
+    toastEl._dismissing = true;
+    if (toastEl._timer) clearTimeout(toastEl._timer);
+    toastEl.classList.remove('show');
+    toastEl.classList.add('hide');
+
+    let finished = false;
+    const onEnd = () => {
+      if (finished) return;
+      finished = true;
+      toastEl.removeEventListener('transitionend', onEnd);
+      if (toastEl.id !== 'toastBar') {
+        toastEl.remove();
+      } else {
+        toastEl.classList.remove('hide');
+        toastEl._dismissing = false;
+      }
+    };
+    toastEl.addEventListener('transitionend', onEnd, { once: true });
+    setTimeout(onEnd, 300);
+  }
+
+  function show(text, kind = 'info', duration = 3500) {
+    const norm = normalizeStatusMessage(text);
+    if (!norm) {
+      if (singleMsgBox) singleMsgBox.className = 'msg-box';
+      return;
+    }
+
+    // 单体胶囊模式 (如 Popup)
+    if (singleMsgBox && singleTextEl) {
+      if (singleTimer) {
+        clearTimeout(singleTimer);
+        singleTimer = null;
+      }
+      singleMsgBox.className = `msg-box show ${kind}`;
+      singleTextEl.textContent = norm;
+      if (singleIconEl) {
+        singleIconEl.innerHTML = getStatusIconSvg(kind === 'ok' ? 'ok' : (kind === 'err' ? 'err' : 'info'), 13);
+      }
+      if (duration && kind !== 'err') {
+        singleTimer = setTimeout(() => {
+          singleMsgBox.className = 'msg-box';
+        }, duration);
+      }
+      return;
+    }
+
+    // 多条堆叠模式 (如 Options 控制中心)
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast-bar show ${kind}`;
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'toast-icon';
+    iconSpan.innerHTML = getStatusIconSvg(kind === 'ok' ? 'ok' : (kind === 'err' ? 'err' : 'info'), 16);
+
+    const msgSpan = document.createElement('span');
+    msgSpan.className = 'toast-msg';
+    msgSpan.textContent = norm;
+
+    toast.appendChild(iconSpan);
+    toast.appendChild(msgSpan);
+
+    toast.addEventListener('click', () => dismiss(toast));
+
+    const activeToasts = container.querySelectorAll('.toast-bar.show');
+    if (activeToasts.length >= (options.maxStack || 3)) {
+      dismiss(activeToasts[0]);
+    }
+
+    container.appendChild(toast);
+
+    if (duration) {
+      toast._timer = setTimeout(() => dismiss(toast), duration);
+    }
+  }
+
+  return {
+    show,
+    ok: (text, dur) => show(text, 'ok', dur),
+    err: (text, dur) => show(text, 'err', dur || 5000),
+    warn: (text, dur) => show(text, 'warn', dur),
+    info: (text, dur) => show(text, 'info', dur),
+    dismiss
+  };
+}
+
+/**
+ * 组件 11：密码显隐与自习室防窥自动回隐组件 (PasswordToggle Component)
+ * 点击切换明密文，自带 10 秒无操作自动回隐保护，防止公共场所遗忘暴露。
+ */
+function createPasswordToggle(options = {}) {
+  const inputEl = $(options.inputId);
+  const toggleBtn = $(options.toggleBtnId);
+  const eyeIcon = $(options.iconId);
+  const timeoutMs = options.timeoutMs || 10000;
+  let rehideTimer = null;
+
+  function rehide() {
+    if (rehideTimer) {
+      clearTimeout(rehideTimer);
+      rehideTimer = null;
+    }
+    if (inputEl && inputEl.type === 'text') {
+      inputEl.type = 'password';
+      if (eyeIcon) eyeIcon.innerHTML = ICONS.eyeOpen;
+      if (typeof options.onToggle === 'function') options.onToggle(false);
+    }
+  }
+
+  function toggle() {
+    if (!inputEl) return;
+    const isCurrentlyPassword = inputEl.type === 'password';
+    inputEl.type = isCurrentlyPassword ? 'text' : 'password';
+
+    if (rehideTimer) {
+      clearTimeout(rehideTimer);
+      rehideTimer = null;
+    }
+
+    if (isCurrentlyPassword) {
+      if (eyeIcon) eyeIcon.innerHTML = ICONS.eyeOff;
+      rehideTimer = setTimeout(rehide, timeoutMs);
+    } else {
+      if (eyeIcon) eyeIcon.innerHTML = ICONS.eyeOpen;
+    }
+
+    if (typeof options.onToggle === 'function') {
+      options.onToggle(isCurrentlyPassword);
+    }
+  }
+
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', toggle);
+  }
+
+  return {
+    toggle,
+    rehide,
+    isRevealed: () => inputEl?.type === 'text'
+  };
+}
+
+/**
+ * 组件 12：全链路网络健康指数测算与语义徽章组件 (NetworkHealthMeter Component)
+ * 根据网关连通度、延迟等级、心跳历史计算 0-100 综合分值并驱动 UI。
+ */
+function createNetworkHealthMeter(options = {}) {
+  const badgeEl = $(options.badgeId);
+  const scoreEl = $(options.scoreId);
+
+  function evaluate(res) {
+    if (!res || !res.reachable) {
+      return {
+        score: 0,
+        grade: 'offline',
+        title: '离线',
+        text: '健康度 0% · 离线',
+        desc: '未连接到校园网物理链路'
+      };
+    }
+
+    if (!res.online) {
+      return {
+        score: res.manualLogout ? 45 : 55,
+        grade: 'wait',
+        title: res.manualLogout ? '已暂停' : '待认证',
+        text: `健康度 50% · ${res.manualLogout ? '已暂停' : '待认证'}`,
+        desc: '已连接局域网网关，互联网访问受限'
+      };
+    }
+
+    let score = 100;
+    const ping = res.pingMs !== undefined ? Number(res.pingMs) : 10;
+    if (ping <= 30) {
+      score = 100;
+    } else if (ping <= 60) {
+      score = 95 - Math.round((ping - 30) * 0.25);
+    } else if (ping <= 120) {
+      score = 85 - Math.round((ping - 60) * 0.25);
+    } else {
+      score = Math.max(60, 70 - Math.round((ping - 120) * 0.1));
+    }
+
+    const grade = score >= 90 ? 'fast' : (score >= 75 ? 'good' : 'normal');
+    const label = score >= 95 ? '极佳' : (score >= 85 ? '畅通' : '良好');
+
+    return {
+      score,
+      grade,
+      title: label,
+      text: `健康度 ${score}% · ${label}`,
+      desc: `网关响应耗时 ${classifyPing(ping, true).text}，链路畅通`
+    };
+  }
+
+  function render(res) {
+    const data = evaluate(res);
+    if (badgeEl) {
+      badgeEl.className = `hero-health-pill ${data.grade}`;
+      badgeEl.title = `${data.text} (${data.desc})`;
+    }
+    if (scoreEl) {
+      scoreEl.textContent = data.text;
+    }
+    return data;
+  }
+
+  return {
+    evaluate,
+    render
+  };
+}
+
+/**
+ * 诊断报告标准化生成器：一键生成脱敏文本快照，便于校园网报障与排查
+ */
+function generateDiagnosticSnapshot(data = {}) {
+  const version = (typeof chrome !== 'undefined' && chrome.runtime?.getManifest?.()?.version) || '1.3.0';
+  const ispMeta = getIspMeta(data.isp || '1');
+  const maskedAcc = maskAccount(data.account || '') || '未配置';
+  const logs = Array.isArray(data.eventLogs) ? data.eventLogs.slice(0, 6) : [];
+
+  const lines = [
+    `=== [校园网自动登录 诊断快照 v${version}] ===`,
+    `导出时间: ${new Date().toLocaleString()}`,
+    `连接状态: ${data.statusText || '—'} (健康度: ${data.healthText || '—'})`,
+    `网关延迟: ${data.pingText || '—'} (网关: 172.30.100.2:80)`,
+    `认证账号: ${maskedAcc} | 运营商: ${ispMeta.name} (${ispMeta.tag})`,
+    `终端地址: ${data.ip || '—'} | MAC: ${fmtMac(data.mac) || '—'}`,
+    `计费流量: ${data.flowText || '—'}`,
+    `保活策略: ${data.policyText || '—'}`,
+    `近况事件:`,
+    ...(logs.length
+      ? logs.map((l) => `  - ${l.time} [${l.from || '巡检'}] ${l.message}${l.count > 1 ? ' ×' + l.count : ''}`)
+      : ['  - 暂无事件记录'])
+  ];
+
+  return lines.join('\n');
+}
+
+/**
+ * 组件 13：现代毛玻璃自定义下拉选择组件 (SelectDropdown Component)
+ * 将原生 <select> 美化为符合无障碍标准的自定义 Combobox 菜单。
+ */
+function formatOptionContent(text) {
+  const trimmed = String(text || '').trim();
+  const match = trimmed.match(/^(.*?)[（\(](.*?)[）\)]$/);
+  if (!match) {
+    return `<span class="opt-label">${escapeHtml(trimmed)}</span>`;
+  }
+  const main = match[1].trim();
+  const sub = match[2].trim();
+  let badgeClass = 'opt-badge';
+  if (sub.includes('推荐') || sub.includes('最快') || sub.includes('最灵敏')) {
+    badgeClass += ' primary';
+  } else if (sub.startsWith('@')) {
+    badgeClass += ' mono';
+  }
+  return `<div class="opt-body"><span class="opt-label">${escapeHtml(main)}</span><span class="${badgeClass}">${escapeHtml(sub)}</span></div>`;
+}
+
+function closeAllCustomSelects() {
+  document.querySelectorAll('.select-wrap.open').forEach((w) => {
+    w.classList.remove('open');
+    const t = w.querySelector('.custom-select-trigger');
+    if (t) t.setAttribute('aria-expanded', 'false');
+    const card = w.closest('.card');
+    if (card) card.style.zIndex = '';
+    const field = w.closest('.field');
+    if (field) field.style.zIndex = '';
+  });
+}
+
+function syncCustomSelect(target) {
+  const el = typeof target === 'string' ? $(target) : target;
+  if (el && typeof el._syncCustomSelect === 'function') {
+    el._syncCustomSelect();
+  }
+}
+
+function initCustomSelects(root = document) {
+  const wraps = root.querySelectorAll('.select-wrap');
+  wraps.forEach((wrap) => {
+    const select = wrap.querySelector('select');
+    if (!select || wrap.dataset.customized === 'true') return;
+    wrap.dataset.customized = 'true';
+
+    select.classList.add('custom-select-hidden');
+    select.tabIndex = -1;
+    select.setAttribute('aria-hidden', 'true');
+
+    const oldArrow = wrap.querySelector('.select-arrow');
+    if (oldArrow) oldArrow.remove();
+
+    const menuId = 'menu-' + (select.id || 'select-' + Math.floor(Math.random() * 10000));
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'custom-select-trigger';
+    trigger.setAttribute('role', 'combobox');
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-controls', menuId);
+
+    const labelWrap = document.createElement('div');
+    labelWrap.className = 'custom-select-label';
+
+    const arrowSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    arrowSvg.setAttribute('class', 'custom-select-arrow');
+    arrowSvg.setAttribute('viewBox', '0 0 24 24');
+    arrowSvg.setAttribute('fill', 'none');
+    arrowSvg.setAttribute('stroke', 'currentColor');
+    arrowSvg.setAttribute('stroke-width', '2');
+    arrowSvg.innerHTML = '<polyline points="6 9 12 15 18 9"/>';
+
+    trigger.appendChild(labelWrap);
+    trigger.appendChild(arrowSvg);
+    wrap.appendChild(trigger);
+
+    const menu = document.createElement('div');
+    menu.id = menuId;
+    menu.className = 'custom-select-menu';
+    menu.setAttribute('role', 'listbox');
+
+    Array.from(select.options).forEach((opt, idx) => {
+      const optionEl = document.createElement('div');
+      optionEl.id = `${menuId}-opt-${idx}`;
+      optionEl.className = 'custom-select-option' + (idx === select.selectedIndex ? ' active' : '');
+      optionEl.setAttribute('role', 'option');
+      optionEl.setAttribute('data-value', opt.value);
+      optionEl.setAttribute('data-index', String(idx));
+      optionEl.setAttribute('aria-selected', idx === select.selectedIndex ? 'true' : 'false');
+
+      optionEl.innerHTML = formatOptionContent(opt.textContent) +
+        '<svg class="custom-select-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
+      optionEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectOption(idx);
+        closeMenu();
+        trigger.focus();
+      });
+
+      menu.appendChild(optionEl);
+    });
+
+    wrap.appendChild(menu);
+
+    function selectOption(index) {
+      if (select.selectedIndex !== index) {
+        select.selectedIndex = index;
+        syncUI();
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        syncUI();
+      }
+    }
+
+    function syncUI() {
+      const curOpt = select.options[select.selectedIndex];
+      if (curOpt) {
+        labelWrap.innerHTML = formatOptionContent(curOpt.textContent);
+      }
+      trigger.setAttribute('aria-activedescendant', `${menuId}-opt-${select.selectedIndex}`);
+      const allItems = menu.querySelectorAll('.custom-select-option');
+      allItems.forEach((it, idx) => {
+        const isMatch = idx === select.selectedIndex;
+        it.classList.toggle('active', isMatch);
+        it.setAttribute('aria-selected', isMatch ? 'true' : 'false');
+      });
+
+      if (wrap.classList.contains('open')) {
+        const activeItem = menu.querySelector('.custom-select-option.active');
+        if (activeItem) {
+          activeItem.scrollIntoView({ block: 'nearest' });
+        }
+      }
+    }
+
+    select._syncCustomSelect = syncUI;
+    select.addEventListener('change', syncUI);
+    syncUI();
+
+    function openMenu() {
+      closeAllCustomSelects();
+
+      const rect = trigger.getBoundingClientRect();
+      const menuHeight = 240;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+        menu.classList.add('placement-top');
+      } else {
+        menu.classList.remove('placement-top');
+      }
+
+      wrap.classList.add('open');
+      trigger.setAttribute('aria-expanded', 'true');
+
+      const parentCard = wrap.closest('.card');
+      if (parentCard) parentCard.style.zIndex = '50';
+      const parentField = wrap.closest('.field');
+      if (parentField) parentField.style.zIndex = '60';
+
+      const activeItem = menu.querySelector('.custom-select-option.active');
+      if (activeItem) {
+        activeItem.scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    function closeMenu() {
+      wrap.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+      const parentCard = wrap.closest('.card');
+      if (parentCard) parentCard.style.zIndex = '';
+      const parentField = wrap.closest('.field');
+      if (parentField) parentField.style.zIndex = '';
+    }
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (wrap.classList.contains('open')) {
+        closeMenu();
+      } else {
+        openMenu();
+      }
+    });
+
+    trigger.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        if (!wrap.classList.contains('open')) {
+          openMenu();
+        } else {
+          let curIdx = select.selectedIndex;
+          if (e.key === 'ArrowDown') {
+            curIdx = Math.min(select.options.length - 1, curIdx + 1);
+          } else if (e.key === 'ArrowUp') {
+            curIdx = Math.max(0, curIdx - 1);
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            closeMenu();
+            return;
+          }
+          selectOption(curIdx);
+        }
+      } else if (e.key === 'Escape' || e.key === 'Tab') {
+        closeMenu();
+      }
+    });
+
+    if (select.id) {
+      const label = document.querySelector(`label[for="${select.id}"]`);
+      if (label) {
+        label.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          trigger.focus();
+          trigger.click();
+        });
+      }
+    }
+  });
+
+  if (!root._customSelectGlobalBound && typeof document !== 'undefined') {
+    root._customSelectGlobalBound = true;
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.select-wrap')) {
+        closeAllCustomSelects();
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeAllCustomSelects();
+      }
+    });
+  }
+}

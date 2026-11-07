@@ -45,35 +45,13 @@ function setStatus(title, desc, cls) {
   }
 }
 
-let msgTimer = null;
-/** 显示悬浮毛玻璃胶囊通知 (支持自动淡出) */
-function setMsg(text, kind, autoDismissMs = 3200) {
-  const box = $('msgBox');
-  const msgEl = $('msg');
-  const iconEl = $('msgIcon');
-
-  if (msgTimer) {
-    clearTimeout(msgTimer);
-    msgTimer = null;
-  }
-
-  if (!text) {
-    box.className = 'msg-box';
-    msgEl.textContent = '';
-    return;
-  }
-
-  const normalized = normalizeStatusMessage(text);
-  box.className = 'msg-box show ' + (kind || 'info');
-  msgEl.textContent = normalized;
-  iconEl.innerHTML = getStatusIconSvg(kind === 'ok' ? 'ok' : (kind === 'err' ? 'err' : 'info'), 13);
-
-  if (autoDismissMs && kind !== 'err') {
-    msgTimer = setTimeout(() => {
-      box.className = 'msg-box';
-    }, autoDismissMs);
-  }
-}
+/** 组件实例：悬浮毛玻璃胶囊通知 (Component: createToastManager) */
+const popupToast = createToastManager({
+  boxId: 'msgBox',
+  textId: 'msg',
+  iconId: 'msgIcon'
+});
+const setMsg = (text, kind, autoDismissMs = 3200) => popupToast.show(text, kind, autoDismissMs);
 
 let currentIp = '';
 let currentAccount = '';
@@ -429,11 +407,7 @@ $('account')?.addEventListener('click', (e) => {
 });
 
 $('msgBox')?.addEventListener('click', () => {
-  $('msgBox').className = 'msg-box';
-  if (msgTimer) {
-    clearTimeout(msgTimer);
-    msgTimer = null;
-  }
+  popupToast.dismiss($('msgBox'));
 });
 
 // --- 点击版本号胶囊或应用头像快速打开设置页 ---
@@ -518,43 +492,15 @@ if (accountIspEl && ispQuickSheet) {
   });
 }
 
-// --- 同步与切换深色/浅色主题 ---
-function applyPopupTheme(theme) {
-  if (theme && theme !== 'auto') {
-    document.documentElement.setAttribute('data-theme', theme);
-  } else {
-    document.documentElement.removeAttribute('data-theme');
-  }
-}
-
-$('btnThemeToggle')?.addEventListener('click', () => {
-  chrome.storage.local.get({ theme: 'auto' }, (s) => {
-    const cur = s && s.theme ? s.theme : 'auto';
-    let next = 'dark';
-    if (cur === 'dark') {
-      next = 'light';
-    } else if (cur === 'light') {
-      next = 'dark';
-    } else {
-      const sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      next = sysDark ? 'light' : 'dark';
-    }
-    chrome.storage.local.set({ theme: next }, () => {
-      applyPopupTheme(next);
-      setMsg(`已切换为${next === 'dark' ? '深色' : '浅色'}模式`, 'info', 1800);
-    });
-  });
-});
-
-chrome.storage.local.get({ theme: 'auto' }, (s) => {
-  applyPopupTheme(s && s.theme);
+// --- 同步与切换深色/浅色主题 (Component: createThemeManager) ---
+const popupThemeManager = createThemeManager({
+  toggleBtnId: 'btnThemeToggle',
+  supportAuto: false,
+  onNotify: (msg) => setMsg(msg, 'info', 1800)
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
-  if (changes.theme) {
-    applyPopupTheme(changes.theme.newValue);
-  }
   if (changes.privacyMask) {
     isMasked = !!changes.privacyMask.newValue;
     updateAccountDisplay();

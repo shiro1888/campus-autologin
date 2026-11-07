@@ -16,78 +16,15 @@ const DEFAULTS = {
   instantTrigger: true
 };
 
-/** 顶部浮动消息通知 (支持多条轻量级堆叠与独立自动隐退) */
+/** 顶部浮动消息通知管理组件 (Component: createToastManager) */
+const toastManager = createToastManager({ containerId: 'toastContainer', maxStack: 3 });
 function showToast(text, kind = 'info', duration = 4000) {
-  const container = $('toastContainer') || $('toastBar')?.parentElement;
-  if (!container) return;
-
-  const toast = document.createElement('div');
-  toast.className = `toast-bar show ${kind}`;
-
-  const iconSpan = document.createElement('span');
-  iconSpan.className = 'toast-icon';
-  if (kind === 'ok') {
-    iconSpan.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
-  } else if (kind === 'err') {
-    iconSpan.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-  } else if (kind === 'warn') {
-    iconSpan.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
-  } else {
-    iconSpan.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
-  }
-
-  const msgSpan = document.createElement('span');
-  msgSpan.className = 'toast-msg';
-  msgSpan.textContent = text;
-
-  toast.appendChild(iconSpan);
-  toast.appendChild(msgSpan);
-
-  // 点击悬浮 Toast 胶囊即可立即快速关闭
-  toast.addEventListener('click', () => {
-    dismissToast(toast);
-  });
-
-  // 最多保持 3 条并存，超出时自动顶替最早的一条
-  const activeToasts = container.querySelectorAll('.toast-bar.show');
-  if (activeToasts.length >= 3) {
-    dismissToast(activeToasts[0]);
-  }
-
-  container.appendChild(toast);
-
-  // 自动倒计时退出
-  toast._timer = setTimeout(() => {
-    dismissToast(toast);
-  }, duration);
-
-  // 保持对静态 DOM 元素的向后兼容
+  toastManager.show(text, kind, duration);
   const staticMsg = $('toastMsg');
   if (staticMsg) staticMsg.textContent = text;
 }
-
-function dismissToast(toast) {
-  if (!toast || toast._dismissing) return;
-  toast._dismissing = true;
-  if (toast._timer) clearTimeout(toast._timer);
-  toast.classList.remove('show');
-  toast.classList.add('hide');
-
-  let finished = false;
-  const onEnd = () => {
-    if (finished) return;
-    finished = true;
-    toast.removeEventListener('transitionend', onEnd);
-    if (toast.id !== 'toastBar') {
-      toast.remove();
-    } else {
-      toast.classList.remove('hide');
-      toast._dismissing = false;
-    }
-  };
-
-  toast.addEventListener('transitionend', onEnd, { once: true });
-  setTimeout(onEnd, 300);
+function dismissToast(toastEl) {
+  toastManager.dismiss(toastEl);
 }
 
 // 点击默认静态 Toast 胶囊立即关闭
@@ -153,6 +90,18 @@ const confirmModal = createConfirmModal({
   descId: 'confirmModalDesc',
   cancelBtnId: 'btnModalCancel',
   confirmBtnId: 'btnModalConfirm'
+});
+
+const healthMeter = createNetworkHealthMeter({
+  badgeId: 'heroHealthBadge',
+  scoreId: 'heroHealthScore'
+});
+
+const passwordToggle = createPasswordToggle({
+  inputId: 'password',
+  toggleBtnId: 'togglePwd',
+  iconId: 'eyeIcon',
+  timeoutMs: 10000
 });
 
 // --- 顶部快捷：注销下线 (Component: createConfirmButton) ---
@@ -242,307 +191,18 @@ function updateTopology(res) {
 
 
 
-/** 主题切换管理 */
-let currentThemePref = 'auto';
-
-function applyTheme(theme) {
-  currentThemePref = theme || 'auto';
-  const sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const effectiveTheme = currentThemePref === 'auto' ? (sysDark ? 'dark' : 'light') : currentThemePref;
-  document.documentElement.setAttribute('data-theme', effectiveTheme);
-  const label = $('themeLabel');
-  if (label) {
-    label.textContent = currentThemePref === 'dark' ? '深色' : (currentThemePref === 'light' ? '浅色' : '自动');
-  }
-}
-
-function initTheme() {
-  chrome.storage.local.get({ theme: 'auto' }, (s) => {
-    applyTheme(s.theme || 'auto');
-  });
-
-  if (window.matchMedia) {
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-      if (currentThemePref === 'auto') {
-        applyTheme('auto');
-      }
-    });
-  }
-
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.theme) {
-      applyTheme(changes.theme.newValue);
-    }
-  });
-
-  const btn = $('btnThemeToggle');
-  if (btn) {
-    btn.addEventListener('click', () => {
-      chrome.storage.local.get({ theme: 'auto' }, (s) => {
-        const cur = s.theme || 'auto';
-        const next = cur === 'auto' ? 'dark' : (cur === 'dark' ? 'light' : 'auto');
-        chrome.storage.local.set({ theme: next }, () => {
-          applyTheme(next);
-          const nameMap = { auto: '跟随系统', dark: '深色模式', light: '浅色模式' };
-          showToast('已切换至 ' + nameMap[next], 'info');
-        });
-      });
-    });
-  }
-}
-
-
-
-/** 格式化下拉选项展示内容（提取括号内的提示并转为美观微型徽章） */
-function formatOptionContent(text) {
-  const trimmed = String(text || '').trim();
-  const match = trimmed.match(/^(.*?)[（\(](.*?)[）\)]$/);
-  if (!match) {
-    return `<span class="opt-label">${escapeHtml(trimmed)}</span>`;
-  }
-  const main = match[1].trim();
-  const sub = match[2].trim();
-  let badgeClass = 'opt-badge';
-  if (sub.includes('推荐') || sub.includes('最快') || sub.includes('最灵敏')) {
-    badgeClass += ' primary';
-  } else if (sub.startsWith('@')) {
-    badgeClass += ' mono';
-  }
-  return `<div class="opt-body"><span class="opt-label">${escapeHtml(main)}</span><span class="${badgeClass}">${escapeHtml(sub)}</span></div>`;
-}
-
-/** 同步自定义下拉选框显示状态 */
-function syncCustomSelect(target) {
-  const el = typeof target === 'string' ? $(target) : target;
-  if (el && typeof el._syncCustomSelect === 'function') {
-    el._syncCustomSelect();
-  }
-}
-
-/** 关闭页面所有开启的自定义下拉选框 */
-function closeAllCustomSelects() {
-  document.querySelectorAll('.select-wrap.open').forEach((w) => {
-    w.classList.remove('open');
-    const t = w.querySelector('.custom-select-trigger');
-    if (t) t.setAttribute('aria-expanded', 'false');
-    const card = w.closest('.card');
-    if (card) card.style.zIndex = '';
-    const field = w.closest('.field');
-    if (field) field.style.zIndex = '';
-  });
-}
-
-/** 初始化现代美化下拉选框组件 */
-function initCustomSelects() {
-  const wraps = document.querySelectorAll('.select-wrap');
-  wraps.forEach((wrap) => {
-    const select = wrap.querySelector('select');
-    if (!select || wrap.dataset.customized === 'true') return;
-    wrap.dataset.customized = 'true';
-
-    // 隐藏原生 select（保持可访问性与表单兼容）
-    select.classList.add('custom-select-hidden');
-    select.tabIndex = -1;
-    select.setAttribute('aria-hidden', 'true');
-
-    // 移除原有静态小箭头
-    const oldArrow = wrap.querySelector('.select-arrow');
-    if (oldArrow) oldArrow.remove();
-
-    const menuId = 'menu-' + (select.id || 'select-' + Math.floor(Math.random() * 10000));
-
-    // 创建触发按钮
-    const trigger = document.createElement('button');
-    trigger.type = 'button';
-    trigger.className = 'custom-select-trigger';
-    trigger.setAttribute('role', 'combobox');
-    trigger.setAttribute('aria-haspopup', 'listbox');
-    trigger.setAttribute('aria-expanded', 'false');
-    trigger.setAttribute('aria-controls', menuId);
-
-    const labelWrap = document.createElement('div');
-    labelWrap.className = 'custom-select-label';
-
-    const arrowSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    arrowSvg.setAttribute('class', 'custom-select-arrow');
-    arrowSvg.setAttribute('viewBox', '0 0 24 24');
-    arrowSvg.setAttribute('fill', 'none');
-    arrowSvg.setAttribute('stroke', 'currentColor');
-    arrowSvg.setAttribute('stroke-width', '2');
-    arrowSvg.innerHTML = '<polyline points="6 9 12 15 18 9"/>';
-
-    trigger.appendChild(labelWrap);
-    trigger.appendChild(arrowSvg);
-    wrap.appendChild(trigger);
-
-    // 创建浮层菜单
-    const menu = document.createElement('div');
-    menu.id = menuId;
-    menu.className = 'custom-select-menu';
-    menu.setAttribute('role', 'listbox');
-
-    // 生成选项
-    Array.from(select.options).forEach((opt, idx) => {
-      const item = document.createElement('div');
-      item.id = `${menuId}-opt-${idx}`;
-      item.className = 'custom-select-option' + (idx === select.selectedIndex ? ' active' : '');
-      item.setAttribute('role', 'option');
-      item.setAttribute('data-value', opt.value);
-      item.setAttribute('data-index', String(idx));
-      item.setAttribute('aria-selected', idx === select.selectedIndex ? 'true' : 'false');
-
-      item.innerHTML = formatOptionContent(opt.textContent) +
-        '<svg class="custom-select-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        selectOption(idx);
-        closeMenu();
-        trigger.focus();
-      });
-
-      menu.appendChild(item);
-    });
-
-    wrap.appendChild(menu);
-
-    function selectOption(index) {
-      if (select.selectedIndex !== index) {
-        select.selectedIndex = index;
-        syncUI();
-        select.dispatchEvent(new Event('change', { bubbles: true }));
-      } else {
-        syncUI();
-      }
-    }
-
-    function syncUI() {
-      const curOpt = select.options[select.selectedIndex];
-      if (curOpt) {
-        labelWrap.innerHTML = formatOptionContent(curOpt.textContent);
-      }
-      trigger.setAttribute('aria-activedescendant', `${menuId}-opt-${select.selectedIndex}`);
-      const allItems = menu.querySelectorAll('.custom-select-option');
-      allItems.forEach((it, idx) => {
-        const isMatch = idx === select.selectedIndex;
-        it.classList.toggle('active', isMatch);
-        it.setAttribute('aria-selected', isMatch ? 'true' : 'false');
-      });
-
-      if (wrap.classList.contains('open')) {
-        const activeItem = menu.querySelector('.custom-select-option.active');
-        if (activeItem) {
-          activeItem.scrollIntoView({ block: 'nearest' });
-        }
-      }
-    }
-
-    // 挂载到 select 元素对象便于外界调用
-    select._syncCustomSelect = syncUI;
-    select.addEventListener('change', syncUI);
-    syncUI();
-
-    function openMenu() {
-      closeAllCustomSelects();
-
-      // 检测视口下方空间，不足时向上弹出
-      const rect = trigger.getBoundingClientRect();
-      const menuHeight = 240;
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-
-      if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
-        menu.classList.add('placement-top');
-      } else {
-        menu.classList.remove('placement-top');
-      }
-
-      wrap.classList.add('open');
-      trigger.setAttribute('aria-expanded', 'true');
-
-      const parentCard = wrap.closest('.card');
-      if (parentCard) parentCard.style.zIndex = '50';
-      const parentField = wrap.closest('.field');
-      if (parentField) parentField.style.zIndex = '60';
-
-      const activeItem = menu.querySelector('.custom-select-option.active');
-      if (activeItem) {
-        activeItem.scrollIntoView({ block: 'nearest' });
-      }
-    }
-
-    function closeMenu() {
-      wrap.classList.remove('open');
-      trigger.setAttribute('aria-expanded', 'false');
-      const parentCard = wrap.closest('.card');
-      if (parentCard) parentCard.style.zIndex = '';
-      const parentField = wrap.closest('.field');
-      if (parentField) parentField.style.zIndex = '';
-    }
-
-    trigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (wrap.classList.contains('open')) {
-        closeMenu();
-      } else {
-        openMenu();
-      }
-    });
-
-    // 键盘支持
-    trigger.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        if (!wrap.classList.contains('open')) {
-          openMenu();
-        } else {
-          let curIdx = select.selectedIndex;
-          if (e.key === 'ArrowDown') {
-            curIdx = Math.min(select.options.length - 1, curIdx + 1);
-          } else if (e.key === 'ArrowUp') {
-            curIdx = Math.max(0, curIdx - 1);
-          } else if (e.key === 'Enter' || e.key === ' ') {
-            closeMenu();
-            return;
-          }
-          selectOption(curIdx);
-        }
-      } else if (e.key === 'Escape' || e.key === 'Tab') {
-        closeMenu();
-      }
-    });
-
-    // 点击 label 自动聚焦并切换打开
-    if (select.id) {
-      const label = document.querySelector(`label[for="${select.id}"]`);
-      if (label) {
-        label.addEventListener('click', (e) => {
-          e.preventDefault();
-          // 必须阻止冒泡：label 是 .select-wrap 的兄弟节点（不在其内部），
-          // 事件冒泡到 document 时会被「点击空白处关闭」的监听器判定为外部点击，
-          // 于是刚打开的下拉框立刻又被关掉 —— 表现为点 label 完全没反应。
-          e.stopPropagation();
-          trigger.focus();
-          trigger.click();
-        });
-      }
-    }
-  });
-}
-
-// 点击空白区域自动关闭
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.select-wrap')) {
-    closeAllCustomSelects();
-  }
+/** 主题切换管理组件 (Component: createThemeManager) */
+const themeManager = createThemeManager({
+  toggleBtnId: 'btnThemeToggle',
+  labelId: 'themeLabel',
+  supportAuto: true,
+  onNotify: (msg) => showToast(msg, 'info')
 });
 
-// ESC 键收起
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    closeAllCustomSelects();
-  }
-});
+
+
+// 下拉选择组件（formatOptionContent / syncCustomSelect / closeAllCustomSelects / initCustomSelects）
+// 已抽象为全局通用组件，定义于 common.js。
 
 /** 从本地存储加载配置到表单 */
 function load() {
@@ -742,6 +402,7 @@ function refreshStatus(cb) {
       $('stStime').textContent = '上线时间: —';
       $('btnLogoutNow').disabled = true;
       logoutConfirmBtn.reset();
+      healthMeter.render(null);
       updateTopology(null);
       if (cb) cb();
       return;
@@ -833,6 +494,7 @@ function refreshStatus(cb) {
     }
 
     updateTopology(res);
+    healthMeter.render(res);
     triggerTelemetryFade();
     if (cb) cb();
   });
@@ -1081,23 +743,24 @@ bindInteractiveNode($('topoNodeInternet'), () => {
 // --- 巡检事件流抽屉操作：复制脱敏诊断报告 & 清空日志 ---
 $('btnCopyDiagnostic')?.addEventListener('click', () => {
   chrome.storage.local.get(['eventLogs', 'lastResult'], (s) => {
-    const ispMeta = getIspMeta($('isp')?.value || '1');
-    const maskedAcc = maskAccount($('account')?.value?.trim() || '') || '未配置';
-    const logs = Array.isArray(s.eventLogs) ? s.eventLogs.slice(0, 5) : [];
-    const lines = [
-      `[校园网自动登录 诊断快照 v${chrome.runtime?.getManifest?.()?.version || '1.3.0'}]`,
-      `时间: ${new Date().toLocaleString()}`,
-      `状态: ${$('stOnline')?.textContent || '—'} | 延迟: ${$('stPing')?.textContent || '—'}`,
-      `账号: ${maskedAcc} | 运营商: ${ispMeta.short} (${ispMeta.tag})`,
-      `本机IP: ${$('stIp')?.textContent || '—'} | 流量: ${$('stFlow')?.textContent || '—'} (${$('stFlowDetail')?.textContent || '—'})`,
-      `策略: ${$('stPolicyPill')?.textContent || '—'}`,
-      `最近事件: ${logs.length ? logs.map((l) => `${l.time} [${l.from || '巡检'}] ${l.message}${l.count > 1 ? ' ×' + l.count : ''}`).join(' ; ') : '暂无'}`
-    ];
+    const reportText = generateDiagnosticSnapshot({
+      account: $('account')?.value?.trim() || '',
+      isp: $('isp')?.value || '1',
+      ip: $('stIp')?.textContent || '',
+      mac: $('stMac')?.textContent || '',
+      statusText: $('stOnline')?.textContent || '',
+      healthText: $('heroHealthScore')?.textContent || '',
+      pingText: $('stPing')?.textContent || '',
+      flowText: `${$('stFlow')?.textContent || '—'} (${$('stFlowDetail')?.textContent || '—'})`,
+      policyText: $('stPolicyPill')?.textContent || '',
+      eventLogs: s.eventLogs
+    });
+
     if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
       showToast('复制诊断报告失败：剪贴板不可用', 'err');
       return;
     }
-    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    navigator.clipboard.writeText(reportText).then(() => {
       showToast('已复制脱敏诊断报告到剪贴板', 'ok');
     }).catch(() => {
       showToast('复制诊断报告失败', 'err');
@@ -1287,43 +950,6 @@ if ($('btnImportConfig') && $('importFileInput')) {
   });
 }
 
-// --- 显示/隐藏密码（带 10 秒无操作自动回隐，防止公共自习室遗忘暴露）---
-let pwdRehideTimer = null;
-$('togglePwd')?.addEventListener('click', () => {
-  const el = $('password');
-  if (!el) return;
-  const isPwd = el.type === 'password';
-  el.type = isPwd ? 'text' : 'password';
-
-  if (pwdRehideTimer) {
-    clearTimeout(pwdRehideTimer);
-    pwdRehideTimer = null;
-  }
-
-  const eyeIcon = $('eyeIcon');
-  if (isPwd) {
-    // 隐藏状态图标 (带有斜线)
-    if (eyeIcon) {
-      eyeIcon.innerHTML = '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>';
-    }
-    // 10 秒后自动回隐为密文
-    pwdRehideTimer = setTimeout(() => {
-      if (el.type === 'text') {
-        el.type = 'password';
-        if (eyeIcon) {
-          eyeIcon.innerHTML = '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>';
-        }
-      }
-      pwdRehideTimer = null;
-    }, 10000);
-  } else {
-    // 正常眼睛图标
-    if (eyeIcon) {
-      eyeIcon.innerHTML = '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>';
-    }
-  }
-});
-
 // --- 自习室防窥模式切换 ---
 $('btnToggleMask')?.addEventListener('click', (e) => {
   e.preventDefault();
@@ -1396,7 +1022,6 @@ $('adaptive').addEventListener('change', () => {
 });
 
 // --- 启动初始化 ---
-initTheme();
 initCustomSelects();
 initIspQuickPills();
 load();
