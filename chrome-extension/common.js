@@ -878,6 +878,20 @@ function createToastManager(options = {}) {
 
   function dismiss(toastEl) {
     if (!toastEl || toastEl._dismissing) return;
+
+    // 单体模式（popup 的 #msgBox）是页面里的常驻元素，组件在初始化时就缓存了它的
+    // 引用。若这里执行 remove()，元素会脱离文档；之后 show() 仍改的是这个游离节点，
+    // 用户再也看不到任何提示（表现为「点一次消息框后所有提示都消失」）。
+    // 因此单体框只复位视觉状态，不做移除。
+    if (singleMsgBox && toastEl === singleMsgBox) {
+      if (singleTimer) {
+        clearTimeout(singleTimer);
+        singleTimer = null;
+      }
+      toastEl.className = 'msg-box';
+      return;
+    }
+
     toastEl._dismissing = true;
     if (toastEl._timer) clearTimeout(toastEl._timer);
     toastEl.classList.remove('show');

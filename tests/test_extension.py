@@ -646,15 +646,18 @@ const problems = [];
 function makeCtx(clipboard) {
   const els = {}, handlers = {};
   const mk = (id) => ({
-    id, textContent: '', innerHTML: '', dataset: {}, style: {},
+    id, textContent: '', innerHTML: '', dataset: {}, style: {}, _removed: false,
     classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
       contains(c) { return this._s.has(c); }, toggle() {} },
     setAttribute() {}, getAttribute() { return null; },
     addEventListener(t, f) { (handlers[id + ':' + t] = handlers[id + ':' + t] || []).push(f); },
-    querySelector() { return null; }, querySelectorAll() { return []; }, focus() {}
+    removeEventListener() {},
+    querySelector() { return null; }, querySelectorAll() { return []; }, focus() {},
+    remove() { this._removed = true; }
   });
   for (const id of ['confirmModalOverlay', 'confirmModalTitle', 'confirmModalDesc',
-                    'btnModalConfirm', 'btnModalCancel', 'copyTarget']) els[id] = mk(id);
+                    'btnModalConfirm', 'btnModalCancel', 'copyTarget',
+                    'msgBox', 'msg', 'msgIcon']) els[id] = mk(id);
   const ctx = {
     console, setTimeout: (f) => { if (typeof f === 'function') f(); return 1; },
     clearTimeout() {}, setInterval: () => 1, clearInterval() {},
@@ -717,6 +720,21 @@ function makeCtx(clipboard) {
   if (!first) problems.push('连续 confirm 后第一个 Promise 永久悬挂');
   if (!second) problems.push('连续 confirm 后第二个 Promise 未结算');
   if (confirmCalls !== 1) problems.push('onConfirm 执行次数异常: ' + confirmCalls);
+
+  // --- 3. 单体消息框被 dismiss 后必须仍可复用 ---
+  // popup 的 #msgBox 是常驻元素，dismiss 若对它执行 remove()，元素会脱离文档，
+  // 之后 show() 只改到游离节点，用户再也看不到任何提示。
+  const toastEnv = makeCtx(null);
+  const singleBox = toastEnv.els.msgBox;
+  const toast = vm.runInContext(
+    'createToastManager({boxId:"msgBox",textId:"msg",iconId:"msgIcon"})', toastEnv.ctx);
+  toast.show('第一条消息', 'info', 3000);
+  toast.dismiss(singleBox);
+  if (singleBox._removed) problems.push('dismiss 把常驻消息框移出了 DOM');
+  toast.show('第二条消息', 'ok', 3000);
+  if (singleBox._removed) problems.push('dismiss 之后消息框已失联，后续提示不可见');
+  if (toastEnv.els.msg.textContent !== '第二条消息')
+    problems.push('dismiss 后 show 未写入新文案: ' + toastEnv.els.msg.textContent);
 
   console.log(problems.length ? 'COMPONENT_PROBLEMS:\n' + problems.join('\n') : 'COMPONENTS_OK');
 })().catch((e) => console.log('COMPONENT_PROBLEMS: 运行异常 ' + e.message));
