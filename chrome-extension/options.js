@@ -1093,6 +1093,10 @@ $('btnCopyDiagnostic')?.addEventListener('click', () => {
       `策略: ${$('stPolicyPill')?.textContent || '—'}`,
       `最近事件: ${logs.length ? logs.map((l) => `${l.time} [${l.trigger || '巡检'}] ${l.message}${l.count > 1 ? ' ×' + l.count : ''}`).join(' ; ') : '暂无'}`
     ];
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+      showToast('复制诊断报告失败：剪贴板不可用', 'err');
+      return;
+    }
     navigator.clipboard.writeText(lines.join('\n')).then(() => {
       showToast('已复制脱敏诊断报告到剪贴板', 'ok');
     }).catch(() => {

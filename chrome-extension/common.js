@@ -505,6 +505,11 @@ function createCopyTrigger(options = {}) {
       return;
     }
 
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+      if (typeof onError === 'function') onError(text);
+      return;
+    }
+
     navigator.clipboard.writeText(text).then(() => {
       if (timer) clearTimeout(timer);
       if (feedbackEl) feedbackEl.classList.add('copied');
