@@ -155,6 +155,32 @@ const confirmModal = createConfirmModal({
   confirmBtnId: 'btnModalConfirm'
 });
 
+// --- 顶部快捷：注销下线 (Component: createConfirmButton) ---
+const logoutConfirmBtn = createConfirmButton({
+  btnEl: 'btnLogoutNow',
+  labelSelector: 'span',
+  idleText: '注销下线',
+  confirmText: '确认注销？',
+  timeoutMs: 3500,
+  onArmed: () => {
+    showToast('再次点击「确认注销」即可断开校园网连接', 'info');
+  },
+  onConfirm: (btn) => {
+    btn.disabled = true;
+    showToast('正在请求注销下线…', 'info');
+
+    chrome.runtime.sendMessage({ type: 'logout' }, (res) => {
+      btn.disabled = false;
+      if (chrome.runtime.lastError || !res) {
+        showToast('注销超时，请到门户手动注销', 'err');
+        return;
+      }
+      showToast(res.message || '注销完成', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));
+      refreshStatus();
+    });
+  }
+});
+
 
 /** 动态更新网络全链路拓扑指示器 */
 function updateTopology(res) {
@@ -1081,32 +1107,6 @@ $('btnClearLogs')?.addEventListener('click', () => {
     activityTimeline.render([]);
     showToast('已清空历史事件流记录', 'info');
   });
-});
-
-// --- 顶部快捷：注销下线 (Component: createConfirmButton) ---
-const logoutConfirmBtn = createConfirmButton({
-  btnEl: $('btnLogoutNow'),
-  labelSelector: 'span',
-  idleText: '注销下线',
-  confirmText: '确认注销？',
-  timeoutMs: 3500,
-  onArmed: () => {
-    showToast('再次点击「确认注销」即可断开校园网连接', 'info');
-  },
-  onConfirm: (btn) => {
-    btn.disabled = true;
-    showToast('正在请求注销下线…', 'info');
-
-    chrome.runtime.sendMessage({ type: 'logout' }, (res) => {
-      btn.disabled = false;
-      if (chrome.runtime.lastError || !res) {
-        showToast('注销超时，请到门户手动注销', 'err');
-        return;
-      }
-      showToast(res.message || '注销完成', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));
-      refreshStatus();
-    });
-  }
 });
 
 // --- 恢复默认设置 (Component: createConfirmModal) ---

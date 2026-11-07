@@ -334,93 +334,111 @@ function createSparkline(containerId, maxBars = 8) {
 
 /**
  * 组件 3：双向流量计量与上下行比例进度条组件 (FlowMeter Component)
- * @param {Object} cfg 元素配置 { totalEl, detailEl, subTagEl, wrapEl, dlBarEl, ulBarEl }
+ * @param {Object} cfg 元素配置，支持 ID 字符串或 DOM 元素引用
  */
-function createFlowMeter(cfg) {
-  return {
-    render(rawData, online) {
-      const raw = rawData || {};
-      const totalEl = $(cfg.totalEl);
-      const detailEl = $(cfg.detailEl);
-      const subTagEl = $(cfg.subTagEl);
-      const wrapEl = $(cfg.wrapEl);
-      const dlBarEl = $(cfg.dlBarEl);
-      const ulBarEl = $(cfg.ulBarEl);
+function createFlowMeter(cfg = {}) {
+  const getEl = (k1, k2) => $(cfg[k1] || cfg[k2]);
+  const total = () => getEl('totalEl', 'totalId');
+  const detail = () => getEl('detailEl', 'detailId');
+  const subTag = () => getEl('subTagEl', 'subTagId');
+  const wrap = () => getEl('wrapEl', 'wrapId');
+  const dlBar = () => getEl('dlBarEl', 'dlId') || getEl('dlBarEl', 'dlBarId');
+  const ulBar = () => getEl('ulBarEl', 'ulId') || getEl('ulBarEl', 'ulBarId');
 
-      if (raw.flow !== undefined) {
-        const totalFormatted = fmtFlow(raw.flow);
-        if (totalEl) totalEl.textContent = totalFormatted;
+  function render(rawData, online) {
+    const raw = rawData || {};
+    const totalEl = total();
+    const detailEl = detail();
+    const subTagEl = subTag();
+    const wrapEl = wrap();
+    const dlBarEl = dlBar();
+    const ulBarEl = ulBar();
 
-        const dl = parseFloat(raw.actdf) || 0;
-        const ul = parseFloat(raw.actuf) || 0;
-        const sum = dl + ul;
+    if (raw.flow !== undefined) {
+      const totalFormatted = fmtFlow(raw.flow);
+      if (totalEl) totalEl.textContent = totalFormatted;
 
-        if (subTagEl) {
-          if (sum > 0) {
-            const dlPct = Math.round((dl / sum) * 100);
-            subTagEl.textContent = `↓${dlPct}%`;
-            subTagEl.classList.add('visible');
-          } else {
-            subTagEl.classList.remove('visible');
-          }
+      const dl = parseFloat(raw.actdf) || 0;
+      const ul = parseFloat(raw.actuf) || 0;
+      const sum = dl + ul;
+
+      if (subTagEl) {
+        if (sum > 0) {
+          const dlPct = Math.round((dl / sum) * 100);
+          subTagEl.textContent = `↓${dlPct}%`;
+          subTagEl.classList.add('visible');
+        } else {
+          subTagEl.classList.remove('visible');
         }
-
-        if (sum > 0 && dlBarEl && ulBarEl && wrapEl) {
-          const dlPct = Math.max(6, Math.min(94, Math.round((dl / sum) * 100)));
-          const ulPct = 100 - dlPct;
-          dlBarEl.style.width = dlPct + '%';
-          ulBarEl.style.width = ulPct + '%';
-          wrapEl.style.display = 'flex';
-          wrapEl.title = `下载 ${dlPct}% (${fmtFlow(dl)}) · 上传 ${ulPct}% (${fmtFlow(ul)})`;
-          if (totalEl) {
-            totalEl.title = `已用: ${totalFormatted} (下载: ${fmtFlow(dl)} / 上传: ${fmtFlow(ul)})`;
-          }
-        } else if (wrapEl) {
-          wrapEl.style.display = 'none';
-        }
-
-        if (detailEl) {
-          if (raw.actdf !== undefined && raw.actuf !== undefined) {
-            detailEl.textContent = `↓ ${fmtFlow(raw.actdf)} · ↑ ${fmtFlow(raw.actuf)}`;
-          } else {
-            detailEl.textContent = '校园网流量统计';
-          }
-        }
-      } else {
-        if (totalEl) totalEl.textContent = online ? '计量中' : '—';
-        if (detailEl) detailEl.textContent = '流量明细: —';
-        if (wrapEl) wrapEl.style.display = 'none';
-        if (subTagEl) subTagEl.classList.remove('visible');
       }
-    },
 
-    reset() {
-      const totalEl = $(cfg.totalEl);
-      const detailEl = $(cfg.detailEl);
-      const subTagEl = $(cfg.subTagEl);
-      const wrapEl = $(cfg.wrapEl);
-      if (totalEl) totalEl.textContent = '—';
+      if (sum > 0 && dlBarEl && ulBarEl && wrapEl) {
+        const dlPct = Math.max(6, Math.min(94, Math.round((dl / sum) * 100)));
+        const ulPct = 100 - dlPct;
+        dlBarEl.style.width = dlPct + '%';
+        ulBarEl.style.width = ulPct + '%';
+        wrapEl.style.display = 'flex';
+        wrapEl.title = `下载 ${dlPct}% (${fmtFlow(dl)}) · 上传 ${ulPct}% (${fmtFlow(ul)})`;
+        if (totalEl) {
+          totalEl.title = `已用: ${totalFormatted} (下载: ${fmtFlow(dl)} / 上传: ${fmtFlow(ul)})`;
+        }
+      } else if (wrapEl) {
+        wrapEl.style.display = 'none';
+      }
+
+      if (detailEl) {
+        if (raw.actdf !== undefined && raw.actuf !== undefined) {
+          detailEl.textContent = `↓ ${fmtFlow(raw.actdf)} · ↑ ${fmtFlow(raw.actuf)}`;
+        } else {
+          detailEl.textContent = '校园网流量统计';
+        }
+      }
+    } else {
+      if (totalEl) totalEl.textContent = online ? '计量中' : '—';
       if (detailEl) detailEl.textContent = '流量明细: —';
       if (wrapEl) wrapEl.style.display = 'none';
       if (subTagEl) subTagEl.classList.remove('visible');
     }
+  }
+
+  function reset() {
+    const totalEl = total();
+    const detailEl = detail();
+    const subTagEl = subTag();
+    const wrapEl = wrap();
+    if (totalEl) totalEl.textContent = '—';
+    if (detailEl) detailEl.textContent = '流量明细: —';
+    if (wrapEl) wrapEl.style.display = 'none';
+    if (subTagEl) subTagEl.classList.remove('visible');
+  }
+
+  return {
+    render,
+    update: render,
+    reset
   };
 }
 
 /**
  * 组件 4：防误触二段式内联确认按钮组件 (ConfirmButton Component)
  * 避免使用原生 window.confirm 导致扩展 Popup 失焦关闭或阻塞线程。
+ * 支持 createConfirmButton('id', { ... }) 与 createConfirmButton({ btnEl: ..., ... }) 多态调用。
  */
 function createConfirmButton(btnOrId, options = {}) {
-  const defaultLabel = options.defaultText || '注销';
+  if (btnOrId && typeof btnOrId === 'object' && (typeof Element === 'undefined' || !(btnOrId instanceof Element)) && typeof btnOrId.addEventListener !== 'function') {
+    options = btnOrId;
+    btnOrId = options.btnEl || options.btn || options.target || options.id;
+  }
+  const defaultLabel = options.defaultText || options.idleText || '注销';
   const confirmLabel = options.confirmText || '确认注销？';
   const timeoutMs = options.timeoutMs || 3200;
+  const labelSelector = options.labelSelector || 'span';
   let timer = null;
 
   const getBtn = () => $(btnOrId);
   const getSpan = () => {
     const b = getBtn();
-    return b ? b.querySelector('span') : null;
+    return b ? (labelSelector ? b.querySelector(labelSelector) : b.querySelector('span')) : null;
   };
 
   function reset() {
@@ -436,7 +454,7 @@ function createConfirmButton(btnOrId, options = {}) {
   }
 
   const btn = getBtn();
-  if (btn) {
+  if (btn && typeof btn.addEventListener === 'function') {
     btn.addEventListener('click', (e) => {
       if (btn.disabled) return;
       const span = getSpan();
@@ -444,8 +462,9 @@ function createConfirmButton(btnOrId, options = {}) {
       if (!btn.classList.contains('confirming')) {
         btn.classList.add('confirming');
         if (span) span.textContent = confirmLabel;
-        if (typeof options.onPrompt === 'function') {
-          options.onPrompt();
+        const promptFn = options.onPrompt || options.onArmed;
+        if (typeof promptFn === 'function') {
+          promptFn(btn);
         }
         timer = setTimeout(reset, timeoutMs);
         return;
@@ -453,7 +472,7 @@ function createConfirmButton(btnOrId, options = {}) {
 
       reset();
       if (typeof options.onConfirm === 'function') {
-        options.onConfirm(e);
+        options.onConfirm(btn, e);
       }
     });
   }
@@ -465,17 +484,22 @@ function createConfirmButton(btnOrId, options = {}) {
  * 组件 5：一键复制微交互组件 (CopyTrigger Component)
  * 统一管理剪贴板写入、防抖锁、图标/胶囊状态翻转与键盘无障碍触发。
  */
-function createCopyTrigger(options) {
+function createCopyTrigger(options = {}) {
   let timer = null;
   const duration = options.duration || 1500;
+  const target = options.triggerEl || options.target || options.targetEl || options.el;
+  const feedback = options.badgeEl || options.feedbackEl || options.pillEl;
+  const getText = options.getText || options.getValue;
+  const onCopied = options.onCopied || options.onSuccess;
+  const onError = options.onError || options.onFail;
 
   function trigger(e) {
     if (e && options.stopPropagation) e.stopPropagation();
-    const el = $(options.target);
-    const feedbackEl = options.feedbackEl ? $(options.feedbackEl) : el;
+    const el = $(target);
+    const feedbackEl = feedback ? $(feedback) : el;
     if (feedbackEl && feedbackEl.classList.contains('copied')) return;
 
-    const text = typeof options.getValue === 'function' ? options.getValue() : '';
+    const text = typeof getText === 'function' ? getText() : '';
     if (!text) {
       if (typeof options.onEmpty === 'function') options.onEmpty();
       return;
@@ -492,48 +516,46 @@ function createCopyTrigger(options) {
       }
 
       const iconEl = options.iconEl ? $(options.iconEl) : null;
-      if (iconEl) {
+      if (iconEl && ICONS && ICONS.checkSuccess) {
         iconEl.innerHTML = ICONS.checkSuccess;
       }
 
-      const pillEl = options.pillEl ? $(options.pillEl) : null;
+      const pillEl = options.pillEl ? $(options.pillEl) : (feedback ? $(feedback) : null);
       const prevPillText = pillEl ? pillEl.textContent : '';
-      if (pillEl && options.copiedPillText) {
-        pillEl.textContent = options.copiedPillText;
+      if (pillEl && (options.copiedPillText || options.copiedText)) {
+        pillEl.textContent = options.copiedPillText || options.copiedText || '已复制 ✓';
         pillEl.classList.add('copied');
       }
 
-      if (typeof options.onSuccess === 'function') {
-        options.onSuccess(text);
+      if (typeof onCopied === 'function') {
+        onCopied(text);
       }
 
       timer = setTimeout(() => {
         if (feedbackEl) feedbackEl.classList.remove('copied');
-        if (iconEl) iconEl.innerHTML = ICONS.clipboard;
-        if (pillEl && options.copiedPillText) {
+        if (iconEl && ICONS && ICONS.clipboard) iconEl.innerHTML = ICONS.clipboard;
+        if (pillEl && (options.copiedPillText || options.copiedText)) {
           pillEl.textContent = options.defaultPillText || prevPillText || '点击复制';
           pillEl.classList.remove('copied');
         }
         timer = null;
       }, duration);
-    }).catch(() => {
-      if (typeof options.onError === 'function') {
-        options.onError(text);
+    }).catch((err) => {
+      if (typeof onError === 'function') {
+        onError(err || text);
       }
     });
   }
 
-  const el = $(options.target);
-  if (el) {
+  const el = $(target);
+  if (el && typeof el.addEventListener === 'function') {
     el.addEventListener('click', trigger);
-    if (options.keyboard) {
-      el.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          trigger(e);
-        }
-      });
-    }
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        trigger(e);
+      }
+    });
   }
 
   return { trigger };
@@ -618,7 +640,16 @@ function createConfirmModal(cfg = {}) {
     });
   }
 
-  return { confirm, close };
+  function open(opts = {}) {
+    return confirm(opts).then((isConfirmed) => {
+      if (isConfirmed && typeof opts.onConfirm === 'function') {
+        opts.onConfirm();
+      }
+      return isConfirmed;
+    });
+  }
+
+  return { confirm, open, close };
 }
 
 /**

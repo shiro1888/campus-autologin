@@ -164,6 +164,102 @@ class TestExtensionStructure(unittest.TestCase):
         for fn in expected_functions:
             self.assertIn(f"function {fn}", common_js, f"common.js missing component function: {fn}")
 
+    def test_scripts_execute_without_runtime_exceptions(self):
+        """模拟浏览器环境执行 common.js + popup.js 与 common.js + options.js，确保无未捕获异常。"""
+        import subprocess
+        runner_script = """
+const fs = require('fs');
+const vm = require('vm');
+const path = require('path');
+
+function createEnv(htmlFile) {
+  const html = fs.readFileSync(htmlFile, 'utf8');
+  const idRegex = /id=["']([^"']+)["']/g;
+  const elements = {};
+  let m;
+  while ((m = idRegex.exec(html)) !== null) {
+    const id = m[1];
+    elements[id] = {
+      id,
+      tagName: 'DIV',
+      classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false },
+      style: {},
+      setAttribute: () => {},
+      removeAttribute: () => {},
+      getAttribute: () => null,
+      addEventListener: () => {},
+      appendChild: () => {},
+      querySelectorAll: () => [],
+      querySelector: () => null,
+      closest: () => null,
+      dataset: {},
+      options: [{ value: '1' }],
+      selectedIndex: 0,
+      value: ''
+    };
+  }
+  const sandbox = {
+    console,
+    setTimeout: (fn) => typeof fn === 'function' && fn(),
+    clearTimeout: () => {},
+    setInterval: () => {},
+    clearInterval: () => {},
+    document: {
+      getElementById: (id) => elements[id] || null,
+      querySelectorAll: () => [],
+      querySelector: () => null,
+      addEventListener: () => {},
+      documentElement: { setAttribute: () => {}, removeAttribute: () => {} }
+    },
+    window: {
+      matchMedia: () => ({ matches: false, addEventListener: () => {} }),
+      addEventListener: () => {}
+    },
+    navigator: { platform: 'Win32', userAgent: 'Chrome' },
+    chrome: {
+      storage: {
+        local: {
+          get: (defaults, cb) => cb(defaults || {}),
+          set: (data, cb) => cb && cb()
+        },
+        onChanged: { addListener: () => {} }
+      },
+      runtime: {
+        getManifest: () => ({ version: '1.3.0' }),
+        sendMessage: (msg, cb) => cb && cb({ reachable: true, online: true })
+      }
+    }
+  };
+  sandbox.window.document = sandbox.document;
+  return sandbox;
+}
+
+const extDir = process.argv[1];
+const commonJs = fs.readFileSync(path.join(extDir, 'common.js'), 'utf8');
+
+// Test options.js
+const optEnv = createEnv(path.join(extDir, 'options.html'));
+vm.createContext(optEnv);
+vm.runInContext(commonJs, optEnv);
+vm.runInContext(fs.readFileSync(path.join(extDir, 'options.js'), 'utf8'), optEnv);
+
+// Test popup.js
+const popEnv = createEnv(path.join(extDir, 'popup.html'));
+vm.createContext(popEnv);
+vm.runInContext(commonJs, popEnv);
+vm.runInContext(fs.readFileSync(path.join(extDir, 'popup.js'), 'utf8'), popEnv);
+
+console.log('ALL_SCRIPTS_OK');
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, EXT_DIR],
+            capture_output=True,
+            text=True,
+            encoding="utf-8"
+        )
+        self.assertEqual(res.returncode, 0, f"Script execution failed:\n{res.stderr}\n{res.stdout}")
+        self.assertIn("ALL_SCRIPTS_OK", res.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
