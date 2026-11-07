@@ -524,6 +524,104 @@ vm.runInContext(src, sandbox);
         self.assertTrue(data["pingPreserved"], "冷启动先探测后写日志，历史心跳被覆盖丢失")
         self.assertEqual(data["writeCount"], 1, "探测与结果写入不应拆成多次 set")
 
+    def test_cold_start_content_result_alone_preserves_logs(self):
+        """冷启动后第一条消息就是 contentResult 时，saveResult 必须自行恢复运行态。
+
+        上一条用例先调用了 checkStatus()，而它入口本身也有 hydrateState()，
+        等于提前把运行态恢复好了 —— 这会让 saveResult() 顶部的 hydrate 变成
+        无法被证伪的冗余行（移除它测试依然全绿），形成假绿盲区。
+
+        真实触发路径：浏览器被断网跳转到门户页 → 内容脚本自动填单并上报结果，
+        此时 SW 可能刚被唤醒，既没有 onStartup 也没有 status 消息。若 saveResult()
+        不自行 hydrate，模块级 eventLogs/pingHistory 仍是空数组，会直接把磁盘上
+        的历史覆盖掉（实测：4 条日志 → 1 条，心跳历史 → 空）。
+
+        本用例只发 contentResult、全程不触碰 checkStatus()，确保该防线被独立锁定。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(process.argv[1], 'utf8');
+const listeners = {};
+let storage = {
+  eventLogs: [
+    { time: '09:00:03', message: '事件A', ok: true, online: true, from: '巡检', count: 1 },
+    { time: '09:00:02', message: '事件B', ok: true, online: true, from: '巡检', count: 1 },
+    { time: '09:00:01', message: '事件C', ok: false, online: false, from: '巡检', count: 1 }
+  ],
+  pingHistory: [11, 22, 33], initialized: true, account: 'test', password: 'pw'
+};
+const writes = [];
+const chrome = {
+  storage: { local: {
+    get: (arg, cb) => {
+      const r = arg === null ? { ...storage } : { ...(arg || {}) };
+      if (typeof cb === 'function') { cb(r); return; }
+      return Promise.resolve(r);
+    },
+    set: (patch, cb) => {
+      writes.push(patch); Object.assign(storage, patch);
+      if (typeof cb === 'function') cb();
+      return Promise.resolve();
+    }
+  } },
+  runtime: {
+    onInstalled: { addListener: (f) => listeners.installed = f },
+    onStartup: { addListener: (f) => listeners.startup = f },
+    onMessage: { addListener: (f) => listeners.message = f },
+    getManifest: () => ({ version: 'test' }), lastError: null
+  },
+  alarms: { onAlarm: { addListener: () => {} }, get: async () => null, create: async () => {} },
+  action: { setBadgeText: () => {}, setBadgeBackgroundColor: () => {} },
+  commands: null
+};
+const sandbox = {
+  console: { log: () => {}, warn: () => {}, error: () => {} }, chrome,
+  setTimeout: (fn) => setTimeout(fn, 0), clearTimeout,
+  setInterval: () => 0, clearInterval: () => {},
+  Date, Math, JSON, Promise, Number, String, Array, Object, RegExp,
+  parseInt, parseFloat, isNaN, Boolean, Set, Map, Error,
+  TextDecoder, AbortController, Uint8Array, ArrayBuffer, URLSearchParams,
+  // 全程不应发起探测；这里故意抛错，一旦有人给本用例加上 checkStatus 会立刻暴露
+  fetch: async () => { throw new Error('checkStatus() 不应被调用'); }
+};
+vm.createContext(sandbox);
+vm.runInContext(src, sandbox);
+
+(async () => {
+  // 关键：不触发 onInstalled / onStartup，也不发 status，只发 contentResult
+  await new Promise((resolve) => listeners.message(
+    { type: 'contentResult', result: { ok: true, online: true, message: '页面自动填写完成' } },
+    {}, resolve
+  ));
+  const last = writes[writes.length - 1] || {};
+  const logs = last.eventLogs || [];
+  const ping = last.pingHistory || [];
+  console.log('RESULT:' + JSON.stringify({
+    writeCount: writes.length,
+    eventLogsLen: logs.length,
+    firstMsg: logs[0] && logs[0].message,
+    pingHistory: ping
+  }));
+})().catch((e) => console.log('ERROR:' + e.message));
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, os.path.join(EXT_DIR, "background.js")],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"后台脚本模拟失败:\n{res.stderr}\n{res.stdout}")
+        line = next((l for l in res.stdout.splitlines() if l.startswith("RESULT:")), None)
+        self.assertIsNotNone(line, f"未拿到模拟结果:\n{res.stdout}\n{res.stderr}")
+        data = json.loads(line[len("RESULT:"):])
+        # 3 条历史 + 1 条新事件。若 saveResult 不自 hydrate，这里会退化成 1 条
+        self.assertEqual(data["eventLogsLen"], 4,
+                         f"saveResult 未自行恢复运行态，冷启动历史日志被覆盖: {data}")
+        self.assertEqual(data["firstMsg"], "页面自动填写完成")
+        # 心跳历史必须原样保留，不能被空数组覆盖
+        self.assertEqual(data["pingHistory"], [11, 22, 33],
+                         f"saveResult 未自行恢复运行态，心跳历史被覆盖: {data}")
+        self.assertEqual(data["writeCount"], 1, "contentResult 应只触发一次 storage 写入")
+
 
     def test_shared_component_degraded_paths(self):
         """运行时验证组件的降级与并发路径，而不只是「不抛异常」。
