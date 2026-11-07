@@ -753,10 +753,10 @@ function refreshStatus(cb) {
     $('stMac').textContent = raw.ss1 ? ('物理 MAC: ' + fmtMac(raw.ss1)) : '物理 MAC: —';
 
     if (res.online) {
-      const { durationInput, stimeDisplay } = resolveSessionDuration(res, raw);
+      const { durationInput, optionsSubtitle } = resolveSessionDuration(res, raw);
       if (durationInput != null) {
         durationTicker.start(durationInput);
-        $('stStime').textContent = stimeDisplay;
+        $('stStime').textContent = optionsSubtitle;
       } else {
         durationTicker.stop();
         $('stTime').textContent = '在线中';
@@ -775,10 +775,10 @@ function refreshStatus(cb) {
     const pingMeta = classifyPing(res.pingMs, res.reachable);
     pingEl.textContent = pingMeta.text;
     if (badgeEl) {
-      badgeEl.className = 'latency-badge ' + pingMeta.tier;
+      badgeEl.className = 'latency-badge ' + pingMeta.grade;
       badgeEl.textContent = pingMeta.label;
     }
-    renderOptPingSparkline(hist || pingMeta.sparkVal);
+    renderOptPingSparkline(hist || pingMeta.fallbackMs);
 
     // Flow & Traffic Detail (下行 / 上行 / 总计明细)
     if (raw.flow !== undefined) {
@@ -1088,10 +1088,10 @@ $('btnCopyDiagnostic')?.addEventListener('click', () => {
       `[校园网自动登录 诊断快照 v${chrome.runtime?.getManifest?.()?.version || '1.3.0'}]`,
       `时间: ${new Date().toLocaleString()}`,
       `状态: ${$('stOnline')?.textContent || '—'} | 延迟: ${$('stPing')?.textContent || '—'}`,
-      `账号: ${maskedAcc} | 运营商: ${ispMeta.name} (${ispMeta.tag})`,
+      `账号: ${maskedAcc} | 运营商: ${ispMeta.short} (${ispMeta.tag})`,
       `本机IP: ${$('stIp')?.textContent || '—'} | 流量: ${$('stFlow')?.textContent || '—'} (${$('stFlowDetail')?.textContent || '—'})`,
       `策略: ${$('stPolicyPill')?.textContent || '—'}`,
-      `最近事件: ${logs.length ? logs.map((l) => `${l.time} [${l.trigger || '巡检'}] ${l.message}${l.count > 1 ? ' ×' + l.count : ''}`).join(' ; ') : '暂无'}`
+      `最近事件: ${logs.length ? logs.map((l) => `${l.time} [${l.from || '巡检'}] ${l.message}${l.count > 1 ? ' ×' + l.count : ''}`).join(' ; ') : '暂无'}`
     ];
     if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
       showToast('复制诊断报告失败：剪贴板不可用', 'err');

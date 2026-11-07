@@ -164,92 +164,211 @@ class TestExtensionStructure(unittest.TestCase):
         for fn in expected_functions:
             self.assertIn(f"function {fn}", common_js, f"common.js missing component function: {fn}")
 
+    def test_shared_component_field_contract(self):
+        """共享组件的返回字段 与 消费端的字段引用必须一致。
+
+        组件化重构曾把 classifyPing / resolveSessionDuration / getIspMeta 抽到
+        common.js，但 options.js 仍沿用旧字段名（tier / sparkVal / stimeDisplay /
+        ispMeta.name），诊断报告与事件日志也用错了 l.trigger。这类错误不会抛异常，
+        只会把 undefined 写进 DOM 或让样式/波形图静默失效，必须靠契约校验兜住。
+        """
+        def read(name):
+            with open(os.path.join(EXT_DIR, name), "r", encoding="utf-8") as f:
+                return f.read()
+
+        common = read("common.js")
+        background = read("background.js")
+        popup = read("popup.js")
+        options = read("options.js")
+
+        # ---- 生产端字段集 ----
+        ping_returns = re.findall(r"return\s*\{\s*grade:.+?\};", common)
+        self.assertTrue(ping_returns, "common.js 中未找到 classifyPing 的 return 语句")
+        ping_fields = set()
+        for ret in ping_returns:
+            ping_fields.update(re.findall(r"(\w+)\s*:", ret))
+
+        dur_ret = re.search(r"return\s*\{\s*durationInput,\s*([^}]*)\};", common)
+        self.assertTrue(dur_ret, "common.js 中未找到 resolveSessionDuration 的 return 语句")
+        dur_fields = {"durationInput"} | {
+            part.strip() for part in dur_ret.group(1).split(",") if part.strip()
+        }
+
+        isp_cfg = re.search(r"const ISP_CONFIG = \{(.*?)\n\};", common, re.S)
+        self.assertTrue(isp_cfg, "common.js 中未找到 ISP_CONFIG")
+        isp_first = re.search(r"\{([^}]*)\}", isp_cfg.group(1), re.S)
+        isp_fields = set(re.findall(r"(\w+)\s*:", isp_first.group(1)))
+
+        entry = re.search(r"const entry = \{(.*?)\n\s*\};", background, re.S)
+        self.assertTrue(entry, "background.js 中未找到 eventLogs 条目定义")
+        log_fields = set(re.findall(r"^\s*(\w+)\s*:", entry.group(1), re.M))
+
+        # ---- 消费端引用 ----
+        for name, src in (("popup.js", popup), ("options.js", options)):
+            ping_refs = set(re.findall(r"\bping(?:Info|Meta)\.(\w+)", src))
+            self.assertTrue(ping_refs, f"{name} 未消费 classifyPing 结果")
+            bad = ping_refs - ping_fields
+            self.assertFalse(bad, f"{name} 引用了 classifyPing 不存在的字段: {bad}（会导致 undefined 写入 DOM）")
+
+            dur_refs = set(re.findall(r"\bdur\.(\w+)", src))
+            for group in re.findall(r"const\s*\{([^}]+)\}\s*=\s*resolveSessionDuration", src):
+                dur_refs.update(
+                    part.strip().split(":")[0].strip()
+                    for part in group.split(",") if part.strip()
+                )
+            bad = dur_refs - dur_fields
+            self.assertFalse(bad, f"{name} 引用了 resolveSessionDuration 不存在的字段: {bad}")
+
+            isp_refs = set(re.findall(r"\b(?:ispMeta|meta)\.(\w+)", src))
+            bad = isp_refs - isp_fields
+            self.assertFalse(bad, f"{name} 引用了 ISP 元数据不存在的字段: {bad}")
+
+        # 事件日志：common.js 时间轴用 item.*，options.js 诊断报告用 l.*
+        log_refs = set(re.findall(r"\bitem\.(\w+)", common))
+        log_refs |= set(re.findall(r"\bl\.(\w+)", options))
+        self.assertTrue(log_refs, "未找到事件日志字段消费点")
+        bad = log_refs - log_fields
+        self.assertFalse(bad, f"事件日志引用了不存在的字段: {bad}")
+
     def test_scripts_execute_without_runtime_exceptions(self):
-        """模拟浏览器环境执行 common.js + popup.js 与 common.js + options.js，确保无未捕获异常。"""
+        """模拟浏览器环境执行脚本：既要无未捕获异常，也不能把 undefined 写进 DOM。"""
         import subprocess
-        runner_script = """
+        runner_script = r"""
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
 
-function createEnv(htmlFile) {
+const problems = [];
+
+function makeEl(id, label) {
+  const listeners = {};
+  const el = {
+    id, tagName: 'DIV', dataset: {}, style: {}, files: [], value: '',
+    checked: false, disabled: false, selectedIndex: 0, title: '',
+    options: [{ value: '1' }],
+    classList: {
+      _s: new Set(),
+      add(...c) { c.forEach((x) => this._s.add(x)); },
+      remove(...c) { c.forEach((x) => this._s.delete(x)); },
+      toggle(c, f) { if (f === undefined) f = !this._s.has(c); f ? this._s.add(c) : this._s.delete(c); return f; },
+      contains(c) { return this._s.has(c); }
+    },
+    setAttribute() {}, removeAttribute() {}, getAttribute() { return null; },
+    addEventListener(t, fn) { (listeners[t] = listeners[t] || []).push(fn); },
+    removeEventListener() {},
+    appendChild() {}, removeChild() {}, remove() {},
+    querySelectorAll() { return []; }, querySelector() { return null; },
+    closest() { return null; }, focus() {}, click() {},
+    _fire(t) {
+      (listeners[t] || []).forEach((fn) => fn({
+        target: el, preventDefault() {}, stopPropagation() {}
+      }));
+    }
+  };
+  let _text = '', _class = '', _html = '';
+  const guard = (kind, v) => {
+    if (v === undefined) problems.push(`[${label}] #${id}.${kind} = undefined`);
+    else if (typeof v === 'string' && v.indexOf('undefined') !== -1)
+      problems.push(`[${label}] #${id}.${kind} 含 "undefined": ${v}`);
+  };
+  Object.defineProperty(el, 'textContent', {
+    get() { return _text; }, set(v) { guard('textContent', v); _text = String(v); }
+  });
+  Object.defineProperty(el, 'className', {
+    get() { return _class; }, set(v) { guard('className', v); _class = String(v); }
+  });
+  Object.defineProperty(el, 'innerHTML', {
+    get() { return _html; }, set(v) { guard('innerHTML', v); _html = String(v); }
+  });
+  return el;
+}
+
+function createEnv(htmlFile, label) {
   const html = fs.readFileSync(htmlFile, 'utf8');
   const idRegex = /id=["']([^"']+)["']/g;
   const elements = {};
   let m;
   while ((m = idRegex.exec(html)) !== null) {
-    const id = m[1];
-    elements[id] = {
-      id,
-      tagName: 'DIV',
-      classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false },
-      style: {},
-      setAttribute: () => {},
-      removeAttribute: () => {},
-      getAttribute: () => null,
-      addEventListener: () => {},
-      appendChild: () => {},
-      querySelectorAll: () => [],
-      querySelector: () => null,
-      closest: () => null,
-      dataset: {},
-      options: [{ value: '1' }],
-      selectedIndex: 0,
-      value: ''
-    };
+    elements[m[1]] = makeEl(m[1], label);
   }
+  const get = (id) => (id && typeof id === 'object') ? id : (elements[id] || makeEl(String(id), label));
   const sandbox = {
     console,
-    setTimeout: (fn) => typeof fn === 'function' && fn(),
-    clearTimeout: () => {},
-    setInterval: () => {},
-    clearInterval: () => {},
+    setTimeout: (fn) => { if (typeof fn === 'function') { try { fn(); } catch (e) { problems.push(`[${label}] setTimeout 回调: ${e.message}`); } } return 1; },
+    clearTimeout: () => {}, setInterval: () => 1, clearInterval: () => {},
+    Blob: function () {}, URL: { createObjectURL: () => '', revokeObjectURL() {} },
     document: {
-      getElementById: (id) => elements[id] || null,
-      querySelectorAll: () => [],
-      querySelector: () => null,
+      getElementById: get,
+      querySelectorAll: () => [], querySelector: () => null,
       addEventListener: () => {},
+      createElement: () => makeEl('created', label),
+      createElementNS: () => makeEl('svg', label),
+      body: { appendChild() {}, removeChild() {} },
       documentElement: { setAttribute: () => {}, removeAttribute: () => {} }
     },
     window: {
       matchMedia: () => ({ matches: false, addEventListener: () => {} }),
-      addEventListener: () => {}
+      addEventListener: () => {}, open() {}, close() {}, confirm: () => false
     },
     navigator: { platform: 'Win32', userAgent: 'Chrome' },
+    Element: function () {},
     chrome: {
       storage: {
         local: {
-          get: (defaults, cb) => cb(defaults || {}),
+          get: (arg, cb) => { const d = (arg && typeof arg === 'object') ? { ...arg } : {}; cb && cb(d); },
           set: (data, cb) => cb && cb()
         },
         onChanged: { addListener: () => {} }
       },
       runtime: {
         getManifest: () => ({ version: '1.3.0' }),
-        sendMessage: (msg, cb) => cb && cb({ reachable: true, online: true })
+        getURL: () => '', openOptionsPage() {}, lastError: null,
+        sendMessage: (msg, cb) => {
+          if (!cb) return;
+          if (msg.type === 'status') {
+            cb({
+              reachable: true, online: true, pingMs: 42, pingHistory: [10, 20, 30],
+              raw: { v4ip: '10.0.0.1', ss5: '', ss1: 'aabbccddeeff', flow: '1024',
+                     actdf: '800', actuf: '224', stime: '2026-11-07 08:00:00' },
+              manualLogout: false, running: false, onlineSince: Date.now() - 3600000
+            });
+          } else cb({ ok: true, online: true, message: 'ok' });
+        }
       }
     }
   };
   sandbox.window.document = sandbox.document;
+  sandbox._elements = elements;
   return sandbox;
 }
 
 const extDir = process.argv[1];
 const commonJs = fs.readFileSync(path.join(extDir, 'common.js'), 'utf8');
 
-// Test options.js
-const optEnv = createEnv(path.join(extDir, 'options.html'));
-vm.createContext(optEnv);
-vm.runInContext(commonJs, optEnv);
-vm.runInContext(fs.readFileSync(path.join(extDir, 'options.js'), 'utf8'), optEnv);
+for (const [htmlFile, jsFile, label] of [
+  ['options.html', 'options.js', 'options'],
+  ['popup.html', 'popup.js', 'popup']
+]) {
+  const env = createEnv(path.join(extDir, htmlFile), label);
+  vm.createContext(env);
+  vm.runInContext(commonJs, env);
+  try {
+    vm.runInContext(fs.readFileSync(path.join(extDir, jsFile), 'utf8'), env);
+  } catch (e) {
+    problems.push(`[${label}] 顶层执行异常: ${e.message}`);
+  }
+  // 触发所有已注册的 click 回调，覆盖交互分支（字段错名常藏在这里）
+  for (const id of Object.keys(env._elements)) {
+    try { env._elements[id]._fire('click'); }
+    catch (e) { problems.push(`[${label}] #${id} click 回调异常: ${e.message}`); }
+  }
+}
 
-// Test popup.js
-const popEnv = createEnv(path.join(extDir, 'popup.html'));
-vm.createContext(popEnv);
-vm.runInContext(commonJs, popEnv);
-vm.runInContext(fs.readFileSync(path.join(extDir, 'popup.js'), 'utf8'), popEnv);
-
-console.log('ALL_SCRIPTS_OK');
+if (problems.length) {
+  console.log('DOM_PROBLEMS:\n' + problems.join('\n'));
+} else {
+  console.log('ALL_SCRIPTS_OK');
+}
 """
         res = subprocess.run(
             ["node", "-e", runner_script, EXT_DIR],
@@ -258,6 +377,8 @@ console.log('ALL_SCRIPTS_OK');
             encoding="utf-8"
         )
         self.assertEqual(res.returncode, 0, f"Script execution failed:\n{res.stderr}\n{res.stdout}")
+        self.assertNotIn("DOM_PROBLEMS", res.stdout,
+                         f"脚本把 undefined 写入 DOM 或交互回调抛异常:\n{res.stdout}")
         self.assertIn("ALL_SCRIPTS_OK", res.stdout)
 
 
