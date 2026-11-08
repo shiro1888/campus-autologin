@@ -1371,6 +1371,148 @@ console.log(problems.length ? 'JSONP_PROBLEMS:\n' + problems.join('\n') : 'JSONP
         self.assertNotIn("JSONP_PROBLEMS", res.stdout, f"JSONP 解析器存在隐患:\n{res.stdout}")
         self.assertIn("JSONP_OK", res.stdout)
 
+    def test_warn_toast_uses_warning_icon(self):
+        """warn 类提示必须渲染警告三角图标，不能在组件重构中退化回 info 圆圈。
+
+        c545129 修复了这个缺陷，但当时未附测试：createToastManager.show() 的三元映射
+        只区分 ok/err，warn 落到 info 分支，getStatusIconSvg 的警告三角分支形同虚设
+        （空凭据保存提示等场景只有琥珀色样式、没有警示图标）。该图标曾于 a24e13c
+        为旧版 showToast 添加，却在 2b355f2 组件重构中丢失 —— 同类回归极容易再次发生。
+
+        本用例驱动真实 common.js，同时校验三层：
+          1. toastIconKind 直通映射（warn/ok/err 保留，未知值退化为 info）；
+          2. getStatusIconSvg('warn') 确为警告三角，且与 info 图标可区分；
+          3. createToastManager 在「单体胶囊」与「多条堆叠」两种模式下，
+             实际写入 DOM 的 SVG 都是警告三角而非 info 圆圈。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(process.argv[1], 'utf8');
+const problems = [];
+
+// 警告三角的独有路径片段（info 圆圈为 cx="12" cy="12" r="10" 的圆）
+const WARN_MARKER = 'M10.29 3.86';
+const INFO_MARKER = 'x1="12" y1="16"';
+
+function mkEl(id) {
+  const el = {
+    id: id || '', textContent: '', innerHTML: '', value: '', className: '',
+    dataset: {}, style: {}, options: [], selectedIndex: 0,
+    classList: {
+      _s: new Set(),
+      add(...c) { c.forEach(x => this._s.add(x)); },
+      remove(...c) { c.forEach(x => this._s.delete(x)); },
+      toggle(c, f) { if (f === undefined) { this._s.has(c) ? this._s.delete(c) : this._s.add(c); } else if (f) { this._s.add(c); } else { this._s.delete(c); } },
+      contains(c) { return this._s.has(c); }
+    },
+    _l: {},
+    addEventListener(t, f) { (this._l[t] = this._l[t] || []).push(f); },
+    removeEventListener() {},
+    dispatchEvent(e) { (this._l[e.type] || []).forEach(f => f(e)); return true; },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+    appendChild(c) { (this._kids = this._kids || []).push(c); },
+    removeChild() {}, remove() {}, focus() {}, click() {},
+    getAttribute() { return null; }, setAttribute() {}, removeAttribute() {},
+    closest() { return null; },
+    getBoundingClientRect() { return { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 }; },
+    scrollIntoView() {}
+  };
+  return el;
+}
+
+const els = new Map();
+const byId = (id) => { if (!id) return null; if (!els.has(id)) els.set(id, mkEl(id)); return els.get(id); };
+
+const ctx = {
+  console,
+  setTimeout: (f) => { if (typeof f === 'function') f(); return 1; },
+  clearTimeout() {}, setInterval: () => 1, clearInterval() {},
+  document: {
+    getElementById: byId,
+    querySelectorAll: () => [],
+    querySelector: () => null,
+    addEventListener() {},
+    createElement: () => mkEl('new'),
+    createElementNS: () => mkEl('new'),
+    documentElement: { setAttribute() {} },
+    body: mkEl('body')
+  },
+  navigator: { platform: 'Win32', userAgent: 'Chrome' },
+  matchMedia: () => ({ matches: false, addEventListener() {} }),
+  Date, Math, JSON, Promise, String, Number, Object, Array, RegExp, Set, Map, Error,
+  parseInt, parseFloat, isNaN, Boolean
+};
+ctx.window = ctx;
+ctx.window.addEventListener = () => {};
+vm.createContext(ctx);
+vm.runInContext(src, ctx);
+
+// ---- 1. toastIconKind 映射 ----
+const kindOf = (k) => vm.runInContext(`toastIconKind(${JSON.stringify(k)})`, ctx);
+if (kindOf('warn') !== 'warn') problems.push('toastIconKind("warn") 应为 "warn"，实际 ' + kindOf('warn'));
+if (kindOf('ok') !== 'ok') problems.push('toastIconKind("ok") 应为 "ok"');
+if (kindOf('err') !== 'err') problems.push('toastIconKind("err") 应为 "err"');
+if (kindOf('info') !== 'info') problems.push('toastIconKind("info") 应为 "info"');
+if (kindOf('unknown') !== 'info') problems.push('未知 kind 应退化为 "info"');
+if (kindOf(undefined) !== 'info') problems.push('undefined kind 应退化为 "info"');
+
+// ---- 2. getStatusIconSvg 分支 ----
+const warnSvg = vm.runInContext('getStatusIconSvg("warn", 16)', ctx);
+const infoSvg = vm.runInContext('getStatusIconSvg("info", 16)', ctx);
+if (warnSvg.indexOf(WARN_MARKER) === -1) problems.push('getStatusIconSvg("warn") 未返回警告三角');
+if (infoSvg.indexOf(WARN_MARKER) !== -1) problems.push('getStatusIconSvg("info") 不应含警告三角路径');
+if (warnSvg === infoSvg) problems.push('warn 与 info 图标不应相同');
+
+// ---- 3a. 单体胶囊模式（popup：#msgBox）----
+const msgBox = byId('msgBox');
+const msgText = mkEl('msg');
+const msgIcon = mkEl('msgIcon');
+// 让 $ 解析到同一批元素：把组件依赖的 id 映射到上面三个节点
+els.set('msgBox', msgBox); els.set('msg', msgText); els.set('msgIcon', msgIcon);
+const single = vm.runInContext(
+  'createToastManager({ boxId: "msgBox", textId: "msg", iconId: "msgIcon" })', ctx);
+single.show('测试警告', 'warn', 0);
+if (msgIcon.innerHTML.indexOf(WARN_MARKER) === -1) {
+  problems.push('单体胶囊模式下 warn 未渲染警告三角，实际: ' + msgIcon.innerHTML.slice(0, 80));
+}
+if (msgText.textContent !== '测试警告') problems.push('单体胶囊模式文案未写入');
+
+// 对照：info 不应画成警告三角
+msgIcon.innerHTML = '';
+single.show('测试信息', 'info', 0);
+if (msgIcon.innerHTML.indexOf(WARN_MARKER) !== -1) {
+  problems.push('单体胶囊模式下 info 被误渲染为警告三角');
+}
+
+// ---- 3b. 多条堆叠模式（options：#toastContainer）----
+const container = mkEl('toastContainer');
+els.set('toastContainer', container);
+const stacked = vm.runInContext('createToastManager({ containerId: "toastContainer", maxStack: 3 })', ctx);
+stacked.show('堆叠警告', 'warn', 0);
+const kids = container._kids || [];
+if (!kids.length) {
+  problems.push('堆叠模式未创建任何 toast 节点');
+} else {
+  const icon = (kids[kids.length - 1]._kids || [])[0];
+  const html = icon ? icon.innerHTML : '';
+  if (html.indexOf(WARN_MARKER) === -1) {
+    problems.push('堆叠模式下 warn 未渲染警告三角，实际: ' + String(html).slice(0, 80));
+  }
+}
+
+console.log(problems.length ? 'WARN_ICON_PROBLEMS:\n' + problems.join('\n') : 'WARN_ICON_OK');
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, os.path.join(EXT_DIR, "common.js")],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"Toast 图标模拟失败:\n{res.stderr}\n{res.stdout}")
+        self.assertNotIn("WARN_ICON_PROBLEMS", res.stdout,
+                         f"warn 提示图标退化:\n{res.stdout}")
+        self.assertIn("WARN_ICON_OK", res.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
