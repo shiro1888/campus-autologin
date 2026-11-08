@@ -823,6 +823,189 @@ console.log(problems.length ? 'PROBLEMS:' + problems.join(' | ') : 'RESULT:OK');
         self.assertIn("RESULT:OK", res.stdout,
                       f"畸形 eventLogs 破坏了 UI 消费端:\n{res.stdout}\n{res.stderr}")
 
+    def test_cross_page_shared_form_keys_are_synced(self):
+        """结构性守卫：popup 会写、且 options 会整表写回的键，必须被跨页监听。
+
+        options.save() 用 readForm() 整表覆盖存储，因此任何「popup 也能改」的
+        表单键，只要设置页的 onChanged 没跟随，就会像运营商那样被静默回退。
+        这里用静态差集兜住未来新增共享键的情况。
+        """
+        with open(os.path.join(EXT_DIR, "popup.js"), "r", encoding="utf-8") as f:
+            popup_src = f.read()
+        with open(os.path.join(EXT_DIR, "options.js"), "r", encoding="utf-8") as f:
+            options_src = f.read()
+
+        # popup 中所有 chrome.storage.local.set({ ... }) 的键
+        popup_writes = set()
+        for body in re.findall(r"storage\.local\.set\(\s*\{([^}]*)\}", popup_src, re.S):
+            popup_writes |= set(re.findall(r"(?:^|[,{])\s*([A-Za-z_]\w*)\s*:", body))
+
+        # options.readForm() 返回对象的键
+        form_match = re.search(r"function readForm\(\)\s*\{.*?return\s*\{(.*?)\}\s*;",
+                               options_src, re.S)
+        self.assertIsNotNone(form_match, "未能定位 readForm()")
+        form_keys = set(re.findall(r"([A-Za-z_]\w*)\s*:", form_match.group(1)))
+
+        # options 的 onChanged 里监听的键
+        listener_match = re.search(r"chrome\.storage\.onChanged\.addListener\s*\((.*?)\n\}\);",
+                                   options_src, re.S)
+        self.assertIsNotNone(listener_match, "未能定位 options 的 onChanged 监听")
+        listened = set(re.findall(r"changes\.([A-Za-z_]\w*)", listener_match.group(1)))
+
+        shared = popup_writes & form_keys
+        self.assertTrue(shared, "探针失效：popup 与 readForm() 之间应有共享键")
+        self.assertEqual(
+            sorted(shared - listened), [],
+            "以下共享键会被 options 的整表保存静默回退，却未在 onChanged 中同步",
+        )
+
+    def test_options_follows_external_isp_change_without_writeback_loop(self):
+        """popup 改运营商后，设置页不能拿陈旧值把它写回去。
+
+        复现路径：两个页面同时存在 → 弹窗「运营商直选」写 storage.isp=2 →
+        设置页的 onChanged 若不处理 isp，其 #isp 仍是 1 → 之后任意一次
+        save()（开关自动保存 / Ctrl+S / 保存并连接）都用 readForm() 整表写回，
+        把 2 悄悄改回 1。后果是用错运营商认证，表现为「密码错误」。
+        同时断言同步过程不派发 change / 不触发循环写入。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const EXT = process.argv[1];
+const html = fs.readFileSync(path.join(EXT, 'options.html'), 'utf8');
+const ids = [...html.matchAll(/id=["']([^"']+)["']/g)].map((m) => m[1]);
+
+function makeEl(id) {
+  const listeners = {};
+  const el = {
+    id, dataset: {}, style: {}, files: [], value: '', checked: false, disabled: false,
+    selectedIndex: 0, title: '', textContent: '', innerHTML: '', className: '',
+    options: [{ value: '1' }, { value: '2' }, { value: '3' }, { value: '4' }],
+    classList: { _s: new Set(), add(...c) { c.forEach((x) => this._s.add(x)); },
+      remove(...c) { c.forEach((x) => this._s.delete(x)); },
+      toggle(c, f) { if (f === undefined) f = !this._s.has(c); f ? this._s.add(c) : this._s.delete(c); return f; },
+      contains(c) { return this._s.has(c); } },
+    setAttribute() {}, removeAttribute() {}, getAttribute() { return null; },
+    addEventListener(t, fn) { (listeners[t] = listeners[t] || []).push(fn); },
+    removeEventListener() {}, appendChild() {}, removeChild() {}, remove() {},
+    querySelectorAll() { return []; }, querySelector() { return makeEl('child'); },
+    closest() { return null; }, focus() {}, click() {},
+    dispatchEvent(evt) { (listeners[evt.type] || []).forEach((fn) => fn({ target: el, preventDefault() {}, stopPropagation() {} })); }
+  };
+  return el;
+}
+const elements = {};
+for (const id of ids) elements[id] = makeEl(id);
+const changedListeners = [];
+const writes = [];
+let storage = {
+  account: '13800000000', password: 'pw', isp: '1', intervalMin: 10 / 60,
+  offlineIntervalMin: 1 / 60, adaptive: true, autoOnStartup: true,
+  contentAutoFill: true, instantTrigger: true, initialized: true, privacyMask: false
+};
+const chrome = {
+  storage: {
+    local: {
+      get(arg, cb) {
+        let out = {};
+        if (arg === null || arg === undefined) out = { ...storage };
+        else if (Array.isArray(arg)) arg.forEach((k) => { out[k] = storage[k]; });
+        else if (typeof arg === 'object') {
+          out = { ...arg };
+          Object.keys(arg).forEach((k) => { if (k in storage) out[k] = storage[k]; });
+        }
+        if (cb) cb(out);
+        return Promise.resolve(out);
+      },
+      set(patch, cb) {
+        writes.push({ ...patch });
+        const changes = {};
+        for (const k of Object.keys(patch)) changes[k] = { oldValue: storage[k], newValue: patch[k] };
+        Object.assign(storage, patch);
+        if (cb) cb();
+        changedListeners.forEach((fn) => fn(changes, 'local'));
+        return Promise.resolve();
+      }
+    },
+    onChanged: { addListener: (fn) => changedListeners.push(fn) }
+  },
+  runtime: {
+    getManifest: () => ({ version: '1.0.0' }), getURL: () => '',
+    openOptionsPage() {}, lastError: null,
+    sendMessage(msg, cb) {
+      if (!cb) return;
+      if (msg.type === 'status') {
+        cb({ reachable: true, online: true, pingMs: 20, raw: { v4ip: '10.0.0.1' },
+             manualLogout: false, running: false, pingHistory: [20] });
+      } else cb({ ok: true, online: true, message: 'ok' });
+    }
+  }
+};
+const sandbox = {
+  console: { log() {}, warn() {}, error() {} },
+  setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {},
+  Blob: function () {}, URL: { createObjectURL: () => '', revokeObjectURL() {} },
+  FileReader: function () {},
+  document: {
+    getElementById: (id) => (elements[id] = elements[id] || makeEl(String(id))),
+    querySelectorAll: () => [], querySelector: () => makeEl('q'),
+    addEventListener() {}, createElement: () => makeEl('created'),
+    createElementNS: () => makeEl('svg'),
+    body: { appendChild() {}, removeChild() {} },
+    documentElement: { setAttribute() {}, removeAttribute() {} },
+    visibilityState: 'visible'
+  },
+  window: { matchMedia: () => ({ matches: false, addEventListener() {} }),
+    addEventListener() {}, open() {}, close() {}, confirm: () => false },
+  navigator: { platform: 'Win32', userAgent: 'Chrome', language: 'zh-CN' },
+  Element: function () {}, chrome,
+  Date, Math, JSON, String, Number, Object, Array, RegExp, Set,
+  parseInt, parseFloat, isNaN, Promise, Error,
+  Event: function (t) { this.type = t; }
+};
+sandbox.window.document = sandbox.document;
+vm.createContext(sandbox);
+vm.runInContext(fs.readFileSync(path.join(EXT, 'common.js'), 'utf8'), sandbox);
+vm.runInContext(fs.readFileSync(path.join(EXT, 'options.js'), 'utf8'), sandbox);
+
+const formIspBefore = vm.runInContext('readForm().isp', sandbox);
+// 模拟弹窗直选运营商：真实 Chrome 会把 onChanged 广播给所有页面
+writes.length = 0;
+chrome.storage.local.set({ isp: '2', authError: false }, () => {});
+const formIspAfter = vm.runInContext('readForm().isp', sandbox);
+const writesFromListener = writes.length;
+
+// 用户在设置页改任意开关，触发 save() 整表写回
+writes.length = 0;
+vm.runInContext('save()', sandbox);
+const savedIsp = writes.length ? writes[0].isp : null;
+
+console.log('RESULT:' + JSON.stringify({
+  formIspBefore, formIspAfter, savedIsp,
+  finalIsp: storage.isp,
+  writesFromListener,
+  selectValue: elements.isp.value
+}));
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, EXT_DIR],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"跨页模拟失败:\n{res.stderr}\n{res.stdout}")
+        line = next((l for l in res.stdout.splitlines() if l.startswith("RESULT:")), None)
+        self.assertIsNotNone(line, f"未拿到模拟结果:\n{res.stdout}\n{res.stderr}")
+        data = json.loads(line[len("RESULT:"):])
+        self.assertEqual(data["formIspBefore"], "1")
+        self.assertEqual(data["formIspAfter"], "2",
+                         f"设置页未跟随外部运营商变更，readForm() 仍是陈旧值: {data}")
+        self.assertEqual(data["selectValue"], "2",
+                         f"设置页下拉框未同步（含自定义下拉与快捷胶囊）: {data}")
+        self.assertEqual(data["savedIsp"], "2",
+                         f"自动保存用陈旧运营商覆盖了弹窗的选择: {data}")
+        self.assertEqual(data["finalIsp"], "2", f"最终存储值被回退: {data}")
+        self.assertEqual(data["writesFromListener"], 1,
+                         f"同步视图时不应产生额外写入（回写循环）: {data}")
+
     def test_shared_component_degraded_paths(self):
         """运行时验证组件的降级与并发路径，而不只是「不抛异常」。
 

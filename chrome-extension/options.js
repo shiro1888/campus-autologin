@@ -977,6 +977,20 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes.eventLogs) {
     activityTimeline.render(Array.isArray(changes.eventLogs.newValue) ? changes.eventLogs.newValue : []);
   }
+  // popup 的「运营商直选」会直接写 storage.isp。设置页若不跟随，之后任意一次
+  // save()（自动保存 / Ctrl+S / 保存并连接）都会用 readForm() 把陈旧的运营商
+  // 写回去，静默撤销用户在弹窗里的选择 —— 表现为「明明换了运营商还是报密码错误」。
+  // 这里只同步视图，绝不派发 change / 调用 save()，否则会形成跨页回写循环。
+  if (changes.isp) {
+    const sel = $('isp');
+    const raw = String(changes.isp.newValue);
+    const next = ['1', '2', '3', '4'].indexOf(raw) !== -1 ? raw : '1';
+    if (sel && sel.value !== next) {
+      sel.value = next;
+      syncCustomSelect('isp');
+      syncIspQuickPills();
+    }
+  }
 });
 
 // 输入时即刻清除表单校验失败高亮与错误提示
