@@ -1188,12 +1188,12 @@ const makeEl = (id) => ({
   setAttribute(k, v) { this[k] = v; },
   getAttribute(k) { return this[k] || null; },
   addEventListener(t, f) { this['on' + t] = f; },
-  querySelector() { return null; },
+  querySelector(sel) { return sel === 'span' ? this : null; },
   querySelectorAll() { return []; },
   focus() {}
 });
 
-for (const id of ['heroHealthBadge', 'heroHealthScore', 'password', 'togglePwd', 'eyeIcon', 'btnTheme', 'themeLabel', 'toastBox', 'toastMsg', 'btnToggleMask', 'maskIcon', 'accentPaletteBar']) {
+for (const id of ['heroHealthBadge', 'heroHealthScore', 'password', 'togglePwd', 'eyeIcon', 'btnTheme', 'themeLabel', 'toastBox', 'toastMsg', 'btnToggleMask', 'maskIcon', 'accentPaletteBar', 'btnConfirmTest']) {
   els[id] = makeEl(id);
 }
 
@@ -1345,6 +1345,26 @@ let animCalled = false;
 ctx.requestAnimationFrame = (fn) => { animCalled = true; fn(); };
 vm.runInContext('triggerPulseAnimation([document.getElementById("heroHealthBadge")])', ctx);
 if (!animCalled) problems.push('triggerPulseAnimation 未利用 requestAnimationFrame');
+
+// --- 9. createPasswordToggle ---
+const pvt = vm.runInContext('createPasswordToggle({ inputId: "password", toggleBtnId: "togglePwd", iconId: "eyeIcon" })', ctx);
+if (els["password"].type !== "password") problems.push('密码框初始状态应为 password');
+pvt.toggle();
+if (els["password"].type !== "text") problems.push('PasswordToggle toggle() 后未变为 text');
+pvt.toggle();
+if (els["password"].type !== "password") problems.push('PasswordToggle 再次 toggle() 未变回 password');
+
+// --- 10. createConfirmButton ---
+let confirmTriggered = false;
+ctx.onConfirmTest = () => { confirmTriggered = true; };
+const cb = vm.runInContext('createConfirmButton("btnConfirmTest", { defaultText: "注销", confirmText: "确认注销？", onConfirm: onConfirmTest })', ctx);
+const testBtn = els["btnConfirmTest"];
+testBtn.onclick({ preventDefault() {} });
+if (!testBtn.classList.contains("confirming")) problems.push('ConfirmButton 首次点击未激活 confirming 类');
+if (confirmTriggered) problems.push('ConfirmButton 首次点击误触了 onConfirm 回调');
+testBtn.onclick({ preventDefault() {} });
+if (!confirmTriggered) problems.push('ConfirmButton 二次点击未触发 onConfirm 回调');
+if (testBtn.classList.contains("confirming")) problems.push('ConfirmButton 确认后未重置 confirming 状态');
 
 console.log(problems.length ? 'COMPONENT_RUNTIME_PROBLEMS:\n' + problems.join('\n') : 'COMPONENTS_RUNTIME_OK');
 """

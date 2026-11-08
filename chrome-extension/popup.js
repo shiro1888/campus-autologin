@@ -284,7 +284,7 @@ function refresh(onComplete) {
 const triggerTelemetryFade = () => triggerPulseAnimation('.dock-value');
 
 // --- 登录 / 重新验证 ---
-$('btnLogin').addEventListener('click', () => {
+$('btnLogin')?.addEventListener('click', () => {
   const btn = $('btnLogin');
   btn.disabled = true;
   btn.classList.add('loading');
@@ -412,7 +412,7 @@ if (brandAvatarEl) {
 }
 
 // --- 刷新按钮 ---
-$('btnRefresh').addEventListener('click', () => refresh());
+$('btnRefresh')?.addEventListener('click', () => refresh());
 
 // --- 内嵌式运营商直选抽屉面板组件 (In-Card ISP Quick Sheet) ---
 const accountIspEl = $('accountIsp');

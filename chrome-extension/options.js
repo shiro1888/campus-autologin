@@ -967,12 +967,15 @@ $('password')?.addEventListener('input', () => {
 
 // --- 即时保存的切换项 ---
 ['autoOnStartup', 'contentAutoFill', 'instantTrigger'].forEach((id) => {
-  $(id).addEventListener('change', () => {
-    save(() => showToast('设置已自动保存。', 'ok'));
-  });
+  const el = $(id);
+  if (el) {
+    el.addEventListener('change', () => {
+      save(() => showToast('设置已自动保存。', 'ok'));
+    });
+  }
 });
 
-$('adaptive').addEventListener('change', () => {
+$('adaptive')?.addEventListener('change', () => {
   syncOfflineRow();
   updatePolicySummaryPill();
   save(() => {
@@ -984,11 +987,14 @@ $('adaptive').addEventListener('change', () => {
 
 // --- 下拉框改动即时保存 ---
 ['intervalMin', 'offlineIntervalMin', 'isp'].forEach((id) => {
-  $(id).addEventListener('change', () => {
-    if (id === 'isp') syncIspQuickPills();
-    updatePolicySummaryPill();
-    save(() => showToast('参数已自动保存并生效。', 'ok'));
-  });
+  const el = $(id);
+  if (el) {
+    el.addEventListener('change', () => {
+      if (id === 'isp') syncIspQuickPills();
+      updatePolicySummaryPill();
+      save(() => showToast('参数已自动保存并生效。', 'ok'));
+    });
+  }
 });
 
 // --- 启动初始化 ---
@@ -1012,6 +1018,10 @@ const statusPoller = createVisibilityPoller(refreshStatus, 15000);
 const accentPicker = createAccentPicker({
   barId: 'accentPaletteBar',
   onNotify: (msg) => showToast(msg, 'ok')
+});
+
+window.addEventListener('pagehide', () => {
+  durationTicker.stop();
 });
 
 
