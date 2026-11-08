@@ -135,6 +135,36 @@ class TestExtensionStructure(unittest.TestCase):
         missing = js_ids - html_ids
         self.assertEqual(len(missing), 0, f"options.js references missing IDs: {missing}")
 
+    def test_component_config_dom_ids_exist(self):
+        """组件配置对象里传入的 DOM ID 也必须真实存在。
+
+        上面两个 *_dom_id_contract 只扫 $('id') / getElementById('id')，
+        但共享组件普遍通过配置对象拿 ID：
+            createActivityTimeline({ listId: 'logTimelineList', ... })
+            createFlowMeter({ wrapId: 'optFlowBarWrap', ... })
+            createToastManager({ boxId: 'msgBox', ... })
+        这类键写错时组件只拿到 null：既不抛异常，也不会往 DOM 写 undefined，
+        表现为「某块 UI 静默不工作」，现有测试完全抓不到。
+        """
+        sentinel = {"popup.js": "msgBox", "options.js": "logTimelineList"}
+        for js_name, html_name in (("popup.js", "popup.html"), ("options.js", "options.html")):
+            with open(os.path.join(EXT_DIR, html_name), "r", encoding="utf-8") as f:
+                html_ids = set(re.findall(r'id=["\']([^"\']+)["\']', f.read()))
+            with open(os.path.join(EXT_DIR, js_name), "r", encoding="utf-8") as f:
+                js_src = f.read()
+            cfg_ids = re.findall(
+                r'\b(?:[A-Za-z]+Id|[A-Za-z]+El|target)\s*:\s*["\']([A-Za-z0-9_-]+)["\']',
+                js_src,
+            )
+            # 防止正则退化成「扫不到任何东西」的假绿
+            self.assertIn(sentinel[js_name], cfg_ids,
+                          f"{js_name} 未能提取到已知配置 ID，检查扫描规则")
+            self.assertGreaterEqual(len(cfg_ids), 10,
+                                    f"{js_name} 提取到的配置 ID 过少，扫描规则可能失效")
+            missing = sorted(set(cfg_ids) - html_ids)
+            self.assertEqual(missing, [],
+                             f"{js_name} 的组件配置引用了不存在的 DOM ID（会静默失效）")
+
     def test_noopener_on_external_links(self):
         for html_name in ("popup.html", "options.html"):
             hp = os.path.join(EXT_DIR, html_name)

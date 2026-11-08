@@ -75,7 +75,7 @@ campus-autologin/
 │   ├── manifest.json          MV3 清单
 │   ├── background.js          Service Worker：定时检查 + 自动重连 + webNavigation 监听
 │   ├── content.js             登录页自动填写与 HUD 提示
-│   ├── common.js              公共模块：时间格式化、流量换算、状态秒表
+│   ├── common.js              共享组件库：格式化工具 + 计时器/波形图/时间轴/Toast/主题/健康度等 UI 组件
 │   ├── popup.html/js/css      工具栏弹出面板
 │   ├── options.html/js/css    控制中心设置页
 │   ├── icons/                 各尺寸图标
