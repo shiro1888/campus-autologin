@@ -95,62 +95,107 @@ try {
     Write-Host "  [PASS] 测试 1 通过：错误密码被前置检查拦截（退出码 1，匹配预期拦截），历史 0 改动。" -ForegroundColor Green
 
     # -------------------------------------------------------------
-    # 测试用例 2: 真实旧凭据全流程脱敏与自检验证
-    # 依赖环境变量 CAMPUS_LEAKED_PASSWORD 与 CAMPUS_LEAKED_ACCOUNT
+    # 测试用例 2: 凭据清洗全流程脱敏与多重自检
+    #
+    # 旧版只在「注入了真实历史旧凭据」时才跑重写主路径，而本仓库历史已清洗
+    # 完成，该条件永远不成立 —— clean_history.ps1 的 filter-repo 重写、替换
+    # 规则、5 层自检、origin 恢复、reflog/gc 清理从未被真正执行验证过。
+    #
+    # 现在改为：优先用环境变量注入的真实凭据（若历史中确实存在）；否则在
+    # **隔离克隆**里植入一组随机虚构凭据 + config.json 并提交，构造出含泄露
+    # 记录的历史，再完整跑一遍清洗流程。这样主路径在任何环境都能被执行，
+    # 且全程只在临时克隆里操作，绝不污染真实仓库。
     # -------------------------------------------------------------
     Write-Host ""
-    Write-Host "  [测试 2/2] 验证【真实旧凭据】清洗全流程与多重自检..." -ForegroundColor Yellow
+    Write-Host "  [测试 2/2] 验证【凭据清洗】全流程与多重自检..." -ForegroundColor Yellow
 
-    $realPass = $env:CAMPUS_LEAKED_PASSWORD
-    $realAcc  = $env:CAMPUS_LEAKED_ACCOUNT
-
-    if (-not $realPass -or -not $realAcc) {
-        $skippedTests++
-        Write-Host "  [SKIP] 未设置环境变量 CAMPUS_LEAKED_PASSWORD / CAMPUS_LEAKED_ACCOUNT。" -ForegroundColor Yellow
-        Write-Host "         跳过依赖真实泄露凭据的重写用例（在历史已清洗干净的环境中，此为预期行为）。" -ForegroundColor Yellow
+    # 工具可用性守卫：缺 git-filter-repo 时如实 SKIP，避免误报失败
+    $hasFilterRepo = $false
+    if (Get-Command "git-filter-repo" -ErrorAction SilentlyContinue) {
+        $hasFilterRepo = $true
     } else {
-        # 先确认克隆库历史中是否存在该旧凭据
-        $preCheckHits = (git -C $tmpClone log --all --oneline "-S$realPass")
-        if (-not $preCheckHits) {
-            $skippedTests++
-            Write-Host "  [SKIP] 克隆库历史中已无该旧凭据记录（仓库已被清洗干净），跳过重写用例。" -ForegroundColor Yellow
-        } else {
-            $p2 = Start-Process powershell -ArgumentList "-NoProfile", "-File", "`"$scriptInClone`"", "-Account", "`"$realAcc`"", "-Password", "`"$realPass`"" -NoNewWindow -Wait -PassThru -RedirectStandardOutput (Join-Path $tmpClone "test2_stdout.txt") -RedirectStandardError (Join-Path $tmpClone "test2_stderr.txt")
-
-            $out2 = if (Test-Path (Join-Path $tmpClone "test2_stdout.txt")) { Get-Content (Join-Path $tmpClone "test2_stdout.txt") -Raw -Encoding UTF8 } else { "" }
-
-            if ($p2.ExitCode -ne 0) {
-                Write-Host "  [失败] 凭据清洗失败，退出码 $($p2.ExitCode)。输出:" -ForegroundColor Red
-                Write-Host $out2 -ForegroundColor DarkGray
-                exit 1
-            }
-
-            if ($out2 -notmatch "自检全部通过") {
-                Write-Host "  [失败] 清洗脚本未输出自检通过标识！" -ForegroundColor Red
-                Write-Host $out2 -ForegroundColor DarkGray
-                exit 1
-            }
-
-            # 深度复核克隆库中的全历史 Commit Blob
-            $remainPass = (git -C $tmpClone log --all --oneline "-S$realPass")
-            $remainAcc  = (git -C $tmpClone log --all --oneline "-S$realAcc")
-            $remainCfg  = (git -C $tmpClone log --all --oneline -- config.json)
-
-            if ($remainPass) {
-                Write-Host "  [失败] 历史中仍残留密码记录！" -ForegroundColor Red
-                exit 1
-            }
-            if ($remainAcc) {
-                Write-Host "  [失败] 历史中仍残留账号记录！" -ForegroundColor Red
-                exit 1
-            }
-            if ($remainCfg) {
-                Write-Host "  [失败] 历史中仍残留 config.json！" -ForegroundColor Red
-                exit 1
-            }
-
-            Write-Host "  [PASS] 测试 2 通过：全流程成功执行（退出码 0），全历史目标凭据/config.json 残留全部为 0。" -ForegroundColor Green
+        $pyCheck = Start-Process python -ArgumentList "-m git_filter_repo --version" -NoNewWindow -Wait -PassThru -ErrorAction SilentlyContinue
+        if ($pyCheck -and $pyCheck.ExitCode -eq 0) { $hasFilterRepo = $true }
+    }
+    if (-not $hasFilterRepo) {
+        $skippedTests++
+        Write-Host "  [SKIP] 未检测到 git-filter-repo，跳过清洗主路径（pip install git-filter-repo 后可全量验证）。" -ForegroundColor Yellow
+    } else {
+        $realPass = $env:CAMPUS_LEAKED_PASSWORD
+        $realAcc  = $env:CAMPUS_LEAKED_ACCOUNT
+        $useReal  = $false
+        if ($realPass -and $realAcc) {
+            $preCheckHits = (git -C $tmpClone log --all --oneline "-S$realPass")
+            if ($preCheckHits) { $useReal = $true }
         }
+
+        if ($useReal) {
+            Write-Host "  [模式] 使用环境变量注入的历史真实旧凭据。" -ForegroundColor Gray
+            $targetPass = $realPass
+            $targetAcc  = $realAcc
+        } else {
+            # 在隔离克隆里植入虚构泄露记录：随机 GUID 保证与任何真实凭据无关，
+            # 且绝不会写回主仓库。config.json 同时构造，用于验证 --invert-paths。
+            Write-Host "  [模式] 在隔离克隆中植入随机虚构凭据，构造可清洗的历史。" -ForegroundColor Gray
+            $targetPass = "E2E_LEAKED_PASS_" + [System.Guid]::NewGuid().ToString("N")
+            $targetAcc  = "E2E_LEAKED_ACC_"  + [System.Guid]::NewGuid().ToString("N")
+            $cfgPath = Join-Path $tmpClone "config.json"
+            [System.IO.File]::WriteAllText(
+                $cfgPath,
+                "{`"account`": `"$targetAcc`", `"password`": `"$targetPass`"}`n",
+                (New-Object System.Text.UTF8Encoding($false)))
+            # .gitignore 明确忽略 config.json（防御性规则），必须用 -f 才能在
+            # 隔离克隆里把它作为「历史遗留配置文件」植入提交。
+            git -C $tmpClone add -f config.json | Out-Null
+            git -C $tmpClone -c user.name="e2e-test" -c user.email="e2e@local.invalid" commit -m "e2e: plant synthetic leaked credentials" --quiet
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "  [失败] 无法在隔离克隆中植入测试提交。" -ForegroundColor Red
+                exit 1
+            }
+            # 前置断言：凭据确实存在于历史中（否则下面的清洗流程会走「安全终止」分支，形成假绿）
+            $plantedPass = (git -C $tmpClone log --all --oneline "-S$targetPass")
+            $plantedAcc  = (git -C $tmpClone log --all --oneline "-S$targetAcc")
+            if (-not $plantedPass -or -not $plantedAcc) {
+                Write-Host "  [失败] 植入的虚构凭据未出现在历史中，测试前提不成立。" -ForegroundColor Red
+                exit 1
+            }
+        }
+
+        $p2 = Start-Process powershell -ArgumentList "-NoProfile", "-File", "`"$scriptInClone`"", "-Account", "`"$targetAcc`"", "-Password", "`"$targetPass`"" -NoNewWindow -Wait -PassThru -RedirectStandardOutput (Join-Path $tmpClone "test2_stdout.txt") -RedirectStandardError (Join-Path $tmpClone "test2_stderr.txt")
+
+        $out2 = if (Test-Path (Join-Path $tmpClone "test2_stdout.txt")) { Get-Content (Join-Path $tmpClone "test2_stdout.txt") -Raw -Encoding UTF8 } else { "" }
+
+        if ($p2.ExitCode -ne 0) {
+            Write-Host "  [失败] 凭据清洗失败，退出码 $($p2.ExitCode)。输出:" -ForegroundColor Red
+            Write-Host $out2 -ForegroundColor DarkGray
+            exit 1
+        }
+
+        if ($out2 -notmatch "自检全部通过") {
+            Write-Host "  [失败] 清洗脚本未输出自检通过标识！" -ForegroundColor Red
+            Write-Host $out2 -ForegroundColor DarkGray
+            exit 1
+        }
+
+        # 深度复核克隆库中的全历史 Commit Blob
+        $remainPass = (git -C $tmpClone log --all --oneline "-S$targetPass")
+        $remainAcc  = (git -C $tmpClone log --all --oneline "-S$targetAcc")
+        $remainCfg  = (git -C $tmpClone log --all --oneline -- config.json)
+
+        if ($remainPass) {
+            Write-Host "  [失败] 历史中仍残留密码记录！" -ForegroundColor Red
+            exit 1
+        }
+        if ($remainAcc) {
+            Write-Host "  [失败] 历史中仍残留账号记录！" -ForegroundColor Red
+            exit 1
+        }
+        if ($remainCfg) {
+            Write-Host "  [失败] 历史中仍残留 config.json！" -ForegroundColor Red
+            exit 1
+        }
+
+        Write-Host "  [PASS] 测试 2 通过：全流程成功执行（退出码 0），全历史目标凭据/config.json 残留全部为 0。" -ForegroundColor Green
     }
 
     # -------------------------------------------------------------
@@ -167,11 +212,10 @@ try {
     Write-Host ""
     Write-Host "============================================================" -ForegroundColor Green
     if ($skippedTests -gt 0) {
-        # 不能报 100%：依赖真实旧凭据的重写用例在本仓库永远无法执行，
-        # 必须如实标注为部分通过，避免"测试全绿"掩盖未覆盖的路径。
+        # 不能报 100%：如实标注被跳过的用例，避免「测试全绿」掩盖未覆盖的路径。
         Write-Host "  [PARTIAL] 已通过：错误密码拦截 + 主仓库隔离核验。" -ForegroundColor Yellow
-        Write-Host "  [PARTIAL] 已跳过：$skippedTests 个依赖历史旧凭据的重写用例。" -ForegroundColor Yellow
-        Write-Host "            （历史已清洗干净时属预期；需全量验证请注入 CAMPUS_LEAKED_* 环境变量）" -ForegroundColor Yellow
+        Write-Host "  [PARTIAL] 已跳过：$skippedTests 个用例（通常为缺少 git-filter-repo 工具）。" -ForegroundColor Yellow
+        Write-Host "            （清洗主路径现通过隔离克隆内植入虚构凭据验证，不再依赖真实历史泄露记录）" -ForegroundColor Yellow
     } else {
         Write-Host "  端到端自动化测试全部通过 (100% SUCCESS)！" -ForegroundColor Green
     }

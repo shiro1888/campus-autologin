@@ -34,6 +34,11 @@ const BACKOFF_GRACE_ATTEMPTS = 10;
 
 // 瞬时触发的节流窗口：短时间内的连续导航失败只触发一次
 const INSTANT_THROTTLE_MS = 15000;
+// autoLogin 因并发被跳过时的重试窗口。断网时导航失败是洪水式事件，
+// 若「跳过就完全归还 15 秒窗口」，会形成「跳过→立刻重试→再跳过」的无限循环，
+// 每个事件都调一次 autoLogin（实测 30 个事件调用 30 次）。改为只缩短到
+// 1 秒：真正需要抢修的那次最多等 1 秒（而非 15 秒），洪水又被限到每秒 1 次。
+const INSTANT_RETRY_AFTER_SKIP_MS = 1000;
 
 // 只有「网络层」错误才可能意味着校园网断了。白名单之外的（如 net::ERR_ABORTED
 // —— 用户按 ESC 中断加载）一律忽略，否则随便一个打不开的页面都会白唤醒一次门户请求。
@@ -254,7 +259,10 @@ async function getSettings() {
   const s = {
     account: typeof stored.account === 'string' && stored.account ? stored.account : DEFAULT_SETTINGS.account,
     password: typeof stored.password === 'string' && stored.password ? stored.password : DEFAULT_SETTINGS.password,
-    isp: stored.isp ? String(stored.isp) : DEFAULT_SETTINGS.isp,
+    // isp 只接受 1-4：storage 可能被手改、旧版本残留或恶意导入注入任意字符串。
+    // content.js 早期版本曾把它拼进 CSS 选择器（现已改为线性匹配），但后台同样
+    // 应做归一化，避免非法 R3 参数被直接发给门户、造成防御纵深不一致。
+    isp: (stored.isp && /^[1-4]$/.test(String(stored.isp))) ? String(stored.isp) : DEFAULT_SETTINGS.isp,
     intervalMin: clampInterval(stored.intervalMin),
     offlineIntervalMin: clampInterval(
       stored.offlineIntervalMin === undefined ? DEFAULT_SETTINGS.offlineIntervalMin : stored.offlineIntervalMin),
@@ -1104,18 +1112,24 @@ async function initDefaults() {
 function setupInstantTriggers() {
   if (!chrome.webNavigation) return;
 
-  let lastInstantAt = 0;   // 上次触发时间戳，用于节流
+  let lastInstantAt = 0;        // 上次「提交瞬时触发」的时间戳，用于节流（提交即占用）
+  let instantInFlight = false;  // 一次瞬时触发已提交、尚未结算（防止在途期间重复提交）
 
-  /** 节流通过返回 false；距上次触发不足 INSTANT_THROTTLE_MS 则返回 true */
-  function throttled() {
-    const now = Date.now();
-    if (now - lastInstantAt < INSTANT_THROTTLE_MS) return true;
-    lastInstantAt = now;
-    return false;
+  /** 距上次成功触发不足 INSTANT_THROTTLE_MS 则返回 true（纯判定，不占用窗口） */
+  function isThrottled() {
+    return Date.now() - lastInstantAt < INSTANT_THROTTLE_MS;
   }
 
   /**
-   * 统一入口：检查开关 -> 节流 -> 发起登录。
+   * 统一入口：检查开关 -> 节流 -> 在途去重 -> 发起登录。
+   *
+   * 节流窗口在「提交时」就占用，因为断网时导航失败是洪水式事件；若等到
+   * autoLogin 结算后再占用，同一批事件会在 await 期间全部通过判定、并发涌入。
+   * 但若这一轮因后台已有认证在跑（running / activeAuthOp）被跳过，15 秒的完整
+   * 窗口会把真正需要抢修的那次挡在外面 —— 故此时把窗口缩短为
+   * INSTANT_RETRY_AFTER_SKIP_MS（1 秒）再放行：既能尽快重试，又把洪水限制在
+   * 每秒 1 次。手动注销暂停（paused）是确定性跳过，保留完整窗口避免空转。
+   *
    * @param {string} label 日志用的触发来源
    * @param {function(): Promise<*>} [pre] 额外前置条件，返回 false 则放弃
    */
@@ -1124,12 +1138,29 @@ function setupInstantTriggers() {
       chrome.storage.local.get({ instantTrigger: true }, (s) => {
         if (!s || s.instantTrigger === false) return;
         if (pre && !pre()) return;
-        if (throttled()) return;
+        if (isThrottled() || instantInFlight) return;
+        instantInFlight = true;
+        // 提交即占用窗口：挡住同一批洪水事件，避免它们在 await 期间并发涌入
+        lastInstantAt = Date.now();
         console.log('[instant] ' + label);
-        autoLogin(label);
+        // 放进 Promise 链再调用，让 autoLogin 的同步抛错也走统一的 .catch
+        // 复位路径（外层 storage 回调虽然也有 try/catch，但不应依赖它来维护
+        // 这个状态标志）。同时保证 .then 里读到的返回值一定是已解析的结果。
+        Promise.resolve().then(() => autoLogin(label))
+          .then((r) => {
+            instantInFlight = false;
+            // 被并发跳过且非用户主动注销：把窗口回拨为「只剩 1 秒」，
+            // 让断网能在结算后再等 1 秒就重试（而非干等 15 秒），同时把同一批
+            // 洪水事件限在每秒 1 次。以 Date.now()（结算时刻）为基准回拨，
+            // 因此 autoLogin 本身耗时多久都不影响剩余等待时间。
+            if (r && r.skipped && !r.paused) {
+              lastInstantAt = Date.now() - (INSTANT_THROTTLE_MS - INSTANT_RETRY_AFTER_SKIP_MS);
+            }
+          })
+          .catch(() => { instantInFlight = false; });
       });
     } catch (e) {
-      // 忽略
+      instantInFlight = false;
     }
   }
 
@@ -1270,8 +1301,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'clearLogs') {
-    eventLogs = [];
-    setState({ eventLogs: [] })
+    // 必须与 saveResult 一样先恢复运行态：冷启动时模块级 eventLogs 为空，
+    // 若并发的 status / checkStatus 在本条 set 落盘之前触发 hydrateState，
+    // 其 !eventLogs.length 条件会把磁盘上的旧日志重新灌回内存，随后又被
+    // 下一次 saveResult 写回 —— 清空操作被静默撤销。
+    hydrateState()
+      .then(() => {
+        eventLogs = [];
+        return setState({ eventLogs: [] });
+      })
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }));
     return true;

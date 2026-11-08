@@ -453,12 +453,35 @@
           return;
         }
         const token = res.token;
+        let released = false;
         function release() {
+          if (released) return;
+          released = true;
+          window.removeEventListener('pagehide', release);
+          window.removeEventListener('beforeunload', release);
           try { chrome.runtime.sendMessage({ type: 'releaseAuthLock', token: token }); } catch (e) {}
         }
-        var p = fn();
+
+        // 关键：btn.click() 若触发表单提交，页面会立刻开始导航，旧文档的 JS
+        // 上下文被销毁 —— 5 秒后的兜底复查回调与 p.then(release) 都不会执行。
+        // 卸载事件是此刻唯一还能运行的代码路径，尝试主动归还锁：多数情况下
+        // sendMessage 能在卸载前送达，把后台从 40 秒等待里立刻解放出来。
+        // 注意：pagehide 期间 sendMessage 不保证送达（MV3 已知限制），因此
+        // 后台「令牌 + 40s 租期」仍是强杀/消息丢失时的最终兜底，二者缺一不可。
+        window.addEventListener('pagehide', release);
+        window.addEventListener('beforeunload', release);
+
+        let p;
+        try {
+          p = fn();
+        } catch (e) {
+          release();
+          return;
+        }
         if (p && typeof p.then === 'function') {
-          p.finally(release);
+          // 用两参数 then 而非 finally：既不产生未处理的 rejection，
+          // 成功/失败两条路径也都会归还锁。
+          p.then(release, release);
         } else {
           release();
         }
