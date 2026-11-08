@@ -1663,6 +1663,27 @@ body {
   box-shadow: 0 10px 24px -4px rgba(37, 99, 235, 0.18), 0 4px 12px -2px rgba(15, 23, 42, 0.08), inset 0 1px 0 #ffffff;
 }
 
+/* Warning Theme —— createToastManager 的单体胶囊模式支持 warn 分支（琥珀色），
+   与 options.css 的 .toast-bar.warn 同源配色；此前缺失会让 warn 提示只剩图标、没有主题样式 */
+.msg-box.warn {
+  background: rgba(15, 23, 42, 0.90);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.35), 0 0 16px -2px rgba(245, 158, 11, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.msg-box.warn .msg-icon {
+  background: rgba(245, 158, 11, 0.18);
+  color: #f59e0b;
+}
+
+[data-theme="light"] .msg-box.warn {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #d97706;
+  box-shadow: 0 10px 24px -4px rgba(245, 158, 11, 0.18), 0 4px 12px -2px rgba(15, 23, 42, 0.08), inset 0 1px 0 #ffffff;
+}
+
 /* ==========================================================================
    Action Buttons with Shimmer Light Beam
    ========================================================================== */

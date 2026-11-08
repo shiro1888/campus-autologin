@@ -166,7 +166,7 @@ function refresh(onComplete) {
   let paused = false;
 
   chrome.storage.local.get(
-    ['account', 'isp', 'intervalMin', 'offlineIntervalMin', 'adaptive', 'lastResult', 'privacyMask'],
+    ['account', 'isp', 'lastResult', 'privacyMask'],
     (s) => {
       currentAccount = (s && typeof s.account === 'string') ? s.account : '';
       if (s && s.privacyMask !== undefined) {

@@ -465,6 +465,35 @@ if (problems.length) {
         missing = [c for c in emitted if ("." + c) not in css]
         self.assertEqual(missing, [], f"options.css 缺少时间轴样式规则: {missing}")
 
+    def test_toast_kind_css_rules_exist(self):
+        """createToastManager 的全部 kind 必须在两种宿主样式表中都有对应主题规则。
+
+        组件支持 ok / err / warn / info 四种 kind，输出两种 DOM 形态：
+          - popup 单体胶囊模式：`.msg-box <kind>`（popup.css）
+          - options 堆叠模式：  `.toast-bar <kind>`（options.css）
+        warn 图标曾在组件重构中丢失（c545129 修复但当时未附测试）；图标修复后
+        popup.css 仍缺 .msg-box.warn 琥珀色主题 —— warn 提示在弹窗里只剩图标、
+        没有任何配色，属于「回归只补了一半」。本用例把「图标 + 样式」两条腿
+        一起锁定，任一缺失即报错。
+        """
+        with open(os.path.join(EXT_DIR, "common.js"), "r", encoding="utf-8") as f:
+            common = f.read()
+        # 从源码提取组件实际支持的 kind（toastIconKind 直通 ok/err/warn，其余退化为 info）
+        kinds = set(re.findall(r"kind === '([a-z]+)'", common)) | {"info"}
+        self.assertEqual(
+            sorted(kinds), ["err", "info", "ok", "warn"],
+            f"toastIconKind 支持的 kind 集合变化后，请同步维护本用例与两端 CSS: {sorted(kinds)}",
+        )
+        with open(os.path.join(EXT_DIR, "popup.css"), "r", encoding="utf-8") as f:
+            popup_css = f.read()
+        with open(os.path.join(EXT_DIR, "options.css"), "r", encoding="utf-8") as f:
+            options_css = f.read()
+        for kind in sorted(kinds):
+            self.assertIn(".msg-box." + kind, popup_css,
+                          f"popup.css 缺少 .msg-box.{kind} 主题（单体胶囊模式该类提示会无样式）")
+            self.assertIn(".toast-bar." + kind, options_css,
+                          f"options.css 缺少 .toast-bar.{kind} 主题（堆叠模式该类提示会无样式）")
+
     def test_css_custom_properties_defined(self):
         """CSS 中 var(--x) 引用的自定义属性必须在同一文件里有定义。
 
