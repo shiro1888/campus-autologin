@@ -32,37 +32,15 @@ $('toastBar')?.addEventListener('click', () => {
   dismissToast($('toastBar'));
 });
 
-/** 自习室防窥遮罩管理 */
-let isMasked = false;
-
-function updateAccountMaskDisplay() {
-  const accInput = $('account');
-  const maskBtn = $('btnToggleMask');
-  const maskIcon = $('maskIcon');
-  if (!accInput) return;
-
-  if (isMasked) {
-    accInput.classList.add('account-masked');
-    if (maskBtn) {
-      maskBtn.classList.add('active');
-      maskBtn.title = '当前：自习室防窥（点击显示明文）';
-      maskBtn.setAttribute('aria-label', '当前：自习室防窥（点击显示明文）');
-    }
-    if (maskIcon) {
-      maskIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
-    }
-  } else {
-    accInput.classList.remove('account-masked');
-    if (maskBtn) {
-      maskBtn.classList.remove('active');
-      maskBtn.title = '当前：明文显示（点击开启自习室防窥）';
-      maskBtn.setAttribute('aria-label', '当前：明文显示（点击开启自习室防窥）');
-    }
-    if (maskIcon) {
-      maskIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
-    }
-  }
-}
+/** 自习室防窥遮罩管理组件 (Component: createPrivacyMaskManager) */
+const privacyMask = createPrivacyMaskManager({
+  toggleBtnId: 'btnToggleMask',
+  iconId: 'maskIcon',
+  onUpdate: (masked) => {
+    $('account')?.classList.toggle('account-masked', masked);
+  },
+  onNotify: (msg) => showToast(msg, 'info', 2000)
+});
 
 /** 动态在线计时器与可视化组件 (来自 common.js 组件库) */
 const durationTicker = createTicker((text) => {
@@ -216,9 +194,7 @@ function load() {
     }
   }
 
-  chrome.storage.local.get(Object.assign({}, DEFAULTS, { privacyMask: false }), (s) => {
-    isMasked = !!s.privacyMask;
-    updateAccountMaskDisplay();
+  chrome.storage.local.get(DEFAULTS, (s) => {
     // 只接受字符串：storage 里的值可能被手改或来自旧版本。
     // 注意不能只用 String() —— String({}) 会得到字面量 "[object Object]"，照样显示难看。
     // 非字符串一律当作空值处理（下面 isp 也用同样的思路）。
@@ -500,15 +476,8 @@ function refreshStatus(cb) {
   });
 }
 
-/** 遥测数据刷新时的平滑微动效 */
-function triggerTelemetryFade() {
-  const vals = document.querySelectorAll('.stat-val, .topo-val');
-  vals.forEach((el) => {
-    el.classList.remove('val-pulse');
-    void el.offsetWidth;
-    el.classList.add('val-pulse');
-  });
-}
+/** 遥测数据刷新时的平滑微动效 (Component: triggerPulseAnimation, 60fps 无 Layout Thrashing) */
+const triggerTelemetryFade = () => triggerPulseAnimation('.stat-val, .topo-val');
 
 
 /** 读取表单当前值 */
@@ -950,21 +919,8 @@ if ($('btnImportConfig') && $('importFileInput')) {
   });
 }
 
-// --- 自习室防窥模式切换 ---
-$('btnToggleMask')?.addEventListener('click', (e) => {
-  e.preventDefault();
-  isMasked = !isMasked;
-  chrome.storage.local.set({ privacyMask: isMasked });
-  updateAccountMaskDisplay();
-  showToast(isMasked ? '已开启自习室防窥模式' : '已恢复明文显示', 'info', 2000);
-});
-
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
-  if (changes.privacyMask) {
-    isMasked = !!changes.privacyMask.newValue;
-    updateAccountMaskDisplay();
-  }
   if (changes.lastResult) {
     const r = changes.lastResult.newValue;
     const text = (v) => (typeof v === 'string' || typeof v === 'number') ? String(v) : '';
@@ -1049,69 +1005,13 @@ if (/Mac/i.test(navigator.platform || navigator.userAgent)) {
   }
 }
 
-// 当偏好设置页面在前台激活时，每 15 秒自动向后台刷新一次网关状态（流量与Ping）
-const statusPollTimer = setInterval(() => {
-  if (document.visibilityState === 'visible') {
-    refreshStatus();
-  }
-}, 15000);
+// --- 智能前台状态轮询组件 (Component: createVisibilityPoller) ---
+const statusPoller = createVisibilityPoller(refreshStatus, 15000);
 
-// 标签页重新切回前台时立即快速刷新
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    refreshStatus();
-  }
+// --- 强调色切换选择器 (Component: createAccentPicker) ---
+const accentPicker = createAccentPicker({
+  barId: 'accentPaletteBar',
+  onNotify: (msg) => showToast(msg, 'ok')
 });
-
-// 页面卸载时清理所有计时器
-window.addEventListener('beforeunload', () => {
-  clearInterval(statusPollTimer);
-  durationTicker.stop();
-});
-
-// --- 强调色切换选择器 ---
-function setAccentColor(accent) {
-  chrome.storage.local.set({ accentColor: accent }, () => {
-    applyAccent(accent);
-    syncAccentDots(accent);
-    showToast(`已应用强调色：${getAccentName(accent)}`, 'ok');
-  });
-}
-
-function getAccentName(accent) {
-  const map = {
-    blue: '科技蓝',
-    purple: '极光紫',
-    emerald: '翡翠绿',
-    amber: '落日橙',
-    rose: '玫瑰粉'
-  };
-  return map[accent] || '默认蓝';
-}
-
-function syncAccentDots(currentAccent) {
-  const dots = document.querySelectorAll('.accent-dot');
-  dots.forEach((dot) => {
-    if (dot.dataset.accent === currentAccent) {
-      dot.classList.add('active');
-    } else {
-      dot.classList.remove('active');
-    }
-  });
-}
-
-function initAccentColorPicker() {
-  initAccent((cur) => syncAccentDots(cur));
-  const bar = $('accentPaletteBar');
-  if (!bar) return;
-  bar.addEventListener('click', (e) => {
-    const dot = e.target.closest('.accent-dot');
-    if (!dot) return;
-    const acc = dot.dataset.accent;
-    if (acc) setAccentColor(acc);
-  });
-}
-
-initAccentColorPicker();
 
 

@@ -55,12 +55,18 @@ const setMsg = (text, kind, autoDismissMs = 3200) => popupToast.show(text, kind,
 
 let currentIp = '';
 let currentAccount = '';
-let isMasked = false;
+
+/** 自习室防窥遮罩管理组件 (Component: createPrivacyMaskManager) */
+const privacyMask = createPrivacyMaskManager({
+  toggleBtnId: 'btnToggleMask',
+  iconId: 'maskIcon',
+  onUpdate: () => updateAccountDisplay(),
+  onNotify: (msg) => setMsg(msg, 'info', 1600)
+});
 
 function updateAccountDisplay() {
   const accEl = $('account');
   const maskBtn = $('btnToggleMask');
-  const maskIcon = $('maskIcon');
   const copyBtn = $('btnCopyAccount');
   if (!accEl) return;
 
@@ -97,24 +103,15 @@ function updateAccountDisplay() {
   }
   accEl.classList.remove('unset');
 
-  if (isMasked) {
+  const masked = privacyMask.isMasked();
+  if (masked) {
     accEl.textContent = maskAccount(currentAccount);
     accEl.classList.add('masked');
     accEl.title = '自习室防窥模式（点击切换明文显示）';
-    if (maskBtn) {
-      maskBtn.classList.add('active');
-      maskBtn.title = '当前：自习室防窥（点击显示明文）';
-    }
-    if (maskIcon) maskIcon.innerHTML = ICONS.eyeOff;
   } else {
     accEl.textContent = currentAccount;
     accEl.classList.remove('masked');
     accEl.title = `点击开启自习室防窥: ${currentAccount}`;
-    if (maskBtn) {
-      maskBtn.classList.remove('active');
-      maskBtn.title = '当前：明文显示（点击开启自习室防窥）';
-    }
-    if (maskIcon) maskIcon.innerHTML = ICONS.eyeOpen;
   }
 }
 
@@ -172,7 +169,9 @@ function refresh(onComplete) {
     ['account', 'isp', 'intervalMin', 'offlineIntervalMin', 'adaptive', 'lastResult', 'privacyMask'],
     (s) => {
       currentAccount = (s && typeof s.account === 'string') ? s.account : '';
-      isMasked = !!(s && s.privacyMask);
+      if (s && s.privacyMask !== undefined) {
+        privacyMask.setMasked(s.privacyMask);
+      }
       updateAccountDisplay();
       syncIspDisplay((s && s.isp) || '1');
 
@@ -281,15 +280,8 @@ function refresh(onComplete) {
   });
 }
 
-/** 遥测数据刷新时的平滑微动效 */
-function triggerTelemetryFade() {
-  const vals = document.querySelectorAll('.dock-value');
-  vals.forEach((el) => {
-    el.classList.remove('val-pulse');
-    void el.offsetWidth;
-    el.classList.add('val-pulse');
-  });
-}
+/** 遥测数据刷新时的平滑微动效 (Component: triggerPulseAnimation, 60fps 无 Layout Thrashing) */
+const triggerTelemetryFade = () => triggerPulseAnimation('.dock-value');
 
 // --- 登录 / 重新验证 ---
 $('btnLogin').addEventListener('click', () => {
@@ -382,17 +374,6 @@ if (popGwTag) {
   });
 }
 
-// --- 自习室防窥模式切换 ---
-function togglePrivacyMask(e) {
-  if (e) e.stopPropagation();
-  isMasked = !isMasked;
-  chrome.storage.local.set({ privacyMask: isMasked });
-  updateAccountDisplay();
-  setMsg(isMasked ? '已开启自习室防窥模式' : '已恢复明文显示', 'info', 1600);
-}
-
-$('btnToggleMask')?.addEventListener('click', togglePrivacyMask);
-
 $('account')?.addEventListener('click', (e) => {
   e.stopPropagation();
   if (!currentAccount) {
@@ -403,7 +384,7 @@ $('account')?.addEventListener('click', (e) => {
     }
     return;
   }
-  togglePrivacyMask(e);
+  privacyMask.toggle();
 });
 
 $('msgBox')?.addEventListener('click', () => {
@@ -501,10 +482,6 @@ const popupThemeManager = createThemeManager({
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
-  if (changes.privacyMask) {
-    isMasked = !!changes.privacyMask.newValue;
-    updateAccountDisplay();
-  }
   if (changes.isp) {
     syncIspDisplay(changes.isp.newValue);
   }

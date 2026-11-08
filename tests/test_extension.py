@@ -193,6 +193,10 @@ class TestExtensionStructure(unittest.TestCase):
             "createNetworkHealthMeter",
             "generateDiagnosticSnapshot",
             "initCustomSelects",
+            "createPrivacyMaskManager",
+            "createAccentPicker",
+            "createVisibilityPoller",
+            "triggerPulseAnimation",
             "classifyPing",
             "resolveSessionDuration",
             "getIspMeta",
@@ -1189,7 +1193,7 @@ const makeEl = (id) => ({
   focus() {}
 });
 
-for (const id of ['heroHealthBadge', 'heroHealthScore', 'password', 'togglePwd', 'eyeIcon', 'btnTheme', 'themeLabel', 'toastBox', 'toastMsg']) {
+for (const id of ['heroHealthBadge', 'heroHealthScore', 'password', 'togglePwd', 'eyeIcon', 'btnTheme', 'themeLabel', 'toastBox', 'toastMsg', 'btnToggleMask', 'maskIcon', 'accentPaletteBar']) {
   els[id] = makeEl(id);
 }
 
@@ -1313,6 +1317,34 @@ tm.apply('dark');
 if (themeAttrs['data-theme'] !== 'dark') problems.push('ThemeManager apply(dark) 失败');
 tm.apply('light');
 if (themeAttrs['data-theme'] !== 'light') problems.push('ThemeManager apply(light) 失败');
+
+// --- 5. createPrivacyMaskManager ---
+const pmm = vm.runInContext('createPrivacyMaskManager({ toggleBtnId: "btnToggleMask", iconId: "maskIcon" })', ctx);
+if (pmm.isMasked() !== false) problems.push('PrivacyMaskManager 初始状态应为 false');
+pmm.toggle();
+if (pmm.isMasked() !== true) problems.push('PrivacyMaskManager toggle() 未切换为 true');
+pmm.setMasked(false);
+if (pmm.isMasked() !== false) problems.push('PrivacyMaskManager setMasked(false) 失败');
+
+// --- 6. createAccentPicker ---
+const ap = vm.runInContext('createAccentPicker({ barId: "accentPaletteBar" })', ctx);
+ap.set('emerald');
+if (themeAttrs['data-accent'] !== 'emerald') problems.push('AccentPicker set(emerald) 未写入 data-accent');
+
+// --- 7. createVisibilityPoller ---
+let polled = 0;
+ctx.onPoll = () => { polled++; };
+ctx.document.visibilityState = 'visible';
+const poller = vm.runInContext('createVisibilityPoller(onPoll, 1000)', ctx);
+poller.trigger();
+if (polled < 1) problems.push('VisibilityPoller trigger() 未执行回调');
+poller.destroy();
+
+// --- 8. triggerPulseAnimation ---
+let animCalled = false;
+ctx.requestAnimationFrame = (fn) => { animCalled = true; fn(); };
+vm.runInContext('triggerPulseAnimation([document.getElementById("heroHealthBadge")])', ctx);
+if (!animCalled) problems.push('triggerPulseAnimation 未利用 requestAnimationFrame');
 
 console.log(problems.length ? 'COMPONENT_RUNTIME_PROBLEMS:\n' + problems.join('\n') : 'COMPONENTS_RUNTIME_OK');
 """

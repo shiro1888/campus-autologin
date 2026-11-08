@@ -195,6 +195,19 @@ function validateContentType(text) {
   return true;
 }
 
+const DECODER_CACHE = {};
+function getDecoder(enc, fatal) {
+  const key = `${enc}-${!!fatal}`;
+  if (!DECODER_CACHE[key] && typeof TextDecoder !== 'undefined') {
+    try {
+      DECODER_CACHE[key] = new TextDecoder(enc, { fatal: !!fatal });
+    } catch (e) {
+      DECODER_CACHE[key] = null;
+    }
+  }
+  return DECODER_CACHE[key];
+}
+
 /**
  * 带超时的 fetch，返回文本。
  *
@@ -232,16 +245,14 @@ async function fetchText(url) {
     const bytes = new Uint8Array(buf);
     for (const enc of candidates) {
       try {
-        // fatal: true —— 遇到非法字节序列就抛错，才能"试错"下一个编码。
-        // 若用默认的 fatal:false，任何编码都会"成功"并产出 U+FFFD 乱码，
-        // 循环第一轮就返回，回退形同虚设（声明缺失/声明错误时必然乱码）。
-        return new TextDecoder(enc, { fatal: true }).decode(bytes);
+        const dec = getDecoder(enc, true);
+        if (dec) return dec.decode(bytes);
       } catch (e) {
         // 该编码不可用，或字节序列在它下面非法 -> 换下一个
       }
     }
-    // 全部失败：按 UTF-8 容错解码，至少不抛异常
-    return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+    const fallback = getDecoder('utf-8', false);
+    return fallback ? fallback.decode(bytes) : new TextDecoder().decode(bytes);
   } finally {
     clearTimeout(timer);
   }

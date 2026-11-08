@@ -73,6 +73,19 @@
     }
   }
 
+  const DECODER_CACHE = {};
+  function getDecoder(enc, fatal) {
+    const key = enc + '-' + !!fatal;
+    if (!DECODER_CACHE[key] && typeof TextDecoder !== 'undefined') {
+      try {
+        DECODER_CACHE[key] = new TextDecoder(enc, { fatal: !!fatal });
+      } catch (e) {
+        DECODER_CACHE[key] = null;
+      }
+    }
+    return DECODER_CACHE[key];
+  }
+
   /**
    * 带编码自适应的文本拉取。
    * 优先遵循响应头声明的 charset（含 utf-8），声明缺失/解码失败时再回退
@@ -106,12 +119,14 @@
           const bytes = new Uint8Array(buf);
           for (let i = 0; i < candidates.length; i++) {
             try {
-              return new TextDecoder(candidates[i], { fatal: true }).decode(bytes);
+              const dec = getDecoder(candidates[i], true);
+              if (dec) return dec.decode(bytes);
             } catch (e) {
               /* 编码不匹配，换下一个 */
             }
           }
-          return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+          const fb = getDecoder('utf-8', false);
+          return fb ? fb.decode(bytes) : new TextDecoder('utf-8').decode(bytes);
         });
       })
       .finally(function () {

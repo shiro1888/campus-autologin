@@ -7,15 +7,18 @@
 /** 简化 DOM ID 查询（亦支持直接传入 DOM 元素） */
 const $ = (idOrEl) => (typeof idOrEl === 'string' ? document.getElementById(idOrEl) : idOrEl);
 
+const HTML_ESCAPE_MAP = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;'
+};
+const HTML_ESCAPE_RE = /[&<>"']/g;
+
 /** HTML 特殊字符安全转义 */
 function escapeHtml(str) {
-  return String(str || '').replace(/[&<>"']/g, (m) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[m]));
+  return String(str || '').replace(HTML_ESCAPE_RE, (m) => HTML_ESCAPE_MAP[m]);
 }
 
 /**
@@ -88,14 +91,17 @@ function fmtFlow(kb) {
   return (n / (1024 * 1024)).toFixed(2) + ' GB';
 }
 
+const MAC_CLEAN_RE = /[^0-9a-fA-F]/g;
+const MAC_PAIR_RE = /.{1,2}/g;
+
 /**
  * 格式化物理 MAC 地址为标准冒号分隔形式 XX:XX:XX:XX:XX:XX
  */
 function fmtMac(hex) {
   if (!hex || typeof hex !== 'string') return '';
-  const clean = hex.replace(/[^0-9a-fA-F]/g, '');
+  const clean = hex.replace(MAC_CLEAN_RE, '');
   if (clean.length !== 12) return hex;
-  return clean.match(/.{1,2}/g).join(':').toUpperCase();
+  return clean.match(MAC_PAIR_RE).join(':').toUpperCase();
 }
 
 /**
@@ -1173,9 +1179,11 @@ function generateDiagnosticSnapshot(data = {}) {
  * 组件 13：现代毛玻璃自定义下拉选择组件 (SelectDropdown Component)
  * 将原生 <select> 美化为符合无障碍标准的自定义 Combobox 菜单。
  */
+const OPT_LABEL_RE = /^(.*?)[（\(](.*?)[）\)]$/;
+
 function formatOptionContent(text) {
   const trimmed = String(text || '').trim();
-  const match = trimmed.match(/^(.*?)[（\(](.*?)[）\)]$/);
+  const match = trimmed.match(OPT_LABEL_RE);
   if (!match) {
     return `<span class="opt-label">${escapeHtml(trimmed)}</span>`;
   }
@@ -1405,5 +1413,224 @@ function initCustomSelects(root = document) {
         closeAllCustomSelects();
       }
     });
+  }
+}
+
+/**
+ * 组件 14：自习室防窥隐私遮罩管理组件 (PrivacyMaskManager Component)
+ * 统一管理自习室防窥状态持久化、UI图标显隐与各端文本脱敏同步。
+ */
+function createPrivacyMaskManager(options = {}) {
+  const toggleBtn = $(options.toggleBtnId);
+  const iconEl = $(options.iconId);
+  let isMasked = false;
+
+  function render() {
+    if (toggleBtn) {
+      toggleBtn.classList.toggle('active', isMasked);
+      const title = isMasked
+        ? (options.maskedTitle || '当前：自习室防窥（点击显示明文）')
+        : (options.unmaskedTitle || '当前：明文显示（点击开启自习室防窥）');
+      toggleBtn.title = title;
+      toggleBtn.setAttribute('aria-label', title);
+    }
+    if (iconEl && ICONS) {
+      iconEl.innerHTML = isMasked ? ICONS.eyeOff : ICONS.eyeOpen;
+    }
+    if (typeof options.onUpdate === 'function') {
+      options.onUpdate(isMasked);
+    }
+  }
+
+  function setMasked(val) {
+    isMasked = !!val;
+    render();
+  }
+
+  function toggle() {
+    isMasked = !isMasked;
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.set({ privacyMask: isMasked }, () => {
+        render();
+        if (typeof options.onNotify === 'function') {
+          options.onNotify(isMasked ? '已开启自习室防窥模式' : '已恢复明文显示');
+        }
+      });
+    } else {
+      render();
+    }
+  }
+
+  function init() {
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get({ privacyMask: false }, (s) => {
+        isMasked = !!(s && s.privacyMask);
+        render();
+      });
+      if (chrome.storage.onChanged) {
+        chrome.storage.onChanged.addListener((changes, area) => {
+          if (area === 'local' && changes.privacyMask) {
+            isMasked = !!changes.privacyMask.newValue;
+            render();
+          }
+        });
+      }
+    }
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        toggle();
+      });
+    }
+  }
+
+  init();
+
+  return {
+    isMasked: () => isMasked,
+    toggle,
+    setMasked,
+    render
+  };
+}
+
+/**
+ * 组件 15：个性化强调色切换选择器组件 (AccentPicker Component)
+ * 统一管理强调色色盘交互、DOM属性绑定与持久化通知。
+ */
+function createAccentPicker(options = {}) {
+  const bar = $(options.barId || 'accentPaletteBar');
+  const dotSelector = options.dotSelector || '.accent-dot';
+  const names = Object.assign({
+    blue: '科技蓝（默认）',
+    purple: '极光紫',
+    emerald: '翡翠绿',
+    amber: '琥珀金',
+    rose: '玫瑰粉'
+  }, options.names);
+
+  function sync(current) {
+    const dots = document.querySelectorAll(dotSelector);
+    dots.forEach((dot) => {
+      dot.classList.toggle('active', dot.dataset.accent === current);
+    });
+  }
+
+  function set(accent) {
+    if (!accent) return;
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.set({ accentColor: accent }, () => {
+        applyAccent(accent);
+        sync(accent);
+        if (typeof options.onNotify === 'function') {
+          options.onNotify(`已应用强调色：${names[accent] || accent}`);
+        }
+      });
+    } else {
+      applyAccent(accent);
+      sync(accent);
+    }
+  }
+
+  function init() {
+    initAccent((cur) => sync(cur));
+    if (bar) {
+      bar.addEventListener('click', (e) => {
+        const dot = e.target.closest(dotSelector);
+        if (dot && dot.dataset.accent) {
+          set(dot.dataset.accent);
+        }
+      });
+    }
+  }
+
+  init();
+
+  return {
+    set,
+    sync,
+    getName: (acc) => names[acc] || acc
+  };
+}
+
+/**
+ * 组件 16：节能前台可见性智能轮询器 (VisibilityPoller Component)
+ * 标签页在前台时按指定间隔轮询，后台隐退时自动暂停以省电省CPU，恢复前台立即首刷。
+ */
+function createVisibilityPoller(callback, intervalMs = 15000) {
+  let timer = null;
+
+  function poll() {
+    if (typeof callback === 'function' && typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      callback();
+    }
+  }
+
+  function start() {
+    stop();
+    timer = setInterval(poll, intervalMs);
+  }
+
+  function stop() {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+  }
+
+  const onVisChange = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      poll();
+      start();
+    } else {
+      stop();
+    }
+  };
+
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', onVisChange);
+  }
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('beforeunload', stop);
+    window.addEventListener('pagehide', stop);
+  }
+
+  start();
+
+  return {
+    start,
+    stop,
+    trigger: poll,
+    destroy() {
+      stop();
+      if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+        document.removeEventListener('visibilitychange', onVisChange);
+      }
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        window.removeEventListener('beforeunload', stop);
+        window.removeEventListener('pagehide', stop);
+      }
+    }
+  };
+}
+
+/**
+ * 组件 17：无排版抖动的微动效触发器 (PulseAnimation Component)
+ * 利用 requestAnimationFrame 重新挂载 CSS 动画，杜绝 offsetWidth 导致的强制重排（Layout Thrashing）。
+ */
+function triggerPulseAnimation(selectorOrElements, className = 'val-pulse') {
+  if (typeof document === 'undefined') return;
+  const elements = typeof selectorOrElements === 'string'
+    ? document.querySelectorAll(selectorOrElements)
+    : selectorOrElements;
+  if (!elements || !elements.length) return;
+
+  elements.forEach((node) => node.classList.remove(className));
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      elements.forEach((node) => node.classList.add(className));
+    });
+  } else {
+    elements.forEach((node) => node.classList.add(className));
   }
 }
