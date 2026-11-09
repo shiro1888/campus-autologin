@@ -2275,6 +2275,47 @@ for (const [label, decode] of [['background.js', loadBackground()], ['content.js
   }
 }
 
+// 5) 两端实现必须逐字节等价（它们是各自独立的一份副本，无法共享模块作用域）。
+//    用例 1-3 已各自跑过，但那只能证明「两边都满足已知期望」；若将来只改一边、
+//    而新行为恰好落在已有断言的缝隙里，仍会静默漂移。这里直接做差分对比：
+//    用一批边界字节（含非法序列、单字节、超长、空）逐一比较两端输出。
+{
+  const bgDecode = loadBackground();
+  const ctDecode = loadContent();
+  const edgeCases = [
+    [],
+    [0x00],
+    [0x7f],
+    [0x80],
+    [0xc2],
+    [0xc2, 0x41],          // 非法 UTF-8 续字节
+    [0xff, 0xfe],          // 非法首字节
+    [0xe4, 0xb8, 0xad],    // 「中」的合法 UTF-8
+    [0xd6, 0xd0],          // 「中」的 GBK
+    [0xca, 0xb1],          // 「时」的 GBK（恰好是合法 UTF-8，边界特例）
+    [0xef, 0xbf, 0xbd],    // U+FFFD 本身
+    Array.from(Buffer.from('混合 ascii 与 中文 mixed', 'utf8')),
+    Array.from(Buffer.from('登录成功', 'utf8')),
+    [0xb1, 0xbe, 0xca, 0xb1, 0xb6, 0xce],   // 不完整 GBK 序列
+    Array.from({ length: 64 }, (_, i) => (i * 37) & 0xff)   // 伪随机字节
+  ];
+  for (const seq of edgeCases) {
+    const bytes = new Uint8Array(seq);
+    for (const decl of ['gbk', '', 'utf-8', 'gb18030', 'big5']) {
+      let a, b, ea = null, eb = null;
+      try { a = bgDecode(bytes, decl); } catch (e) { ea = e.message; }
+      try { b = ctDecode(bytes, decl); } catch (e) { eb = e.message; }
+      if (ea !== eb) {
+        problems.push('两端抛错不一致 seq=' + JSON.stringify(seq) + ' decl=' + decl +
+                      ' bg=' + ea + ' content=' + eb);
+      } else if (a !== b) {
+        problems.push('两端解码结果漂移 seq=' + JSON.stringify(seq) + ' decl=' + decl +
+                      ' bg=' + JSON.stringify(a) + ' content=' + JSON.stringify(b));
+      }
+    }
+  }
+}
+
 // 4) 无效编码名必须被缓存为 null（否则每次调用都重复尝试构造）
 {
   let src = fs.readFileSync(path.join(EXT, 'background.js'), 'utf8');
