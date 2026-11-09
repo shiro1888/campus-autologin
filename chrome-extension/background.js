@@ -196,16 +196,93 @@ function validateContentType(text) {
 }
 
 const DECODER_CACHE = {};
+/**
+ * 取（并缓存）TextDecoder 实例。
+ *
+ * 用 `key in DECODER_CACHE` 而非 `!DECODER_CACHE[key]` 判断是否已缓存：
+ * 构造失败时写入的是 null，用真值判断会把它当成「未缓存」而每次调用都重新
+ * 尝试构造（无效编码会被反复 new + try/catch），既浪费也掩盖了缓存意图。
+ */
 function getDecoder(enc, fatal) {
   const key = `${enc}-${!!fatal}`;
-  if (!DECODER_CACHE[key] && typeof TextDecoder !== 'undefined') {
-    try {
-      DECODER_CACHE[key] = new TextDecoder(enc, { fatal: !!fatal });
-    } catch (e) {
-      DECODER_CACHE[key] = null;
-    }
+  if (key in DECODER_CACHE) return DECODER_CACHE[key];
+  if (typeof TextDecoder === 'undefined') return null;
+  try {
+    DECODER_CACHE[key] = new TextDecoder(enc, { fatal: !!fatal });
+  } catch (e) {
+    DECODER_CACHE[key] = null;
   }
   return DECODER_CACHE[key];
+}
+
+/** 归一化编码名：utf8 -> utf-8，统一小写 */
+function normalizeEnc(enc) {
+  const e = String(enc || '').toLowerCase().trim();
+  return e === 'utf8' ? 'utf-8' : e;
+}
+
+/**
+ * 解码门户响应字节，返回文本。
+ *
+ * 为什么不能只信响应头声明：门户 / 网关 / 透明代理都可能把 UTF-8 内容错标成
+ * `charset=gbk`。而 GBK 几乎不会解码失败（任意字节序列都能「成功」解出字符），
+ * 于是错标时会静默产出「鐧诲綍鎴愬姛」这类乱码 —— 既不抛错，`fatal:true` 也拦不住。
+ * 后果是门户返回的中文错误提示（msga）变成乱码，按中文关键字匹配的判定
+ * （宵禁、密码错误等）随之失效。
+ *
+ * 判定依据（结构化，不依赖乱码启发式）：GBK 双字节区（首字节 0x81-0xFE、
+ * 次字节 0x40-0xFE）与 UTF-8 双字节区（首字节 0xC2-0xDF、次字节 0x80-0xBF）
+ * 交集很小，因此**真实 GBK 中文文本几乎不可能是合法 UTF-8**（如「密码错误」
+ * 的 GBK 字节 c3dc… 中 0xDC 不是 UTF-8 后续字节，fatal 直接抛错）；反之
+ * UTF-8 文本被当作 GBK 却总能解出乱码。故：字节若为合法 UTF-8 且含非 ASCII，
+ * 优先按 UTF-8；否则走「声明优先」的回退链。
+ *
+ * @param {Uint8Array} bytes 原始字节
+ * @param {string} declaredCharset 响应头声明的 charset（可为空）
+ */
+function decodePortalBytes(bytes, declaredCharset) {
+  const declared = normalizeEnc(declaredCharset);
+  const hasNonAscii = bytes.some((b) => b > 0x7f);
+
+  // 1) 结构校验：是否为合法 UTF-8（fatal 遇到非法序列立即抛错）
+  let utf8Text = null;
+  if (hasNonAscii) {
+    const dec = getDecoder('utf-8', true);
+    if (dec) {
+      try {
+        utf8Text = dec.decode(bytes);
+      } catch (e) {
+        utf8Text = null;   // 不是合法 UTF-8：说明多半是真正的 GBK 字节
+      }
+    }
+  }
+
+  // 2) 合法 UTF-8 + 含非 ASCII：优先按 UTF-8 解。
+  //    覆盖「声明缺失」「声明为 gbk 等传统中文编码」两种错标场景；
+  //    真实 GBK 中文文本落在合法 UTF-8 上的概率极低（见函数文档）。
+  if (utf8Text !== null) return utf8Text;
+
+  // 3) 其余情况遵循声明，再按 gbk -> gb18030 -> utf-8 回退
+  const candidates = [];
+  const pushEnc = (enc) => {
+    const k = normalizeEnc(enc);
+    if (k && candidates.indexOf(k) === -1) candidates.push(k);
+  };
+  if (declared) pushEnc(declared);
+  pushEnc('gbk');
+  pushEnc('gb18030');
+  pushEnc('utf-8');
+
+  for (const enc of candidates) {
+    try {
+      const dec = getDecoder(enc, true);
+      if (dec) return dec.decode(bytes);
+    } catch (e) {
+      // 该编码不可用，或字节序列在它下面非法 -> 换下一个
+    }
+  }
+  const fallback = getDecoder('utf-8', false);
+  return fallback ? fallback.decode(bytes) : new TextDecoder().decode(bytes);
 }
 
 /**
@@ -230,29 +307,9 @@ async function fetchText(url) {
     const buf = await resp.arrayBuffer();
     const ct = String(resp.headers && resp.headers.get ? (resp.headers.get('content-type') || '') : '');
     const m = /charset\s*=\s*"?([\w-]+)"?/i.exec(ct);
-    const charset = m ? m[1].toLowerCase() : '';
-    // 优先遵循响应头声明的 charset（含 utf-8）：门户 :801/eportal 实测声明 utf-8，
-    // 若仍强制 gbk 优先，会把 utf-8 字节按 gbk 解出乱码且不抛错，静默错译中文错误提示。
-    const candidates = [];
-    const pushEnc = (enc) => {
-      const k = (enc === 'utf8') ? 'utf-8' : enc;
-      if (candidates.indexOf(k) === -1) candidates.push(k);
-    };
-    if (charset) pushEnc(charset);
-    pushEnc('gbk');
-    pushEnc('gb18030');
-    pushEnc('utf-8');
-    const bytes = new Uint8Array(buf);
-    for (const enc of candidates) {
-      try {
-        const dec = getDecoder(enc, true);
-        if (dec) return dec.decode(bytes);
-      } catch (e) {
-        // 该编码不可用，或字节序列在它下面非法 -> 换下一个
-      }
-    }
-    const fallback = getDecoder('utf-8', false);
-    return fallback ? fallback.decode(bytes) : new TextDecoder().decode(bytes);
+    // 解码细节见 decodePortalBytes：不能只信声明的 charset（GBK 几乎不会解码失败，
+    // 错标时会静默产出乱码）；先用「是否为合法 UTF-8」做结构化判定。
+    return decodePortalBytes(new Uint8Array(buf), m ? m[1] : '');
   } finally {
     clearTimeout(timer);
   }

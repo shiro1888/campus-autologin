@@ -2152,6 +2152,167 @@ console.log(problems.length ? 'LOCK_PROBLEMS:\n' + problems.join('\n') : 'LOCK_O
         self.assertEqual(res.returncode, 0, f"内容脚本锁模拟失败:\n{res.stderr}\n{res.stdout}")
         self.assertIn("LOCK_OK", res.stdout, f"页面导航后锁未正确释放:\n{res.stdout}")
 
+    def test_portal_charset_detection_handles_mislabeling(self):
+        """门户响应的 charset 错标不得产出乱码，真实 GBK 也不得被误判。
+
+        背景：GBK 几乎不会解码失败（任意字节序列都能「成功」解出字符），因此
+        一旦 UTF-8 内容被网关/代理错标成 `charset=gbk`，旧实现会静默返回
+        「鐧诲綍鎴愬姛」这类乱码 —— 既不抛错，`fatal:true` 也拦不住。后果是
+        msga 中文错误提示变乱码，按中文关键字匹配的判定（宵禁/密码错误）失效。
+
+        修复依据是结构化判定而非乱码启发式：真实 GBK 中文几乎不可能是合法
+        UTF-8（双字节序列次字节常落在 0x40-0x7E，fatal 直接抛错），故「合法
+        UTF-8 且含非 ASCII => 按 UTF-8 解」即可同时正确处理两类输入。
+
+        本用例锁定两个方向：错标 UTF-8 要还原，真实 GBK 不能被误判，
+        并对 background.js / content.js 两端实现分别校验（二者是独立副本）。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const EXT = process.argv[1];
+const problems = [];
+
+// 已知 GBK 字节序列（不依赖 iconv）：密码错误 / 登录成功 / 本时段禁止使用
+const GBK_CASES = {
+  '密码错误':        [0xc3,0xdc,0xc2,0xeb,0xb4,0xed,0xce,0xf3],
+  '登录成功':        [0xb5,0xc7,0xc2,0xbc,0xb3,0xc9,0xb9,0xa6],
+  '本时段禁止使用':  [0xb1,0xbe,0xca,0xb1,0xb6,0xce,0xbd,0xfb,0xd6,0xb9,0xca,0xb9,0xd3,0xc3]
+};
+const DECLARATIONS = ['gbk', 'gb2312', '', 'utf-8'];
+
+function loadBackground() {
+  let src = fs.readFileSync(path.join(EXT, 'background.js'), 'utf8');
+  src += '\nglobalThis.__decode = decodePortalBytes;';
+  const sb = {
+    console: { log() {}, warn() {}, error() {} },
+    chrome: {
+      storage: { local: { get: (a, cb) => { if (cb) cb({}); return Promise.resolve({}); },
+        set: (p, cb) => { if (cb) cb(); return Promise.resolve(); } } },
+      runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} },
+        onMessage: { addListener() {} }, getManifest: () => ({ version: 't' }), lastError: null },
+      alarms: { onAlarm: { addListener() {} }, get: async () => null, create: async () => {} },
+      action: { setBadgeText() {}, setBadgeBackgroundColor() {} }, commands: null
+    },
+    setTimeout: (f) => { if (typeof f === 'function') f(); return 1; }, clearTimeout() {},
+    setInterval: () => 0, clearInterval() {},
+    Date, Math, JSON, Promise, Number, String, Array, Object, RegExp,
+    parseInt, parseFloat, isNaN, Boolean, Set, Map, Error,
+    TextDecoder, AbortController, Uint8Array, ArrayBuffer, URLSearchParams,
+    fetch: async () => { throw new Error('unused'); }
+  };
+  sb.globalThis = sb;
+  vm.createContext(sb);
+  vm.runInContext(src, sb);
+  return sb.__decode;
+}
+
+function loadContent() {
+  let src = fs.readFileSync(path.join(EXT, 'content.js'), 'utf8');
+  const idx = src.lastIndexOf('})();');
+  src = src.slice(0, idx) + '__export({ decodePortalBytes });\n' + src.slice(idx);
+  let exported = null;
+  const sb = {
+    console, setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {},
+    document: { readyState: 'loading', addEventListener() {} },
+    window: { addEventListener() {}, removeEventListener() {} },
+    chrome: { runtime: { lastError: null, sendMessage() {} },
+      storage: { local: { get: (d, cb) => cb(d) } } },
+    navigator: {}, AbortController, TextDecoder, Uint8Array, Promise,
+    Date, Math, JSON, String, Number, Object, Array, RegExp, Error,
+    fetch: async () => { throw new Error('unused'); },
+    __export: (o) => { exported = o; }
+  };
+  vm.createContext(sb);
+  vm.runInContext(src, sb);
+  return exported.decodePortalBytes;
+}
+
+for (const [label, decode] of [['background.js', loadBackground()], ['content.js', loadContent()]]) {
+  // 1) 真实 GBK 中文：任何声明下都必须还原为正确文本（不得被误判成 UTF-8）
+  for (const text of Object.keys(GBK_CASES)) {
+    const bytes = new Uint8Array(GBK_CASES[text]);
+    for (const decl of DECLARATIONS) {
+      const out = decode(bytes, decl);
+      if (out !== text) {
+        problems.push(label + ' GBK "' + text + '" declared=' + JSON.stringify(decl) +
+                      ' -> ' + JSON.stringify(out));
+      }
+    }
+  }
+  // 2) UTF-8 中文被错标成 gbk/无声明：必须还原，不能产出乱码
+  for (const text of Object.keys(GBK_CASES)) {
+    const bytes = new Uint8Array(Buffer.from(text, 'utf8'));
+    for (const decl of ['gbk', '', 'utf-8']) {
+      const out = decode(bytes, decl);
+      if (out !== text) {
+        problems.push(label + ' UTF8 "' + text + '" declared=' + JSON.stringify(decl) +
+                      ' -> ' + JSON.stringify(out) + '（错标时应还原而非乱码）');
+      }
+    }
+  }
+  // 3) 纯 ASCII（典型 JSONP 响应）必须原样返回
+  const ascii = 'dr1001({"result":1,"uid":"1"})';
+  const outAscii = decode(new Uint8Array(Buffer.from(ascii, 'ascii')), 'gbk');
+  if (outAscii.indexOf('"result":1') === -1) {
+    problems.push(label + ' ASCII 响应被破坏 -> ' + JSON.stringify(outAscii));
+  }
+}
+
+// 4) 无效编码名必须被缓存为 null（否则每次调用都重复尝试构造）
+{
+  let src = fs.readFileSync(path.join(EXT, 'background.js'), 'utf8');
+  src += '\nglobalThis.__getDecoder = getDecoder;';
+  const sb = {
+    console: { log() {}, warn() {}, error() {} },
+    chrome: { storage: { local: { get: (a, cb) => { if (cb) cb({}); return Promise.resolve({}); }, set: (p, cb) => { if (cb) cb(); return Promise.resolve(); } } },
+      runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener() {} }, getManifest: () => ({ version: 't' }), lastError: null },
+      alarms: { onAlarm: { addListener() {} }, get: async () => null, create: async () => {} },
+      action: { setBadgeText() {}, setBadgeBackgroundColor() {} }, commands: null },
+    setTimeout: (f) => { if (typeof f === 'function') f(); return 1; }, clearTimeout() {},
+    setInterval: () => 0, clearInterval() {},
+    Date, Math, JSON, Promise, Number, String, Array, Object, RegExp,
+    parseInt, parseFloat, isNaN, Boolean, Set, Map, Error,
+    TextDecoder, AbortController, Uint8Array, ArrayBuffer, URLSearchParams,
+    fetch: async () => { throw new Error('unused'); }
+  };
+  sb.globalThis = sb;
+  vm.createContext(sb);
+  vm.runInContext(src, sb);
+  if (sb.__getDecoder('definitely-not-an-encoding', true) !== null) {
+    problems.push('无效编码未返回 null');
+  }
+  // 二次调用仍为 null（说明走了缓存分支而非重复构造）
+  if (sb.__getDecoder('definitely-not-an-encoding', true) !== null) {
+    problems.push('无效编码二次调用未稳定返回 null');
+  }
+}
+
+console.log(problems.length ? 'CHARSET_PROBLEMS:\n' + problems.join('\n') : 'CHARSET_OK');
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, EXT_DIR],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"编码检测模拟失败:\n{res.stderr}\n{res.stdout}")
+        self.assertIn("CHARSET_OK", res.stdout, f"门户编码检测存在缺陷:\n{res.stdout}")
+
+    def test_decoder_cache_does_not_retry_failed_construction(self):
+        """decoder 缓存必须把「构造失败」也记为已缓存，避免反复 new。
+
+        旧实现用 `!DECODER_CACHE[key]` 判断，构造失败写入 null 后条件依然成立，
+        每次调用都会重新 new TextDecoder + 抛异常再 catch。功能上无害，
+        但与「缓存」意图矛盾，且在切换编码的高频路径上做无用功。
+        """
+        for js_name in ("background.js", "content.js"):
+            with open(os.path.join(EXT_DIR, js_name), "r", encoding="utf-8") as f:
+                src = f.read()
+            self.assertIn("key in DECODER_CACHE", src,
+                          f"{js_name} 的 decoder 缓存未用 in 判断（null 会被当作未缓存）")
+            self.assertNotRegex(
+                src, r"if \(!DECODER_CACHE\[",
+                f"{js_name} 仍用真值判断缓存，构造失败会被反复重试")
+
 
 if __name__ == "__main__":
     unittest.main()

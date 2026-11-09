@@ -74,23 +74,83 @@
   }
 
   const DECODER_CACHE = {};
+  /**
+   * 取（并缓存）TextDecoder 实例。
+   * 用 `key in DECODER_CACHE` 判断缓存：构造失败时写入 null，若用真值判断
+   * 会把它当成未缓存而每次重复尝试构造（与 background.js 保持一致）。
+   */
   function getDecoder(enc, fatal) {
     const key = enc + '-' + !!fatal;
-    if (!DECODER_CACHE[key] && typeof TextDecoder !== 'undefined') {
-      try {
-        DECODER_CACHE[key] = new TextDecoder(enc, { fatal: !!fatal });
-      } catch (e) {
-        DECODER_CACHE[key] = null;
-      }
+    if (key in DECODER_CACHE) return DECODER_CACHE[key];
+    if (typeof TextDecoder === 'undefined') return null;
+    try {
+      DECODER_CACHE[key] = new TextDecoder(enc, { fatal: !!fatal });
+    } catch (e) {
+      DECODER_CACHE[key] = null;
     }
     return DECODER_CACHE[key];
   }
 
+  /** 归一化编码名：utf8 -> utf-8，统一小写 */
+  function normalizeEnc(enc) {
+    const e = String(enc || '').toLowerCase().trim();
+    return e === 'utf8' ? 'utf-8' : e;
+  }
+
+  /**
+   * 解码门户响应字节（与 background.js 的 decodePortalBytes 同源逻辑）。
+   *
+   * 不能只信响应头声明的 charset：GBK 几乎不会解码失败，一旦 UTF-8 内容被
+   * 错标成 charset=gbk（网关/代理改写头部），会静默产出「鐧诲綍鎴愬姛」这类
+   * 乱码，导致门户中文错误提示与按中文关键字匹配的判定一起失效。
+   * 故先用「是否为合法 UTF-8」做结构化判定（真实 GBK 中文几乎不可能是合法
+   * UTF-8：其双字节序列的次字节常落在 0x40-0x7E 区，fatal 会直接抛错）。
+   */
+  function decodePortalBytes(bytes, declaredCharset) {
+    const declared = normalizeEnc(declaredCharset);
+    let hasNonAscii = false;
+    for (let i = 0; i < bytes.length; i++) {
+      if (bytes[i] > 0x7f) { hasNonAscii = true; break; }
+    }
+
+    // 1) 结构校验 + 优先按 UTF-8 解（覆盖「声明缺失」与「错标 gbk」两种场景）
+    if (hasNonAscii) {
+      const utf8Dec = getDecoder('utf-8', true);
+      if (utf8Dec) {
+        try {
+          return utf8Dec.decode(bytes);
+        } catch (e) {
+          /* 不是合法 UTF-8 -> 走下面的声明优先回退链 */
+        }
+      }
+    }
+
+    // 2) 遵循声明，再按 gbk -> gb18030 -> utf-8 回退
+    const candidates = [];
+    const pushEnc = function (enc) {
+      const k = normalizeEnc(enc);
+      if (k && candidates.indexOf(k) === -1) candidates.push(k);
+    };
+    if (declared) pushEnc(declared);
+    pushEnc('gbk');
+    pushEnc('gb18030');
+    pushEnc('utf-8');
+
+    for (let i = 0; i < candidates.length; i++) {
+      try {
+        const dec = getDecoder(candidates[i], true);
+        if (dec) return dec.decode(bytes);
+      } catch (e) {
+        /* 编码不匹配，换下一个 */
+      }
+    }
+    const fb = getDecoder('utf-8', false);
+    return fb ? fb.decode(bytes) : new TextDecoder('utf-8').decode(bytes);
+  }
+
   /**
    * 带编码自适应的文本拉取。
-   * 优先遵循响应头声明的 charset（含 utf-8），声明缺失/解码失败时再回退
-   * gbk -> gb18030 -> utf-8。门户 ePortal 接口可能声明 utf-8，若一律 gbk 优先
-   * 会把 utf-8 字节误解成乱码（GBK 对多数 utf-8 序列不会抛错）。
+   * 解码策略统一收敛到 decodePortalBytes，见其注释。
    */
   function fetchPortalText(url, timeoutMs = 8000) {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -106,27 +166,7 @@
         return resp.arrayBuffer().then(function (buf) {
           const ct = String(resp.headers && resp.headers.get ? (resp.headers.get('content-type') || '') : '');
           const m = /charset\s*=\s*"?([\w-]+)"?/i.exec(ct);
-          const charset = m ? m[1].toLowerCase() : '';
-          const candidates = [];
-          const pushEnc = function (enc) {
-            const k = (enc === 'utf8') ? 'utf-8' : enc;
-            if (candidates.indexOf(k) === -1) candidates.push(k);
-          };
-          if (charset) pushEnc(charset);
-          pushEnc('gbk');
-          pushEnc('gb18030');
-          pushEnc('utf-8');
-          const bytes = new Uint8Array(buf);
-          for (let i = 0; i < candidates.length; i++) {
-            try {
-              const dec = getDecoder(candidates[i], true);
-              if (dec) return dec.decode(bytes);
-            } catch (e) {
-              /* 编码不匹配，换下一个 */
-            }
-          }
-          const fb = getDecoder('utf-8', false);
-          return fb ? fb.decode(bytes) : new TextDecoder('utf-8').decode(bytes);
+          return decodePortalBytes(new Uint8Array(buf), m ? m[1] : '');
         });
       })
       .finally(function () {
