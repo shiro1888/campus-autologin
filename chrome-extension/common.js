@@ -660,6 +660,33 @@ function createConfirmModal(cfg = {}) {
       if (e.key === 'Escape') {
         e.preventDefault();
         close(false);
+        return;
+      }
+      // 焦点陷阱：overlay 标了 aria-modal="true"，就必须把键盘焦点限制在框内，
+      // 否则 Tab 会跑到背后的设置项上 —— 用户看不见焦点、却可能误改配置，
+      // 而且「模态」的语义与实际行为不一致。这里只处理 Tab，其余按键不拦截。
+      if (e.key === 'Tab') {
+        const focusables = overlay.querySelectorAll(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), ' +
+          'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusables || !focusables.length) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement;
+        // 焦点不在框内（或落在容器本身）时，Tab 一律拉回第一个元素
+        if (!overlay.contains(active)) {
+          e.preventDefault();
+          first.focus();
+          return;
+        }
+        if (e.shiftKey && active === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     });
   }

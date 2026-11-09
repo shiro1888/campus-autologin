@@ -2900,5 +2900,125 @@ const read = (expr) => vm.runInContext(expr, sandbox);
                              f"{html_name} 的 ARIA 引用指向不存在的 id（会静默退化为无名称）: {dangling}")
 
 
+    def test_confirm_modal_traps_keyboard_focus(self):
+        """模态框声明了 aria-modal="true"，就必须把键盘焦点限制在框内。
+
+        此前只处理了 Escape：面板打开时按 Tab，焦点会一路跑到背后的设置项上。
+        键盘/读屏用户看不见焦点所在，却可能误改配置（例如点到「恢复默认」）。
+        语义（aria-modal）与实际行为不一致，比没有 aria-modal 更容易误导。
+
+        必须验证四条：
+        1. 焦点在框外时按 Tab -> 拉回第一个可聚焦元素；
+        2. 焦点在最后一个元素再 Tab -> 回到第一个（正向循环）；
+        3. 焦点在第一个元素按 Shift+Tab -> 到最后一个（反向循环）；
+        4. 焦点在中间元素 -> 不拦截（preventDefault 不被调用），允许浏览器默认行为。
+        同时确认 Escape 仍能关闭，避免焦点陷阱破坏原有退出方式。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(process.argv[1], 'utf8');
+const problems = [];
+
+let focused = null;
+function mkEl(id) {
+  const L = {};
+  const s = new Set();
+  return {
+    id, textContent: '', className: '', dataset: {}, disabled: false,
+    classList: {
+      add: (...c) => c.forEach((x) => s.add(x)),
+      remove: (...c) => c.forEach((x) => s.delete(x)),
+      toggle: (c, f) => { const v = f === undefined ? !s.has(c) : f; v ? s.add(c) : s.delete(c); return v; },
+      contains: (c) => s.has(c)
+    },
+    setAttribute(k, v) { this[k] = v; }, removeAttribute() {}, getAttribute(k) { return this[k] || null; },
+    focus() { focused = id; },
+    addEventListener(t, f) { (L[t] = L[t] || []).push(f); }, removeEventListener() {},
+    querySelector: () => null, querySelectorAll: () => [],
+    _L: L
+  };
+}
+
+const overlay = mkEl('overlay');
+const cancelBtn = mkEl('cancelBtn');
+const confirmBtn = mkEl('confirmBtn');
+const outside = mkEl('outside');
+const focusables = [cancelBtn, confirmBtn];
+overlay.querySelectorAll = () => focusables;
+overlay.contains = (el) => el === overlay || focusables.indexOf(el) !== -1;
+
+const activeRef = { el: outside };
+const docL = {};
+const ctx = {
+  console: { log() {}, warn() {}, error() {} },
+  setTimeout: (f) => { if (typeof f === 'function') f(); return 1; },
+  clearTimeout() {}, setInterval: () => 1, clearInterval() {}, requestAnimationFrame: () => 1,
+  document: {
+    getElementById: (id) => ({ overlay, cancelBtn, confirmBtn,
+      confirmModalTitle: mkEl('t'), confirmModalDesc: mkEl('d') })[id] || null,
+    get activeElement() { return activeRef.el; },
+    querySelectorAll: () => [], querySelector: () => null,
+    addEventListener: (t, f) => { (docL[t] = docL[t] || []).push(f); },
+    createElement: () => mkEl('c'), createElementNS: () => mkEl('s'),
+    documentElement: { setAttribute() {}, removeAttribute() {} }, body: { appendChild() {} }
+  },
+  window: { matchMedia: () => ({ matches: false, addEventListener() {} }),
+    addEventListener() {}, removeEventListener() {} },
+  navigator: {}, Element: function () {},
+  chrome: { storage: { local: { get: (d, cb) => { if (cb) cb(d); return Promise.resolve(d); },
+      set: (p, cb) => { if (cb) cb(); return Promise.resolve(); } }, onChanged: { addListener() {} } },
+    runtime: { getManifest: () => ({ version: 't' }) } },
+  Date, Math, JSON, String, Number, Object, Array, RegExp, Set, Map,
+  parseInt, parseFloat, isNaN, Promise, Error, Boolean
+};
+vm.createContext(ctx);
+vm.runInContext(src, ctx);
+
+const modal = vm.runInContext(
+  'createConfirmModal({overlayId:"overlay",cancelBtnId:"cancelBtn",confirmBtnId:"confirmBtn"})', ctx);
+modal.open({});
+
+const press = (ev) => (docL.keydown || []).slice().forEach((f) => f(ev));
+
+// 1. 焦点在框外 -> Tab 拉回第一个
+focused = null; activeRef.el = outside;
+let prevented = false;
+press({ key: 'Tab', shiftKey: false, preventDefault() { prevented = true; } });
+if (focused !== 'cancelBtn') problems.push('焦点在框外时 Tab 未拉回第一个元素，实际 ' + focused);
+if (!prevented) problems.push('焦点在框外时未 preventDefault');
+
+// 2. 最后一个 + Tab -> 回到第一个
+focused = null; activeRef.el = confirmBtn; prevented = false;
+press({ key: 'Tab', shiftKey: false, preventDefault() { prevented = true; } });
+if (focused !== 'cancelBtn') problems.push('末尾 Tab 未循环到第一个，实际 ' + focused);
+if (!prevented) problems.push('末尾 Tab 未 preventDefault');
+
+// 3. 第一个 + Shift+Tab -> 到最后一个
+focused = null; activeRef.el = cancelBtn; prevented = false;
+press({ key: 'Tab', shiftKey: true, preventDefault() { prevented = true; } });
+if (focused !== 'confirmBtn') problems.push('首个元素 Shift+Tab 未循环到末尾，实际 ' + focused);
+if (!prevented) problems.push('首个元素 Shift+Tab 未 preventDefault');
+
+// 4. 中间元素 -> 不拦截
+focused = null; activeRef.el = cancelBtn; prevented = false;
+press({ key: 'Tab', shiftKey: false, preventDefault() { prevented = true; } });
+if (prevented) problems.push('中间元素按 Tab 被错误拦截（应允许浏览器默认行为）');
+
+// 5. Escape 仍能关闭
+activeRef.el = cancelBtn;
+press({ key: 'Escape', preventDefault() {} });
+if (overlay.classList.contains('open')) problems.push('Escape 未关闭模态框');
+
+console.log(problems.length ? 'FOCUS_TRAP_PROBLEMS:\n' + problems.join('\n') : 'FOCUS_TRAP_OK');
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, os.path.join(EXT_DIR, "common.js")],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"焦点陷阱模拟失败:\n{res.stderr}\n{res.stdout}")
+        self.assertIn("FOCUS_TRAP_OK", res.stdout, f"模态框焦点陷阱存在缺陷:\n{res.stdout}")
+
+
 if __name__ == "__main__":
     unittest.main()
