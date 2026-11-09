@@ -557,23 +557,22 @@ function friendlyError(data) {
   const joined = raw.join(' ').trim();
   const key = joined.toLowerCase();
   if (key) {
-    // 宵禁 / 夜间断网判断（含误按 UTF-8 解码形成的乱码签名，如 \u02b1(ʱ) 与 \u03bd(ν)）
+    // 宵禁 / 夜间断网判断。
+    // 这里曾经还有「按 UTF-8 误解码后的乱码签名」分支（U+02B1 / U+03BD 等）：
+    // 那是 decodePortalBytes 之前的临时兜底 —— GBK 的「本时段禁止使用」被容错
+    // UTF-8 解码后仍需被识别。现在字节解码已按「是否合法 UTF-8」做结构化判定，
+    // 多字中文短语不会再被误解（实测 4 种声明下均精确还原），该分支已不可达，
+    // 故移除；保留它们反而会误伤本就含有这些字符的正常文案。
     if (
       key.indexOf('本时段禁止使用') !== -1 ||
       key.indexOf('禁止使用') !== -1 ||
       key.indexOf('时段') !== -1 ||
-      key.indexOf('禁止上网') !== -1 ||
-      /[\u02b1][\s\S]{0,3}[\u03bd]/.test(joined) ||
-      /ʱ[\s\S]{0,3}ν/.test(joined) ||
-      /[\ufffd].*ʱ/.test(joined)
+      key.indexOf('禁止上网') !== -1
     ) {
       return '当前时段禁止使用校园网（夜间断网/宵禁时段）';
     }
     for (const k of Object.keys(ERROR_MAP)) {
       if (key.indexOf(k) !== -1) return ERROR_MAP[k];
-    }
-    if (/[\ufffd]/.test(joined)) {
-      return '登录失败：当前时段受限或账号密码错误';
     }
   }
   return joined ? '登录失败：' + joined : '登录失败：账号或密码错误';
@@ -591,7 +590,9 @@ function isPermanentAuthError(msg) {
   // ascii 原因（见 ERROR_MAP），不含中文关键词也不含 errorN 形式，必须显式列出 ——
   // 漏掉会让这些「重试无用」的错误退化成每秒重试（停机状态下每天上万次无效认证）。
   // 「禁止使用」/「时段」代表校园网夜间断网/宵禁策略，重试无用，必须降频。
-  return /密码|账号不存在|账号格式|被锁定|锁定|欠费|停机|已在别处|禁止使用|禁止上网|时段|[\u02b1].*[\u03bd]|password error|userid error|out of service|supplicant version too low/i.test(m) ||
+  // （此处原有 \u02b1...\u03bd 乱码签名匹配，随 decodePortalBytes 的结构化解码一并移除：
+  //  多字中文短语已不会被误解码，该分支不可达。）
+  return /密码|账号不存在|账号格式|被锁定|锁定|欠费|停机|已在别处|禁止使用|禁止上网|时段|password error|userid error|out of service|supplicant version too low/i.test(m) ||
     /error[1-6]/i.test(m);
 }
 

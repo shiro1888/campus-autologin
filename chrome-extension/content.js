@@ -179,17 +179,16 @@
     const s = String(rawMsg || '').trim();
     if (!s) return '';
     const low = s.toLowerCase();
-    // 1. 宵禁 / 夜间断网判断：
-    //    支持正常中文关键字，以及 GBK「本时段禁止使用」被旧脚本或错误 UTF-8 解码后
-    //    形成的乱码签名（如 \u02b1(ʱ) 与 \u03bd(ν) 伴随 \ufffd 菱形问号）。
+    // 宵禁 / 夜间断网判断：
+    // 此处原有「按 UTF-8 误解码形成的乱码签名」分支（U+02B1 / U+03BD / U+FFFD），
+    // 那是 decodePortalBytes 之前的临时兜底。现在字节解码按「是否合法 UTF-8」结构化
+    // 判定，多字中文短语（本时段禁止使用 / 密码错误 等，实测 4 种声明下）都能精确还原，
+    // 乱码分支已不可达，故移除；保留反而会误伤本就含这些字符的正常文案。
     if (
       low.indexOf('本时段禁止使用') !== -1 ||
       low.indexOf('禁止使用') !== -1 ||
       low.indexOf('时段') !== -1 ||
-      low.indexOf('禁止上网') !== -1 ||
-      /[\u02b1][\s\S]{0,3}[\u03bd]/.test(s) ||
-      /ʱ[\s\S]{0,3}ν/.test(s) ||
-      /[\ufffd].*ʱ/.test(s)
+      low.indexOf('禁止上网') !== -1
     ) {
       return '当前时段禁止使用校园网（夜间断网/宵禁时段）';
     }
@@ -204,10 +203,6 @@
     }
     if (low.indexOf('userid error4') !== -1 || low.indexOf('out of service') !== -1) {
       return '账号已欠费或已停机';
-    }
-    // 2. 若仍残留有  (U+FFFD) 或未识别乱码，不要直接展示给用户造成困惑
-    if (/[\ufffd]/.test(s)) {
-      return '认证失败（可能处于夜间断网时段或账号密码有误）';
     }
     return s;
   }

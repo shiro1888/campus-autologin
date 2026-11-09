@@ -1782,6 +1782,22 @@ vm.runInContext(src, sandbox);
   const fe = vm.runInContext('friendlyError({msga:"本时段禁止使用"})', sandbox);
   if (fe.indexOf('时段') === -1) problems.push('宵禁提示未识别: ' + fe);
 
+  // 4b) 真实 GBK 字节 -> 解码 -> 宵禁识别 -> 判为永久错误（端到端链路）。
+  //     乱码签名分支已随结构化解码移除，这条链路必须仍然成立。
+  const gbkCurfew = Uint8Array.from([0xb1, 0xbe, 0xca, 0xb1, 0xb6, 0xce, 0xbd, 0xfb, 0xd6, 0xb9, 0xca, 0xb9, 0xd3, 0xc3]);
+  const decodedCurfew = vm.runInContext('decodePortalBytes', sandbox)(gbkCurfew, 'gbk');
+  if (decodedCurfew !== '本时段禁止使用') {
+    problems.push('GBK 宵禁字节解码错误: ' + JSON.stringify(decodedCurfew));
+  }
+  const feGbk = vm.runInContext('friendlyError(' + JSON.stringify({ msga: decodedCurfew }) + ')', sandbox);
+  if (feGbk.indexOf('时段') === -1) problems.push('GBK 宵禁解码后未识别为宵禁: ' + feGbk);
+  if (!pa(decodedCurfew)) problems.push('GBK 宵禁解码后未判为永久错误（会每秒重试）');
+  // 乱码签名不得再作为可命中路径被依赖：本函数不应对纯乱码给出宵禁结论
+  const feGarbled = vm.runInContext('friendlyError({msga:"\\u02b1\\u03bd"})', sandbox);
+  if (feGarbled.indexOf('时段') !== -1) {
+    problems.push('乱码签名仍被当作宵禁（应已随结构化解码移除）: ' + feGarbled);
+  }
+
   // 5) ensureAlarm 六路周期分支
   const period = async (setup) => {
     alarmCreates.length = 0;
