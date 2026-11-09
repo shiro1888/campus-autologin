@@ -787,21 +787,35 @@ function applyAccent(accent) {
   document.documentElement.setAttribute('data-accent', target);
 }
 
+/**
+ * 强调色初始化：读取当前值并注册变更监听。
+ *
+ * 幂等：重复调用不会重复注册 onChanged 监听器。此前每次调用都会 addListener，
+ * 而 addListener 无法去重 —— 一旦某个页面（或将来新增的组件）多次调用本函数，
+ * 监听器就会累积，同一变更被处理 N 次。当前调用点各只调一次，但这类"调用次数
+ * 决定副作用"的隐含契约很脆弱，故在此显式收敛。
+ *
+ * @param {function(string): void} [callback] 每次强调色确定/变更时回调（仅首次注册时绑定）
+ */
+let accentListenerBound = false;
+let accentOnChange = null;
 function initAccent(callback) {
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get({ accentColor: 'blue' }, (res) => {
-      const acc = res && res.accentColor ? res.accentColor : 'blue';
-      applyAccent(acc);
-      if (typeof callback === 'function') callback(acc);
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
+  // 记录最新回调：监听器只注册一次，但每次调用都应让新回调接管后续变更
+  if (typeof callback === 'function') accentOnChange = callback;
+  chrome.storage.local.get({ accentColor: 'blue' }, (res) => {
+    const acc = res && res.accentColor ? res.accentColor : 'blue';
+    applyAccent(acc);
+    if (typeof callback === 'function') callback(acc);
+  });
+  if (chrome.storage.onChanged && !accentListenerBound) {
+    accentListenerBound = true;
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes.accentColor) {
+        applyAccent(changes.accentColor.newValue);
+        if (typeof accentOnChange === 'function') accentOnChange(changes.accentColor.newValue);
+      }
     });
-    if (chrome.storage.onChanged) {
-      chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'local' && changes.accentColor) {
-          applyAccent(changes.accentColor.newValue);
-          if (typeof callback === 'function') callback(changes.accentColor.newValue);
-        }
-      });
-    }
   }
 }
 

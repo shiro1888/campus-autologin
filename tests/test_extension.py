@@ -2371,5 +2371,95 @@ console.log(problems.length ? 'CHARSET_PROBLEMS:\n' + problems.join('\n') : 'CHA
                 f"{js_name} 仍用真值判断缓存，构造失败会被反复重试")
 
 
+    def test_init_accent_binds_listener_once(self):
+        """initAccent 必须幂等：重复调用不得累积 storage.onChanged 监听器。
+
+        chrome.storage.onChanged.addListener 无法去重。旧实现每次调用 initAccent
+        都注册一个监听器，因此「调用次数决定副作用」—— 一旦某个页面或将来新增的
+        组件多次调用，同一强调色变更就会被处理 N 次（applyAccent + callback 各 N 次）。
+        当前调用点各只调一次，但这类隐含契约很脆弱，需用测试锁定。
+
+        同时校验：监听器只注册一次，但**最新传入的回调**应接管后续变更
+        （而不是停留在首次注册时捕获的那个闭包上）。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(process.argv[1], 'utf8');
+const problems = [];
+let listenerCount = 0;
+const listeners = [];
+let applied = [];
+
+const ctx = {
+  console: { log() {}, warn() {}, error() {} },
+  setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {},
+  requestAnimationFrame: () => 1,
+  document: {
+    getElementById: () => null, querySelectorAll: () => [], querySelector: () => null,
+    addEventListener() {},
+    createElement: () => ({ classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+      style: {}, dataset: {}, setAttribute() {}, appendChild() {}, addEventListener() {} }),
+    createElementNS: () => ({ setAttribute() {}, innerHTML: '', style: {} }),
+    documentElement: { setAttribute: (k, v) => { if (k === 'data-accent') applied.push(v); },
+      removeAttribute() {} },
+    body: { appendChild() {} }
+  },
+  window: { matchMedia: () => ({ matches: false, addEventListener() {} }),
+    addEventListener() {}, removeEventListener() {} },
+  navigator: {}, Element: function () {},
+  chrome: {
+    storage: {
+      local: {
+        get: (d, cb) => { const r = { accentColor: 'purple' }; if (cb) cb(r); return Promise.resolve(r); },
+        set: (p, cb) => { if (cb) cb(); return Promise.resolve(); }
+      },
+      onChanged: { addListener: (f) => { listenerCount++; listeners.push(f); } }
+    },
+    runtime: { getManifest: () => ({ version: 't' }) }
+  },
+  Date, Math, JSON, String, Number, Object, Array, RegExp, Set, Map,
+  parseInt, parseFloat, isNaN, Promise, Error, Boolean
+};
+vm.createContext(ctx);
+vm.runInContext(src, ctx);
+
+vm.runInContext('initAccent()', ctx);
+const after1 = listenerCount;
+vm.runInContext('initAccent()', ctx);
+const after2 = listenerCount;
+vm.runInContext('initAccent()', ctx);
+const after3 = listenerCount;
+
+if (after1 !== 1) problems.push('首次 initAccent 应注册 1 个监听器，实际 ' + after1);
+if (after2 !== 1) problems.push('重复调用累积了监听器: ' + after2);
+if (after3 !== 1) problems.push('三次调用后监听器数应为 1，实际 ' + after3);
+
+// 最新回调应接管后续变更。
+// 注意：initAccent 每次调用都会立刻用「当前值」回调一次（初始渲染），
+// 因此这里必须先把初始回调的痕迹清掉，只观测「变更事件」触发的回调。
+let cb1 = null, cb2 = null;
+let phase = 'init';
+ctx.__set1 = (v) => { if (phase === 'change') cb1 = v; };
+ctx.__set2 = (v) => { if (phase === 'change') cb2 = v; };
+vm.runInContext('initAccent(__set1)', ctx);
+vm.runInContext('initAccent(__set2)', ctx);
+phase = 'change';
+applied = [];
+listeners.forEach((f) => f({ accentColor: { newValue: 'rose' } }, 'local'));
+if (cb2 !== 'rose') problems.push('最新回调未接管变更，收到: ' + JSON.stringify(cb2));
+if (cb1 !== null) problems.push('旧回调仍在被调用（应已被新回调替换）: ' + JSON.stringify(cb1));
+if (applied.indexOf('rose') === -1) problems.push('变更时未应用新的强调色');
+
+console.log(problems.length ? 'ACCENT_PROBLEMS:\n' + problems.join('\n') : 'ACCENT_OK');
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, os.path.join(EXT_DIR, "common.js")],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"强调色初始化模拟失败:\n{res.stderr}\n{res.stdout}")
+        self.assertIn("ACCENT_OK", res.stdout, f"initAccent 幂等性缺陷:\n{res.stdout}")
+
+
 if __name__ == "__main__":
     unittest.main()
