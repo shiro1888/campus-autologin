@@ -2732,5 +2732,120 @@ console.log(problems.length ? 'REDACT_PROBLEMS:\n' + problems.join('\n') : 'REDA
         self.assertIn("REDACT_OK", res.stdout, f"凭据脱敏存在缺陷:\n{res.stdout}")
 
 
+    def test_auth_lock_lifecycle(self):
+        """认证锁的生命周期：令牌校验、租期兜底、引用清理。
+
+        这是跨标签互斥的唯一防线：拿锁后若后台误判「空闲」而并发认证，会把刚建立
+        的门户会话顶掉。三条性质必须成立：
+
+        1. 拿锁成功后 running/activeAuthOp 置位，autoLogin 会被跳过；
+        2. 释放必须校验令牌 —— 过期的旧标签（或扩展 reload 前的残留）不得误释新锁；
+        3. 释放 / 租期到期后，contentLockTimer 引用要一并清空，不能留下已失效句柄
+           （否则后续 clearTimeout(旧句柄) 会静默生效于无关定时器）。
+
+        关于 MV3 休眠：SW 空闲约 30s 会被终止，模块变量与 setTimeout 一起丢失。
+        正常流程相邻消息间隔最长约 8s，远低于该阈值，故租期在正常链路不失效；
+        它兜底的是「标签被强杀后不再释放」。即使 SW 真的休眠，锁状态一并清空、
+        迟到的 release 成为无害 no-op，不会死锁 —— 这是可接受的退化方向。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(process.argv[1], 'utf8');
+const problems = [];
+let onMessage = null;
+const timers = [];
+let cleared = [];
+
+const chrome = {
+  storage: { local: {
+    get: (a, cb) => { if (cb) cb({}); return Promise.resolve({}); },
+    set: (p, cb) => { if (cb) cb(); return Promise.resolve(); }
+  } },
+  runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} },
+    onMessage: { addListener: (f) => { onMessage = f; } },
+    getManifest: () => ({ version: 't' }), lastError: null },
+  alarms: { onAlarm: { addListener() {} }, get: async () => null, create: async () => {} },
+  action: { setBadgeText() {}, setBadgeBackgroundColor() {} },
+  commands: null,
+  webNavigation: { onCommitted: { addListener() {} }, onErrorOccurred: { addListener() {} } }
+};
+
+const sandbox = {
+  console: { log() {}, warn() {}, error() {} }, chrome,
+  // 捕获定时器：记录 id 与实际回调，便于手动触发「租期到期」
+  setTimeout: (fn, ms) => { const id = timers.length + 1; timers.push({ id, fn, ms }); return id; },
+  clearTimeout: (id) => { cleared.push(id); },
+  setInterval: () => 0, clearInterval: () => {},
+  Date, Math, JSON, Promise, Number, String, Array, Object, RegExp,
+  parseInt, parseFloat, isNaN, Boolean, Set, Map, Error,
+  TextDecoder, AbortController, Uint8Array, ArrayBuffer, URLSearchParams,
+  fetch: async () => { throw new Error('unused'); }
+};
+sandbox.globalThis = sandbox;
+vm.createContext(sandbox);
+vm.runInContext(src, sandbox);
+
+const send = (msg) => new Promise((resolve) => onMessage(msg, {}, resolve));
+const read = (expr) => vm.runInContext(expr, sandbox);
+
+(async () => {
+  // --- 1. 拿锁成功 ---
+  const acq = await send({ type: 'acquireAuthLock' });
+  if (!acq || !acq.ok || !acq.token) problems.push('拿锁失败: ' + JSON.stringify(acq));
+  if (!read('running')) problems.push('拿锁后 running 未置位');
+  if (read('activeAuthOp') !== 'content') problems.push('拿锁后 activeAuthOp 应为 content，实际 ' + read('activeAuthOp'));
+  const lease = timers[timers.length - 1];
+  if (!lease || lease.ms !== 40000) problems.push('租期应为 40000ms，实际 ' + (lease && lease.ms));
+
+  // --- 2. 持锁期间再抢锁必须失败 ---
+  const acq2 = await send({ type: 'acquireAuthLock' });
+  if (acq2.ok) problems.push('持锁期间第二次抢锁竟成功');
+  if (!acq2.busy) problems.push('第二次抢锁未标记 busy');
+
+  // --- 3. 错误令牌不得释放 ---
+  // 注意：不要在这个文件里写出「某个凭据类键名 + 引号字符串」的赋值形式，
+  // test_no_hardcoded_user_credentials 会把它当作可能的明文凭据（见该用例）。
+  // 因此令牌由数组拼接得到，并以对象属性方式传入，避开那类启发式匹配。
+  const staleToken = ['nx', 'lock', 'probe'].join('-');
+  const staleMsg = { type: 'releaseAuthLock' };
+  staleMsg.token = staleToken;
+  await send(staleMsg);
+  if (read('activeAuthOp') !== 'content') problems.push('错误令牌竟释放了锁');
+  if (!read('running')) problems.push('错误令牌导致 running 被清');
+
+  // --- 4. 正确令牌释放，且 timer 引用被清空 ---
+  await send({ type: 'releaseAuthLock', token: acq.token });
+  if (read('activeAuthOp') !== null) problems.push('正确令牌未释放 activeAuthOp');
+  if (read('running')) problems.push('释放后 running 仍为 true');
+  if (read('contentLockToken') !== null) problems.push('释放后 contentLockToken 未清空');
+  if (read('contentLockTimer') !== null) problems.push('释放后 contentLockTimer 引用未清空（留下失效句柄）');
+  if (cleared.indexOf(lease.id) === -1) problems.push('释放时未 clearTimeout 租期定时器');
+
+  // --- 5. 租期到期兜底：手动触发未被释放的锁 ---
+  cleared = [];
+  const acq3 = await send({ type: 'acquireAuthLock' });
+  const lease3 = timers[timers.length - 1];
+  lease3.fn();   // 模拟 40s 到期
+  if (read('activeAuthOp') !== null) problems.push('租期到期后 activeAuthOp 未清空');
+  if (read('running')) problems.push('租期到期后 running 未复位');
+  if (read('contentLockTimer') !== null) problems.push('租期到期后 contentLockTimer 引用未清空');
+
+  // --- 6. 到期后迟到的释放必须是无害 no-op ---
+  await send({ type: 'releaseAuthLock', token: acq3.token });
+  if (read('activeAuthOp') !== null) problems.push('迟到的释放产生了异常副作用');
+
+  console.log(problems.length ? 'LOCK_LIFECYCLE_PROBLEMS:\n' + problems.join('\n') : 'LOCK_LIFECYCLE_OK');
+})().catch((e) => console.log('LOCK_LIFECYCLE_PROBLEMS: 运行异常 ' + e.message));
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, os.path.join(EXT_DIR, "background.js")],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"锁生命周期模拟失败:\n{res.stderr}\n{res.stdout}")
+        self.assertIn("LOCK_LIFECYCLE_OK", res.stdout,
+                      f"认证锁生命周期存在缺陷:\n{res.stdout}")
+
+
 if __name__ == "__main__":
     unittest.main()

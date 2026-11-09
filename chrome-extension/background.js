@@ -1421,11 +1421,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       // 此前租期 30s 只剩 1 秒余量，门户响应偏慢时租约会中途到期、锁被清掉，
       // 另一个门户标签就能抢锁并发认证（正是本锁要防的事）。放宽到 40s 留足余量，
       // 又不至于在孤儿标签（中途被关闭）时过久阻塞后台自动重连。
+      //
+      // 关于 MV3 休眠：SW 空闲约 30s 会被终止，模块级变量（activeAuthOp /
+      // contentLockToken / 本定时器）随之丢失，超时的 setTimeout 也不会触发。
+      // 实测正常流程中相邻两条消息之间最长只隔约 8s（content 脚本每次
+      // checkStatus/directLogin 都有 8s 上限），远低于 30s，故租期在正常链路里
+      // 不会因休眠而失效；它真正兜底的是「标签被强杀后不再发 releaseAuthLock」。
+      // 反过来，若 SW 真的休眠了，锁状态一并清空、release 变成无害的 no-op，
+      // 也不会产生死锁 —— 这是可接受的退化方向。
       contentLockTimer = setTimeout(() => {
         if (activeAuthOp === 'content' && contentLockToken === token) {
           activeAuthOp = null;
           running = false;
           contentLockToken = null;
+          contentLockTimer = null;   // 定时器已自然到期，清引用
         }
       }, 40000);
       sendResponse({ ok: true, token: token });
@@ -1440,7 +1449,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       activeAuthOp = null;
       running = false;
       contentLockToken = null;
-      if (contentLockTimer) clearTimeout(contentLockTimer);
+      if (contentLockTimer) {
+        clearTimeout(contentLockTimer);
+        contentLockTimer = null;   // 一并清引用，避免留下已失效的句柄
+      }
     }
     sendResponse({ ok: true });
     return true;
