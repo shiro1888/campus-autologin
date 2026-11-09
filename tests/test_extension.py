@@ -1161,6 +1161,24 @@ function makeCtx(clipboard) {
   if (!second) problems.push('连续 confirm 后第二个 Promise 未结算');
   if (confirmCalls !== 1) problems.push('onConfirm 执行次数异常: ' + confirmCalls);
 
+  // --- 2b. 两个实例共用同一 overlay：都必须结算 ---
+  // overlay.dataset.bound 去重后，若只让第一个实例持有按钮监听，第二个实例的
+  // activeResolve 永远不会被调用 —— 它的 Promise 永久悬挂（实测确认）。
+  // 工厂函数语义上允许多实例，故登记表把结算广播给该 overlay 上所有实例。
+  const multiEnv = makeCtx(null);
+  const modalA = vm.runInContext('createConfirmModal({})', multiEnv.ctx);
+  const modalB = vm.runInContext('createConfirmModal({})', multiEnv.ctx);
+  let aSettled = false, bSettled = false;
+  modalA.open({}).then(() => { aSettled = true; });
+  modalB.open({}).then(() => { bSettled = true; });
+  multiEnv.els.confirmModalOverlay.classList.add('open');
+  (multiEnv.handlers['btnModalConfirm:click'] || []).forEach((f) => f({}));
+  await Promise.resolve(); await Promise.resolve();
+  if (!aSettled) problems.push('多实例：实例 A 的 Promise 未结算');
+  if (!bSettled) problems.push('多实例：实例 B 的 Promise 永久悬挂');
+  const bindings = (multiEnv.handlers['btnModalConfirm:click'] || []).length;
+  if (bindings !== 1) problems.push('多实例导致重复绑定按钮监听: ' + bindings);
+
   // --- 3. 单体消息框被 dismiss 后必须仍可复用 ---
   // popup 的 #msgBox 是常驻元素，dismiss 若对它执行 remove()，元素会脱离文档，
   // 之后 show() 只改到游离节点，用户再也看不到任何提示。

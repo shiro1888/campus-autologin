@@ -600,6 +600,36 @@ function createConfirmModal(cfg = {}) {
   const getConfirmBtn = () => $(cfg.confirmBtnId || 'btnModalConfirm');
   const getCancelBtn = () => $(cfg.cancelBtnId || 'btnModalCancel');
 
+  /**
+   * 同一 overlay 上的所有实例登记表。
+   *
+   * DOM 事件只能绑定一次（overlay.dataset.bound 去重），否则会出现重复绑定、
+   * 一次点击触发多次结算。但去重后若只让「第一个实例」持有按钮监听，第二个
+   * 实例的 activeResolve 就永远不会被调用 —— 它的 Promise 永久悬挂（实测确认）。
+   * 工厂函数在语义上允许同一 DOM 创建多个实例，因此这里用一个登记表把
+   * 「结算」广播给该 overlay 上的全部实例：每个实例只结算自己 pending 的那次。
+   */
+  const instancesKey = '__confirmModalInstances';
+  function registryOf(overlay) {
+    if (!overlay[instancesKey]) overlay[instancesKey] = [];
+    return overlay[instancesKey];
+  }
+  /** 结算本 overlay 上所有实例中处于 pending 的那一个（含自身） */
+  function settleAll(overlay, result) {
+    registryOf(overlay).forEach((inst) => inst.settle(result));
+  }
+
+  /** 结算单个实例（幂等：无 pending 时为空操作） */
+  function settle(result) {
+    if (!activeResolve) return;
+    const r = activeResolve;
+    activeResolve = null;
+    r(!!result);
+  }
+
+  /** 本实例句柄，供 registry 回调（需在 init 之前定义） */
+  const self = { settle };
+
   function close(result) {
     const overlay = getOverlay();
     if (!overlay || !overlay.classList.contains('open')) return;
@@ -608,16 +638,14 @@ function createConfirmModal(cfg = {}) {
     if (lastFocused && typeof lastFocused.focus === 'function') {
       lastFocused.focus();
     }
-    if (activeResolve) {
-      const r = activeResolve;
-      activeResolve = null;
-      r(!!result);
-    }
+    settleAll(overlay, !!result);
   }
 
   function init() {
     const overlay = getOverlay();
-    if (!overlay || overlay.dataset.bound === 'true') return;
+    if (!overlay) return;
+    if (registryOf(overlay).indexOf(self) === -1) registryOf(overlay).push(self);
+    if (overlay.dataset.bound === 'true') return;
     overlay.dataset.bound = 'true';
 
     getCancelBtn()?.addEventListener('click', () => close(false));
@@ -645,11 +673,7 @@ function createConfirmModal(cfg = {}) {
 
     // 已有模态框在等待时（快速双击触发第二次 open），先以「取消」结算上一次，
     // 否则 activeResolve 被覆盖，第一个 Promise 会永久悬挂、其 .then 永不执行。
-    if (activeResolve) {
-      const prev = activeResolve;
-      activeResolve = null;
-      prev(false);
-    }
+    settle(false);
 
     lastFocused = document.activeElement;
     const titleEl = getTitle();
