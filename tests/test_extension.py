@@ -2847,5 +2847,58 @@ const read = (expr) => vm.runInContext(expr, sandbox);
                       f"认证锁生命周期存在缺陷:\n{res.stdout}")
 
 
+    def test_form_controls_have_accessible_names(self):
+        """每个可见表单控件都必须有可访问名称，且 ARIA 引用不得悬空。
+
+        options 页的四个开关（自适应/断网跳转/开机自启/门户自动填单）采用
+        「<label class="toggle-switch"> 包裹 checkbox」的滑块样式：点击有效，
+        但 label 内只有 <span class="slider">、没有文字，屏幕阅读器读不出名称。
+        这类缺陷不影响鼠标用户，因此极易长期存在；而 aria-labelledby 指向的
+        id 一旦被重命名，又会静默退化成「无名称」而不报错。
+
+        本用例同时守住三条：
+        1. 可见 input 必须有 <label for> / aria-label / aria-labelledby（或显式
+           aria-hidden 的隐藏输入，如 importFileInput 由按钮代理点击）；
+        2. 所有 aria-labelledby / aria-describedby / aria-controls 指向的 id 必须存在；
+        3. id 不得重复（重复 id 会让 label 与 aria 引用指向错误元素）。
+        """
+        import re as _re
+        for html_name in ("popup.html", "options.html"):
+            with open(os.path.join(EXT_DIR, html_name), "r", encoding="utf-8") as f:
+                html = f.read()
+
+            ids = _re.findall(r'id=["\']([^"\']+)["\']', html)
+            dups = sorted({i for i in ids if ids.count(i) > 1})
+            self.assertEqual(dups, [], f"{html_name} 存在重复 id（label/aria 会指向错误元素）: {dups}")
+
+            label_for = set(_re.findall(r'<label[^>]*for=["\']([^"\']+)["\']', html))
+
+            unlabeled = []
+            for m in _re.finditer(r"<input\b[^>]*>", html):
+                tag = m.group(0)
+                idm = _re.search(r'id=["\']([^"\']+)["\']', tag)
+                iid = idm.group(1) if idm else None
+                type_m = _re.search(r'type=["\']([^"\']+)["\']', tag)
+                itype = (type_m.group(1) if type_m else "text").lower()
+                if itype == "hidden":
+                    continue
+                has_label = iid is not None and iid in label_for
+                has_aria = ("aria-label=" in tag or "aria-labelledby=" in tag
+                            or 'aria-hidden="true"' in tag)
+                if not has_label and not has_aria:
+                    unlabeled.append((iid, itype))
+            self.assertEqual(unlabeled, [],
+                             f"{html_name} 存在无可访问名称的表单控件（屏幕阅读器读不出）: {unlabeled}")
+
+            dangling = []
+            for attr in ("aria-labelledby", "aria-describedby", "aria-controls"):
+                for m in _re.finditer(attr + r'=["\']([^"\']+)["\']', html):
+                    for each in m.group(1).split():
+                        if each and each not in ids:
+                            dangling.append((attr, each))
+            self.assertEqual(dangling, [],
+                             f"{html_name} 的 ARIA 引用指向不存在的 id（会静默退化为无名称）: {dangling}")
+
+
 if __name__ == "__main__":
     unittest.main()

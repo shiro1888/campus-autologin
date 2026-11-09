@@ -361,12 +361,12 @@
             </div>
             <div class="switch-info">
               <div class="switch-title">
-                <span>自适应加速 (Adaptive Turbo)</span>
+                <span id="adaptiveTitle">自适应加速 (Adaptive Turbo)</span>
                 <span class="badge-success">极速秒级恢复</span>
               </div>
             </div>
             <label class="toggle-switch">
-              <input type="checkbox" id="adaptive">
+              <input type="checkbox" id="adaptive" aria-labelledby="adaptiveTitle">
               <span class="slider"></span>
             </label>
           </div>
@@ -430,12 +430,12 @@
             </div>
             <div class="switch-info">
               <div class="switch-title">
-                <span>断网跳转瞬间重连 (Instant Trigger)</span>
+                <span id="instantTriggerTitle">断网跳转瞬间重连 (Instant Trigger)</span>
                 <span class="badge-primary">0秒响应 · 推荐</span>
               </div>
             </div>
             <label class="toggle-switch">
-              <input type="checkbox" id="instantTrigger">
+              <input type="checkbox" id="instantTrigger" aria-labelledby="instantTriggerTitle">
               <span class="slider"></span>
             </label>
           </div>
@@ -446,12 +446,12 @@
             </div>
             <div class="switch-info">
               <div class="switch-title">
-                <span>浏览器启动时自动登录</span>
+                <span id="autoOnStartupTitle">浏览器启动时自动登录</span>
                 <span class="badge-neutral">静默自启</span>
               </div>
             </div>
             <label class="toggle-switch">
-              <input type="checkbox" id="autoOnStartup">
+              <input type="checkbox" id="autoOnStartup" aria-labelledby="autoOnStartupTitle">
               <span class="slider"></span>
             </label>
           </div>
@@ -462,12 +462,12 @@
             </div>
             <div class="switch-info">
               <div class="switch-title">
-                <span>校园网门户页面自动填单并提交</span>
+                <span id="contentAutoFillTitle">校园网门户页面自动填单并提交</span>
                 <span class="badge-neutral">内容脚本</span>
               </div>
             </div>
             <label class="toggle-switch">
-              <input type="checkbox" id="contentAutoFill">
+              <input type="checkbox" id="contentAutoFill" aria-labelledby="contentAutoFillTitle">
               <span class="slider"></span>
             </label>
           </div>
@@ -488,7 +488,8 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <span>导入配置</span>
           </button>
-          <input type="file" id="importFileInput" accept=".json,application/json" style="display:none">
+          <input type="file" id="importFileInput" accept=".json,application/json"
+                 style="display:none" tabindex="-1" aria-hidden="true">
 
           <button type="button" class="btn-ghost-danger btn-reset-dock" id="btnResetDefaults" title="将所有设置恢复为出厂默认">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
