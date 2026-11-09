@@ -478,11 +478,33 @@ async function saveResult(result, trigger) {
 }
 
 function ok(message, online) {
-  return { ok: true, online: !!online, message: message, time: nowText() };
+  return { ok: true, online: !!online, message: redactCredentials(message), time: nowText() };
+}
+
+//
+// 凭证脱敏：异常消息是外部/引擎产出的自由文本，可能意外带回完整请求 URL。
+// 登录请求本身是 GET + 查询参数（upass=<密码>），一旦 URL 出现在 message 里，
+// 密码就会随 lastResult / eventLogs 写进 storage，并渲染到弹窗、事件时间轴
+// 与「复制诊断报告」中 —— 这是最难察觉的一类泄漏（不报错、界面看起来正常）。
+//
+// 实测 Chrome 的网络错误消息通常只是 "Failed to fetch"，规范也未规定其内容
+// （浏览器相关），所以这不是已确认的泄漏路径；但 e.message 属于不可控外部输入，
+// 在把它写进用户可见结果前做一次确定性擦除，是成本极低、无副作用的纵深防御。
+//
+const URL_CREDENTIAL_RE = /((?:DDDDD|upass|password|passwd|pwd|account)=)([^&\s"']*)/gi;
+
+/**
+ * 擦除文本中的账号/密码查询参数值。用于任何将要落盘或展示的外部文本。
+ * @param {*} text 任意值（非字符串会被 String 化，null/undefined 返回 ''）
+ * @returns {string} 已擦除敏感值的文本
+ */
+function redactCredentials(text) {
+  if (text === null || text === undefined) return '';
+  return String(text).replace(URL_CREDENTIAL_RE, (m, p1) => p1 + '***');
 }
 
 function fail(message, online) {
-  return { ok: false, online: !!online, message: message, time: nowText() };
+  return { ok: false, online: !!online, message: redactCredentials(message), time: nowText() };
 }
 
 // ---------------------------------------------------------------------------

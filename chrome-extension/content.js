@@ -62,10 +62,27 @@
     });
   }
 
-  /** 告诉后台记录一次结果 */
+  /**
+   * 凭证脱敏：擦除文本中的账号/密码查询参数值（与 background.js 同源规则）。
+   *
+   * content.js 的 report() 会把消息交给后台落盘（lastResult / eventLogs），
+   * 其中 message 可能拼接了门户返回的 msga / msg —— 属于不可控外部文本。
+   * 页面本身就在门户源下，若门户（或被篡改的明文 HTTP 响应）回显了含
+   * upass= 的 URL，密码会顺着消息写进日志并显示在时间轴与诊断报告里。
+   * 在唯一的出口做一次确定性擦除，比在每个调用点各自小心更可靠。
+   */
+  const URL_CREDENTIAL_RE = /((?:DDDDD|upass|password|passwd|pwd|account)=)([^&\s"']*)/gi;
+  function redactCredentials(text) {
+    if (text === null || text === undefined) return '';
+    return String(text).replace(URL_CREDENTIAL_RE, function (m, p1) { return p1 + '***'; });
+  }
+
+  /** 告诉后台记录一次结果（message 统一脱敏后再上报） */
   function report(r) {
     try {
-      chrome.runtime.sendMessage({ type: 'contentResult', result: r }, function () {
+      const payload = Object.assign({}, r);
+      if (payload.message !== undefined) payload.message = redactCredentials(payload.message);
+      chrome.runtime.sendMessage({ type: 'contentResult', result: payload }, function () {
         void chrome.runtime.lastError;   // 后台没醒也无所谓
       });
     } catch (e) {

@@ -2598,5 +2598,139 @@ console.log(problems.length ? 'MASK_PROBLEMS:\n' + problems.join('\n') : 'MASK_O
         self.assertIn("MASK_OK", res.stdout, f"账号脱敏存在缺陷:\n{res.stdout}")
 
 
+    def test_credential_redaction_in_reported_messages(self):
+        """任何落盘/展示的外部文本都必须擦除 URL 中的账号与密码。
+
+        登录/注销都是 GET + 查询参数（`upass=<密码>`），URL 本身携带凭据。
+        `fail()` / `report()` 的 message 会进入 `lastResult` 与 `eventLogs`，
+        进而渲染到弹窗、事件时间轴和「复制诊断报告」—— 一旦异常消息或门户回显
+        里带回完整 URL，密码就会静默落盘。这类泄漏不报错、界面看起来正常，
+        只能靠断言兜住。
+
+        实测 Chrome 网络错误消息通常只是 "Failed to fetch"（规范未规定内容），
+        所以这是纵深防御而非已知泄漏；但 e.message 属不可控外部输入。
+
+        同时必须验证不误伤：含「密码」二字的中文提示、正常错误文案、
+        以及不含查询参数的 URL 都要原样保留。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const EXT = process.argv[1];
+const problems = [];
+
+function bgSandbox() {
+  const sb = {
+    console: { log() {}, warn() {}, error() {} },
+    chrome: {
+      storage: { local: { get: (a, cb) => { if (cb) cb({}); return Promise.resolve({}); },
+        set: (p, cb) => { if (cb) cb(); return Promise.resolve(); } } },
+      runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} },
+        onMessage: { addListener() {} }, getManifest: () => ({ version: 't' }), lastError: null },
+      alarms: { onAlarm: { addListener() {} }, get: async () => null, create: async () => {} },
+      action: { setBadgeText() {}, setBadgeBackgroundColor() {} }, commands: null
+    },
+    setTimeout: (f) => { if (typeof f === 'function') f(); return 1; }, clearTimeout() {},
+    setInterval: () => 0, clearInterval() {},
+    Date, Math, JSON, Promise, Number, String, Array, Object, RegExp,
+    parseInt, parseFloat, isNaN, Boolean, Set, Map, Error,
+    TextDecoder, AbortController, Uint8Array, ArrayBuffer, URLSearchParams,
+    fetch: async () => { throw new Error('unused'); }
+  };
+  sb.globalThis = sb;
+  vm.createContext(sb);
+  vm.runInContext(fs.readFileSync(path.join(EXT, 'background.js'), 'utf8') +
+    '\nglobalThis.__fail = fail; globalThis.__ok = ok;', sb);
+  return sb;
+}
+
+const sb = bgSandbox();
+
+// --- 1. fail()/ok() 必须擦除凭据 ---
+const LEAKY = [
+  'Failed: http://172.30.100.2/drcom/login?DDDDD=13800000000&upass=Secret123&0MKKey=123456',
+  'x?upass=Secret123',
+  'password=topsecret&next=1',
+  'account=13800000000&pwd=hunter2'
+];
+for (const msg of LEAKY) {
+  const f = sb.__fail(msg, false);
+  const o = sb.__ok(msg, true);
+  for (const [kind, out] of [['fail', f.message], ['ok', o.message]]) {
+    if (/Secret123|topsecret|hunter2|13800000000/.test(out)) {
+      problems.push(kind + '() 未擦除凭据: ' + JSON.stringify(out));
+    }
+    if (out.indexOf('***') === -1) {
+      problems.push(kind + '() 未生成脱敏占位: ' + JSON.stringify(out));
+    }
+  }
+}
+
+// --- 2. 正常文案必须原样保留（不得误伤） ---
+const SAFE = [
+  '已在线，无需登录',
+  '网络连接失败，请检查 Wi-Fi 或网线',
+  '密码错误，请检查密码',
+  '登录成功，已确认在线',
+  '当前时段禁止使用校园网（夜间断网/宵禁时段）',
+  'Failed to fetch',
+  '发生未知错误：TypeError: x is undefined',
+  'http://172.30.100.2/ 门户不可达'
+];
+for (const msg of SAFE) {
+  const out = sb.__fail(msg, false).message;
+  if (out !== msg) problems.push('误伤正常文案: ' + JSON.stringify(msg) + ' -> ' + JSON.stringify(out));
+}
+
+// --- 3. content.js 的 report() 也必须脱敏 ---
+let captured = null;
+const ctSrc = fs.readFileSync(path.join(EXT, 'content.js'), 'utf8');
+const idx = ctSrc.lastIndexOf('})();');
+const patched = ctSrc.slice(0, idx) + '__export({ report });\n' + ctSrc.slice(idx);
+const ctSb = {
+  console, setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {},
+  document: { readyState: 'loading', addEventListener() {} },
+  window: { addEventListener() {}, removeEventListener() {} },
+  chrome: {
+    runtime: { lastError: null,
+      sendMessage: (m) => { captured = m; } },
+    storage: { local: { get: (d, cb) => cb(d) } }
+  },
+  navigator: {}, AbortController, TextDecoder, Uint8Array, Promise, Object,
+  Date, Math, JSON, String, Number, Array, RegExp, Error,
+  fetch: async () => { throw new Error('unused'); },
+  __export: (o) => { ctSb.__api = o; }
+};
+ctSb.__api = null;
+vm.createContext(ctSb);
+vm.runInContext(patched, ctSb);
+ctSb.__api.report({ ok: false, online: false, message: '登录失败：http://x/login?upass=Secret123' });
+if (!captured) {
+  problems.push('content.js report() 未发出消息');
+} else {
+  const m = captured.result && captured.result.message;
+  if (/Secret123/.test(String(m))) problems.push('content.js report() 未擦除凭据: ' + JSON.stringify(m));
+}
+// 正常文案不得被 report() 改动
+captured = null;
+ctSb.__api.report({ ok: true, online: true, message: '登录成功，已确认在线' });
+if (!captured || captured.result.message !== '登录成功，已确认在线') {
+  problems.push('content.js report() 误伤正常文案: ' + JSON.stringify(captured && captured.result && captured.result.message));
+}
+// 不应修改调用方传入的对象
+const original = { ok: false, online: false, message: 'x?upass=Secret123' };
+ctSb.__api.report(original);
+if (original.message !== 'x?upass=Secret123') problems.push('report() 就地修改了调用方的对象');
+
+console.log(problems.length ? 'REDACT_PROBLEMS:\n' + problems.join('\n') : 'REDACT_OK');
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, EXT_DIR],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"凭据脱敏模拟失败:\n{res.stderr}\n{res.stdout}")
+        self.assertIn("REDACT_OK", res.stdout, f"凭据脱敏存在缺陷:\n{res.stdout}")
+
+
 if __name__ == "__main__":
     unittest.main()
