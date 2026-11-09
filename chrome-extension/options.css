@@ -1844,8 +1844,7 @@ body {
   height: 20px;
 }
 
-.form-card:hover .card-icon,
-.side-card:hover .card-icon {
+.form-card:hover .card-icon {
   transform: scale(1.08);
 }
 
@@ -1854,14 +1853,10 @@ body {
 .card-icon.amber { background: #fef3c7; color: #d97706; }
 .card-icon.purple { background: #ede9fe; color: #7c3aed; }
 
-.form-card:hover .card-icon.blue,
-.side-card:hover .card-icon.blue { box-shadow: 0 0 16px rgba(59, 130, 246, 0.35); }
-.form-card:hover .card-icon.emerald,
-.side-card:hover .card-icon.emerald { box-shadow: 0 0 16px rgba(16, 185, 129, 0.35); }
-.form-card:hover .card-icon.amber,
-.side-card:hover .card-icon.amber { box-shadow: 0 0 16px rgba(245, 158, 11, 0.35); }
-.form-card:hover .card-icon.purple,
-.side-card:hover .card-icon.purple { box-shadow: 0 0 16px rgba(139, 92, 246, 0.35); }
+.form-card:hover .card-icon.blue { box-shadow: 0 0 16px rgba(59, 130, 246, 0.35); }
+.form-card:hover .card-icon.emerald { box-shadow: 0 0 16px rgba(16, 185, 129, 0.35); }
+.form-card:hover .card-icon.amber { box-shadow: 0 0 16px rgba(245, 158, 11, 0.35); }
+.form-card:hover .card-icon.purple { box-shadow: 0 0 16px rgba(139, 92, 246, 0.35); }
 
 [data-theme="dark"] .card-icon.blue { background: rgba(59, 130, 246, 0.18); color: #60a5fa; }
 [data-theme="dark"] .card-icon.emerald { background: rgba(16, 185, 129, 0.18); color: #34d399; }
@@ -3585,11 +3580,6 @@ input[aria-invalid="true"] {
     padding: 18px 14px;
     border-radius: var(--radius-lg);
   }
-
-  .side-card {
-    padding: 16px 14px;
-  }
-
 
   .card-header {
     gap: 10px;
