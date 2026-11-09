@@ -2478,6 +2478,125 @@ console.log(problems.length ? 'ACCENT_PROBLEMS:\n' + problems.join('\n') : 'ACCE
         self.assertEqual(res.returncode, 0, f"强调色初始化模拟失败:\n{res.stderr}\n{res.stdout}")
         self.assertIn("ACCENT_OK", res.stdout, f"initAccent 幂等性缺陷:\n{res.stdout}")
 
+    def test_account_masking_consistent_and_safe(self):
+        """账号脱敏必须正确、耐脏，并在两份独立副本之间保持一致。
+
+        maskAccount 是日志/诊断报告防泄漏的最后一道关口，却在两处各有一份独立
+        实现：background.js（巡检日志、console.log）与 common.js（popup 显示、
+        诊断快照）。两处必须逐值等价 —— 否则「弹窗里遮了、日志里没遮」这类
+        不对称泄漏不会报错，只能靠人偶然发现。
+
+        本用例覆盖三类风险：
+        1. 边界值：<=4 位全遮、5-7 位保留首尾各 2、>=8 位保留首 3 尾 4；
+           5 位与 7 位是最易写错的分界（曾出现 5 位漏遮中间）。
+        2. 脏输入：null / undefined / 非字符串（number/object/array）必须返回 ''，
+           不能抛异常，也不能把 "[object Object]" 之类当真账号脱敏。
+        3. 两端一致性：同一批输入在 background.js 与 common.js 中结果相同。
+        附带断言：脱敏结果绝不能包含完整原值（除 <=4 位本就全遮的情况）。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const EXT = process.argv[1];
+const problems = [];
+
+function mkSandbox() {
+  return {
+    console: { log() {}, warn() {}, error() {} },
+    setTimeout: (f) => { if (typeof f === 'function') f(); return 1; },
+    clearTimeout() {}, setInterval: () => 0, clearInterval() {},
+    requestAnimationFrame: () => 1,
+    document: {
+      getElementById: () => null, querySelectorAll: () => [], querySelector: () => null,
+      addEventListener() {},
+      createElement: () => ({ classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+        style: {}, dataset: {}, setAttribute() {}, appendChild() {}, addEventListener() {} }),
+      createElementNS: () => ({ setAttribute() {}, innerHTML: '', style: {} }),
+      documentElement: { setAttribute() {}, removeAttribute() {} },
+      body: { appendChild() {} }, visibilityState: 'visible'
+    },
+    window: { matchMedia: () => ({ matches: false, addEventListener() {} }),
+      addEventListener() {}, removeEventListener() {} },
+    navigator: {}, Element: function () {},
+    chrome: {
+      storage: { local: {
+        get: (d, cb) => { if (cb) cb(d); return Promise.resolve(d); },
+        set: (p, cb) => { if (cb) cb(); return Promise.resolve(); }
+      }, onChanged: { addListener() {} } },
+      runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} },
+        onMessage: { addListener() {} }, getManifest: () => ({ version: 't' }), lastError: null },
+      alarms: { onAlarm: { addListener() {} }, get: async () => null, create: async () => {} },
+      action: { setBadgeText() {}, setBadgeBackgroundColor() {} }, commands: null
+    },
+    Date, Math, JSON, Promise, Number, String, Array, Object, RegExp,
+    parseInt, parseFloat, isNaN, Boolean, Set, Map, Error,
+    TextDecoder, AbortController, Uint8Array, ArrayBuffer, URLSearchParams,
+    fetch: async () => { throw new Error('unused'); }
+  };
+}
+
+function loadMask(file) {
+  const sb = mkSandbox();
+  sb.globalThis = sb;
+  vm.createContext(sb);
+  let src = fs.readFileSync(path.join(EXT, file), 'utf8');
+  src += '\nglobalThis.__mask = maskAccount;';
+  vm.runInContext(src, sb);
+  return sb.__mask;
+}
+
+const bgMask = loadMask('background.js');
+const ctMask = loadMask('common.js');
+
+// --- 1. 边界值 ---
+const CASES = [
+  ['', ''],
+  ['abc', '****'],
+  ['abcd', '****'],
+  ['abcde', 'ab****de'],
+  ['abcdef', 'ab****ef'],
+  ['abcdefg', 'ab****fg'],
+  ['abcdefgh', 'abc****efgh'],
+  ['13812345678', '138****5678']
+];
+for (const [input, expected] of CASES) {
+  const a = bgMask(input), b = ctMask(input);
+  if (a !== expected) problems.push('background maskAccount(' + JSON.stringify(input) + ') = ' + JSON.stringify(a) + '，期望 ' + JSON.stringify(expected));
+  if (b !== expected) problems.push('common maskAccount(' + JSON.stringify(input) + ') = ' + JSON.stringify(b) + '，期望 ' + JSON.stringify(expected));
+}
+// 带空格应等价于 trim 后的结果
+if (bgMask('  spaced  ') !== 'sp****ed') problems.push('background 未 trim 首尾空格: ' + JSON.stringify(bgMask('  spaced  ')));
+if (ctMask('  spaced  ') !== 'sp****ed') problems.push('common 未 trim 首尾空格: ' + JSON.stringify(ctMask('  spaced  ')));
+
+// --- 2. 脏输入必须安全返回空串 ---
+const DIRTY = [null, undefined, 12345, { a: 1 }, [1, 2], true];
+for (const v of DIRTY) {
+  let a, b, ea = null, eb = null;
+  try { a = bgMask(v); } catch (e) { ea = e.message; }
+  try { b = ctMask(v); } catch (e) { eb = e.message; }
+  if (ea) problems.push('background maskAccount(' + String(v) + ') 抛异常: ' + ea);
+  if (eb) problems.push('common maskAccount(' + String(v) + ') 抛异常: ' + eb);
+  if (!ea && a !== '') problems.push('background maskAccount(' + String(v) + ') 应返回空串，实际 ' + JSON.stringify(a));
+  if (!eb && b !== '') problems.push('common maskAccount(' + String(v) + ') 应返回空串，实际 ' + JSON.stringify(b));
+}
+
+// --- 3. 两端一致 + 不得泄漏原值 ---
+for (const [input] of CASES) {
+  if (input.length <= 4) continue;   // <=4 位本就全遮，无需比较
+  const a = bgMask(input), b = ctMask(input);
+  if (a !== b) problems.push('两端脱敏不一致 input=' + JSON.stringify(input) + ' bg=' + JSON.stringify(a) + ' common=' + JSON.stringify(b));
+  if (a.indexOf(input) !== -1) problems.push('脱敏结果仍含完整原值: ' + JSON.stringify(a));
+}
+
+console.log(problems.length ? 'MASK_PROBLEMS:\n' + problems.join('\n') : 'MASK_OK');
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, EXT_DIR],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"账号脱敏模拟失败:\n{res.stderr}\n{res.stdout}")
+        self.assertIn("MASK_OK", res.stdout, f"账号脱敏存在缺陷:\n{res.stdout}")
+
 
 if __name__ == "__main__":
     unittest.main()
