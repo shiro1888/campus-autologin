@@ -1955,13 +1955,24 @@ body {
 }
 
 /* 键盘焦点环：仅键盘导航时显示（:focus-visible），统一品牌色。
-   深色下对深底 3.46:1，满足非文字组件 3:1 要求；鼠标点击不受影响。 */
+   深色下对深底 3.46:1，满足非文字组件 3:1 要求；鼠标点击不受影响。
+
+   注意：除原生 button/a 外，弹窗里还有若干「div/span + role="button" +
+   tabindex="0"」的自定义控件（品牌头像、版本胶囊、IP 胶囊、网关胶囊、
+   运营商徽章）。它们能被 Tab 聚焦，但此前只有 :hover/:active 样式，
+   键盘用户完全看不到焦点落在哪 —— 补齐这些类名后才能保持一致。 */
 .btn-primary:focus-visible,
 .btn-secondary:focus-visible,
 .icon-btn:focus-visible,
 .foot-link:focus-visible,
 .copy-hint:focus-visible,
-.dock-copy-btn:focus-visible {
+.dock-copy-btn:focus-visible,
+.brand-avatar-box:focus-visible,
+.ver-pill:focus-visible,
+.ip-capsule:focus-visible,
+.gw-route-pill:focus-visible,
+.isp-badge:focus-visible,
+.isp-sheet-btn:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }

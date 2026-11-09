@@ -398,7 +398,14 @@ function openSettingsAndClose(e) {
   window.close();
 }
 
+// ver-pill 是 <span role="button" tabindex="0">：需要显式处理 Enter/Space，
+// 否则键盘用户 Tab 到它并按 Enter 不会有任何反应（原生 button 才不会这样）。
 $('ver')?.addEventListener('click', openSettingsAndClose);
+$('ver')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    openSettingsAndClose(e);
+  }
+});
 $('openOptions')?.addEventListener('click', openSettingsAndClose);
 
 const brandAvatarEl = $('brandAvatar');

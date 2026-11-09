@@ -3019,6 +3019,56 @@ console.log(problems.length ? 'FOCUS_TRAP_PROBLEMS:\n' + problems.join('\n') : '
         self.assertEqual(res.returncode, 0, f"焦点陷阱模拟失败:\n{res.stderr}\n{res.stdout}")
         self.assertIn("FOCUS_TRAP_OK", res.stdout, f"模态框焦点陷阱存在缺陷:\n{res.stdout}")
 
+    def test_focusable_elements_have_visible_focus_ring(self):
+        """每个可聚焦控件都必须有 :focus-visible 样式，否则键盘用户看不到焦点。
+
+        弹窗里除原生 button/a 外，还有多个「div/span + role="button" +
+        tabindex="0"」的自定义控件（品牌头像、版本胶囊、IP 胶囊、网关胶囊、
+        运营商徽章、运营商快捷按钮）。它们能被 Tab 聚焦，但此前只有
+        :hover/:active —— 键盘用户完全看不到焦点落在哪，属于典型的
+        「鼠标能用、键盘失明」缺陷。
+
+        本用例把「可聚焦」与「有焦点环」两个集合对齐：前者从 HTML 提取
+        （tabindex="0" 或原生 button/a），后者从 CSS 中声明了 outline 的
+        规则提取，逐个比对类名 / id。
+        """
+        import re as _re
+        for html_name, css_name in (("popup.html", "popup.css"), ("options.html", "options.css")):
+            with open(os.path.join(EXT_DIR, html_name), "r", encoding="utf-8") as f:
+                html = f.read()
+            with open(os.path.join(EXT_DIR, css_name), "r", encoding="utf-8") as f:
+                css = f.read()
+
+            focus_sels = set()
+            for m in _re.finditer(r"([^{}]+)\{[^}]*outline\s*:\s*2px", css):
+                for part in m.group(1).split(","):
+                    part = part.strip()
+                    if "focus" in part:
+                        focus_sels.add(part)
+            self.assertTrue(focus_sels, f"{css_name} 未找到任何 focus 环规则")
+
+            missing = []
+            for m in _re.finditer(r"<(button|a|div|span)\b([^>]*)>", html):
+                tag, attrs = m.group(1), m.group(2)
+                if not ('tabindex="0"' in attrs or tag in ("button", "a")):
+                    continue
+                # 隐藏的代理触发控件不算（由可见按钮代替）
+                if 'style="display:none"' in attrs or 'aria-hidden="true"' in attrs:
+                    continue
+                cls = _re.search(r'class=["\']([^"\']+)["\']', attrs)
+                classes = cls.group(1).split() if cls else []
+                idm = _re.search(r'id=["\']([^"\']+)["\']', attrs)
+                eid = idm.group(1) if idm else None
+
+                covered = any(
+                    any(("." + c) in s for s in focus_sels) for c in classes
+                ) or (eid is not None and any(("#" + eid) in s for s in focus_sels))
+                if not covered:
+                    missing.append((tag, eid, classes))
+
+            self.assertEqual(missing, [],
+                             f"{html_name} 存在可聚焦但无焦点环的控件（键盘用户看不到焦点）: {missing}")
+
 
 if __name__ == "__main__":
     unittest.main()

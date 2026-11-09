@@ -3672,6 +3672,7 @@ input[aria-invalid="true"] {
 .topo-step:focus-visible,
 .log-drawer-toggle:focus-visible,
 .log-action-btn:focus-visible,
+.isp-pill:focus-visible,
 .btn-modal-cancel:focus-visible,
 .btn-modal-confirm:focus-visible,
 .custom-select-trigger:focus-visible,
