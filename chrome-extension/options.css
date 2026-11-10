@@ -1996,10 +1996,6 @@ input::placeholder {
   opacity: 1;
 }
 
-#account {
-  padding-right: 40px;
-}
-
 input[type="text"]:focus,
 input[type="password"]:focus,
 select:focus {
