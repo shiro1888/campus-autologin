@@ -288,11 +288,14 @@ function decodePortalBytes(bytes, declaredCharset) {
 /**
  * 带超时的 fetch，返回文本。
  *
- * 必须按响应头声明的 charset 解码：门户实测声明 `charset=gbk`
- * （chkstatus 为 application/javascript; charset=gbk），而 fetch 的 resp.text()
- * **一律按 UTF-8** 解码、忽略该声明 —— 于是门户返回的中文（如 msga 错误原因）
- * 会变成 U+FFFD 乱码，导致中文错误提示无法显示、也影响按中文匹配的判定。
- * result/flow 等 ASCII 字段虽不受影响，但既然拿到了声明就应当遵照。
+ * 为什么不能直接用 resp.text()：它**一律按 UTF-8** 解码、忽略响应头声明 ——
+ * 门户实测声明 `charset=gbk`（chkstatus 为 application/javascript; charset=gbk），
+ * 中文（如 msga 错误原因）会变成 U+FFFD 乱码，按中文关键字匹配的判定随之失效；
+ * result/flow 等 ASCII 字段虽不受影响，但既然拿到了原始字节就应按正确编码解出。
+ *
+ * 解码也不能只信声明本身（网关/代理可能把 UTF-8 错标成 gbk，GBK 几乎不会解码
+ * 失败、错标时静默产出乱码），统一收敛到 decodePortalBytes：先按字节结构判定
+ * 是否合法 UTF-8，再以声明优先的回退链解出。
  */
 async function fetchText(url) {
   const ctrl = new AbortController();
