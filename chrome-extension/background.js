@@ -158,6 +158,34 @@ function parseGatewayDurationSec(raw) {
   return 0;
 }
 
+/**
+ * 推算本次会话的开始时间戳。
+ *
+ * 优先用网关给出的活跃秒数（actt / oltime），其次用门户的 stime，
+ * 两者都不可用时才退回「此刻」。
+ *
+ * stime 的有效性判定不能要求「必须和今天是同一天」：校园网允许跨夜在线，
+ * 23:50 上线、00:10 查看是完全正常的会话，旧实现用「日期字符串必须相等」
+ * 的比较会把它判为过期残留，
+ * 把 onlineSince 重置成 Date.now() —— 会话时长归零，且该值会落盘、
+ * 整个会话期间不再重算（if (!onlineSince) 保护），UI 因此一直显示 0。
+ *
+ * 这里与 common.js 的 resolveSessionDuration 对齐，改用「16 小时」阈值：
+ * 只要 stime 有效、不是未来时间、且距今不超过 16 小时就采信，
+ * 跨夜会话正常显示，几天前的残留日期仍会被挡掉。
+ */
+function deriveOnlineSince(raw) {
+  const gwSec = parseGatewayDurationSec(raw);
+  if (gwSec > 0) return Date.now() - gwSec * 1000;
+  const now = Date.now();
+  const MAX_STIME_AGE_MS = 16 * 3600 * 1000;
+  if (raw && raw.stime) {
+    const ms = new Date(String(raw.stime).replace(/-/g, '/')).getTime();
+    if (Number.isFinite(ms) && ms <= now && (now - ms) <= MAX_STIME_AGE_MS) return ms;
+  }
+  return now;
+}
+
 /** 账号脱敏（日志与调试安全防窥） */
 function maskAccount(acc) {
   if (!acc || typeof acc !== 'string') return '';
@@ -930,20 +958,7 @@ async function updateConnState(st) {
     }
   } else if (st.online) {
     if (!onlineSince) {
-      const gwSec = parseGatewayDurationSec(st.raw);
-      if (gwSec > 0) {
-        onlineSince = Date.now() - gwSec * 1000;
-      } else if (st.raw && st.raw.stime) {
-        const d = new Date(String(st.raw.stime).replace(/-/g, '/'));
-        const ms = d.getTime();
-        if (Number.isFinite(ms) && !isNaN(ms) && d.toDateString() === new Date().toDateString() && ms <= Date.now()) {
-          onlineSince = ms;
-        } else {
-          onlineSince = Date.now();
-        }
-      } else {
-        onlineSince = Date.now();
-      }
+      onlineSince = deriveOnlineSince(st.raw);
       patchOnlineSince = true;
     }
   }
@@ -1339,20 +1354,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .then(async ([st, s]) => {
         let curOnlineSince = onlineSince || s.onlineSince || null;
         if (st.online && !curOnlineSince) {
-          const gwSec = parseGatewayDurationSec(st.raw);
-          if (gwSec > 0) {
-            curOnlineSince = Date.now() - gwSec * 1000;
-          } else if (st.raw && st.raw.stime) {
-            const d = new Date(String(st.raw.stime).replace(/-/g, '/'));
-            const ms = d.getTime();
-            if (Number.isFinite(ms) && !isNaN(ms) && d.toDateString() === new Date().toDateString() && ms <= Date.now()) {
-              curOnlineSince = ms;
-            } else {
-              curOnlineSince = Date.now();
-            }
-          } else {
-            curOnlineSince = Date.now();
-          }
+          curOnlineSince = deriveOnlineSince(st.raw);
           onlineSince = curOnlineSince;
           await setState({ onlineSince: curOnlineSince });
         }

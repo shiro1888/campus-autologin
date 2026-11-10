@@ -3069,6 +3069,113 @@ console.log(problems.length ? 'FOCUS_TRAP_PROBLEMS:\n' + problems.join('\n') : '
             self.assertEqual(missing, [],
                              f"{html_name} 存在可聚焦但无焦点环的控件（键盘用户看不到焦点）: {missing}")
 
+    def test_overnight_session_duration_is_not_reset(self):
+        """跨夜在线会话的计时不能被「必须同一天」的守卫误杀。
+
+        校园网允许跨夜在线：23:50 上线、00:10 打开插件是完全正常的情况。
+        旧实现在 status / updateConnState 里用
+        `d.toDateString() === new Date().toDateString()` 判定 stime 有效性，
+        跨夜时判为过期残留，把 onlineSince 重置成 Date.now() —— 会话时长归零，
+        且该值会落盘、之后因 `if (!onlineSince)` 不再重算，整个会话期间 UI 一直显示 0。
+        common.js 直接解析 raw.stime 本是对的，但 UI 优先用 background 的
+        onlineSince，错误值反而覆盖了正确值。
+
+        本用例用可控时钟驱动真实 status 消息路径，断言具体时间戳而非「不抛异常」。
+        """
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(process.argv[1], 'utf8');
+const NOW = new Date('2026/11/10 00:10:00').getTime();
+const STIME_MS = new Date('2026/11/09 23:50:00').getTime();
+
+function fakeDate() {
+  return new Proxy(Date, {
+    get(t, k) { return k === 'now' ? () => NOW : t[k]; },
+    construct(t, args) { return args.length ? new t(...args) : new t(NOW); }
+  });
+}
+function mkCtx() {
+  const listeners = {};
+  const storage = { initialized: true, account: 't', password: 'p' };
+  const chrome = {
+    storage: { local: {
+      get: (a, cb) => { const r = a === null ? { ...storage } : { ...(a || {}) }; if (cb) cb(r); return Promise.resolve(r); },
+      set: (p, cb) => { Object.assign(storage, p); if (cb) cb(); return Promise.resolve(); }
+    } },
+    runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} },
+      onMessage: { addListener: (f) => { listeners.message = f; } },
+      getManifest: () => ({ version: 't' }), lastError: null, sendMessage() {} },
+    alarms: { onAlarm: { addListener() {} }, get: async () => null, create: async () => {} },
+    action: { setBadgeText() {}, setBadgeBackgroundColor() {} }, commands: null,
+    webNavigation: { onCommitted: { addListener() {} }, onErrorOccurred: { addListener() {} } }
+  };
+  const ctx = {
+    console: { log() {}, warn() {}, error() {} }, chrome,
+    setTimeout: (f, ms) => setTimeout(f, ms), clearTimeout,
+    setInterval: () => 1, clearInterval() {}, Date: fakeDate(),
+    Math, JSON, Promise, Number, String, Array, Object, RegExp, Set, Map, Error,
+    parseInt, parseFloat, isNaN, Boolean,
+    TextDecoder, TextEncoder, AbortController, Uint8Array, ArrayBuffer, URLSearchParams,
+    fetch: async () => { throw new Error('offline'); }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(src, ctx);
+  return { ctx, listeners };
+}
+async function runCase(raw) {
+  const { ctx, listeners } = mkCtx();
+  ctx.__st = { reachable: true, online: true, raw: raw, pingMs: 20,
+               pingHistory: [20], message: '当前已在线' };
+  vm.runInContext('checkStatus = () => Promise.resolve(__st)', ctx);
+  const resp = await new Promise((resolve) => {
+    listeners.message({ type: 'status' }, {}, resolve);
+    setTimeout(() => resolve(null), 1500);
+  });
+  return resp && resp.onlineSince;
+}
+(async () => {
+  const cases = [
+    ['overnight20m', { stime: '2026-11-09 23:50:00' }, STIME_MS],
+    ['overnight4h',  { stime: '2026-11-09 20:10:00' }, new Date('2026/11/09 20:10:00').getTime()],
+    ['stale3days',   { stime: '2026-11-07 08:00:00' }, NOW],
+    ['over16h',      { stime: '2026-11-09 08:00:00' }, NOW],
+    ['future',       { stime: '2026-11-10 01:00:00' }, NOW],
+    ['invalid',      { stime: '???' },                  NOW],
+    ['noRaw',        null,                             NOW],
+    ['acttPriority', { stime: '2026-11-09 23:50:00', actt: '3600' }, NOW - 3600000],
+    ['sentinelActt', { stime: '2026-11-09 23:50:00', actt: '4294967295' }, STIME_MS]
+  ];
+  const out = {};
+  for (const [name, raw, expect] of cases) {
+    const got = await runCase(raw);
+    out[name] = { got: got === undefined || got === null ? null : Number(got), expect, ok: Number(got) === expect };
+  }
+  console.log('RESULT:' + JSON.stringify(out));
+})().catch((e) => console.log('ERROR:' + e.message));
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, os.path.join(EXT_DIR, "background.js")],
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        )
+        self.assertEqual(res.returncode, 0, f"跨夜会话模拟失败:\n{res.stderr}\n{res.stdout}")
+        line = next((l for l in res.stdout.splitlines() if l.startswith("RESULT:")), None)
+        self.assertIsNotNone(line, f"未拿到模拟结果:\n{res.stdout}\n{res.stderr}")
+        data = json.loads(line[len("RESULT:"):])
+        for name, case in data.items():
+            self.assertTrue(case["ok"],
+                            f"{name}: onlineSince={case['got']}，期望 {case['expect']}"
+                            f"（跨夜会话被重置成 now 会让 UI 时长归零）")
+        self.assertEqual(data["overnight20m"]["expect"] - data["overnight20m"]["got"], 0)
+        # 结构性守卫：两处调用点必须收敛到同一个函数，避免以后逻辑再次分叉
+        with open(os.path.join(EXT_DIR, "background.js"), "r", encoding="utf-8") as f:
+            bg = f.read()
+        self.assertIn("function deriveOnlineSince(", bg)
+        self.assertGreaterEqual(bg.count("deriveOnlineSince("), 3,
+                                "status 与 updateConnState 应共用同一个推算函数")
+        self.assertNotIn("toDateString() === new Date().toDateString()", bg,
+                         "不应再用『必须同一天』判定 stime 有效性")
+
 
 if __name__ == "__main__":
     unittest.main()
