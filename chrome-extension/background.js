@@ -1240,7 +1240,7 @@ function setupInstantTriggers() {
    * 每秒 1 次。手动注销暂停（paused）是确定性跳过，保留完整窗口避免空转。
    *
    * @param {string} label 日志用的触发来源
-   * @param {function(): Promise<*>} [pre] 额外前置条件，返回 false 则放弃
+   * @param {function(): boolean} [pre] 额外前置条件（同步判定），返回 false 则放弃
    */
   function trigger(label, pre) {
     try {
@@ -1491,7 +1491,7 @@ if (chrome.commands && chrome.commands.onCommand) {
       console.log('[command] 快捷键触发登录');
       // manual=true：这是用户主动按键，与点「立即登录」等价，应解除注销暂停。
       // 否则用户注销后按快捷键毫无反应，会以为快捷键坏了。
-      autoLogin('快捷键', true);
+      autoLogin('快捷键', true).catch(() => {});
     }
   });
 }
