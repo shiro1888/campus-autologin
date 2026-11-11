@@ -36,7 +36,7 @@
 4. 选择这个文件夹：
 
    ```
-   C:\Project\campus-autologin\chrome-extension
+   C:\Project\Campus-Autologin\chrome-extension
    ```
 
 5. 插件出现在列表里即安装成功。点击工具栏的插件图标 → **⚙ 设置**，确认账号密码后点 **保存并连接**。
