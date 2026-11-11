@@ -12,7 +12,7 @@
  * 本脚本只做三件事：
  *   1) 先查 chkstatus，已在线就直接退出（不打扰用户）
  *   2) 等页面渲染出登录表单，自动填写账号密码、选中运营商
- *   3) 点击登录按钮；若 4 秒后仍未上线，则用同源 fetch 兜底登录
+ *   3) 点击登录按钮；若 5 秒后仍未上线，则用同源 fetch 兜底登录
  */
 
 'use strict';
@@ -635,24 +635,9 @@
 
                 report({ ok: false, state: 'submitted', online: false, message: '已自动填写并提交登录表单，等待网关响应…' });
 
-              // 兜底：5.0 秒后仍未上线且无明确错误，再用同源 fetch 尝试一次
-              setTimeout(function () {
-                if (done) { resolveFlow(); return; }
-                if (detectPageError()) {
-                  done = true;
-                  showHud('登录失败：网关返回错误提示', 'error');
-                  report({ ok: false, online: false, message: '登录失败：网关返回错误提示' });
-                  resolveFlow();
-                  return;
-                }
-                checkStatus().then(function (ok) {
-                  if (ok) {
-                    done = true;
-                    showHud('校园网认证成功！已在线', 'success');
-                    report({ ok: true, online: true, message: '登录成功，已确认在线' });
-                    resolveFlow();
-                    return;
-                  }
+                // 兜底：5.0 秒后仍未上线且无明确错误，再用同源 fetch 尝试一次
+                setTimeout(function () {
+                  if (done) { resolveFlow(); return; }
                   if (detectPageError()) {
                     done = true;
                     showHud('登录失败：网关返回错误提示', 'error');
@@ -660,42 +645,57 @@
                     resolveFlow();
                     return;
                   }
-                  // 兜底登录前复查「手动注销」标志：用户在等待期间点了注销时不得再把人登回。
-                  getSettings().then(function (fresh) {
-                    if (fresh.paused) {
+                  checkStatus().then(function (ok) {
+                    if (ok) {
                       done = true;
-                      report({ ok: false, online: false, message: '已手动注销，取消兜底登录' });
+                      showHud('校园网认证成功！已在线', 'success');
+                      report({ ok: true, online: true, message: '登录成功，已确认在线' });
                       resolveFlow();
                       return;
                     }
-                    directLogin(s.account, s.password, s.isp).then(function (r) {
+                    if (detectPageError()) {
                       done = true;
-                      if (r.ok) {
-                        showHud('校园网认证成功！已在线', 'success');
-                      } else {
-                        const displayMsg = !r.msg ? '登录失败：认证被拒绝' : (
-                          r.msg.indexOf('登录失败') === 0 || r.msg.indexOf('当前时段') === 0 || r.msg.indexOf('认证失败') === 0
-                            ? r.msg
-                            : ('登录失败：' + r.msg)
-                        );
-                        showHud(displayMsg, 'error');
-                      }
-                      report({
-                        ok: r.ok,
-                        online: r.ok,
-                        message: r.ok ? '登录成功（兜底请求）' : ('登录失败：' + (r.msg || '认证被拒绝'))
-                      });
+                      showHud('登录失败：网关返回错误提示', 'error');
+                      report({ ok: false, online: false, message: '登录失败：网关返回错误提示' });
                       resolveFlow();
+                      return;
+                    }
+                    // 兜底登录前复查「手动注销」标志：用户在等待期间点了注销时不得再把人登回。
+                    getSettings().then(function (fresh) {
+                      if (fresh.paused) {
+                        done = true;
+                        report({ ok: false, online: false, message: '已手动注销，取消兜底登录' });
+                        resolveFlow();
+                        return;
+                      }
+                      directLogin(s.account, s.password, s.isp).then(function (r) {
+                        done = true;
+                        if (r.ok) {
+                          showHud('校园网认证成功！已在线', 'success');
+                        } else {
+                          const displayMsg = !r.msg ? '登录失败：认证被拒绝' : (
+                            r.msg.indexOf('登录失败') === 0 || r.msg.indexOf('当前时段') === 0 || r.msg.indexOf('认证失败') === 0
+                              ? r.msg
+                              : ('登录失败：' + r.msg)
+                          );
+                          showHud(displayMsg, 'error');
+                        }
+                        report({
+                          ok: r.ok,
+                          online: r.ok,
+                          message: r.ok ? '登录成功（兜底请求）' : ('登录失败：' + (r.msg || '认证被拒绝'))
+                        });
+                        resolveFlow();
+                      }).catch(function () {
+                        resolveFlow();   // 异常也要结束流程，让锁释放
+                      });
                     }).catch(function () {
-                      resolveFlow();   // 异常也要结束流程，让锁释放
+                      resolveFlow();
                     });
                   }).catch(function () {
                     resolveFlow();
                   });
-                }).catch(function () {
-                  resolveFlow();
-                });
-              }, 5000);
+                }, 5000);
               });
             });
           });
