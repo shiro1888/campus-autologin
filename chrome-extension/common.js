@@ -874,6 +874,10 @@ function initAccent(callback) {
  * 组件 9：深浅色主题模式管理组件 (ThemeManager Component)
  * 统一管理 auto/dark/light 状态轮转、系统偏好跟随、存储持久化与多端无缝响应。
  */
+// 与 initAccent 保持相同的幂等保护：单一页面内若多次实例化 ThemeManager，
+// onChanged 监听器只注册一次，通过 _themeApplyFn 指针把事件路由给最新实例的 apply。
+let _themeListenerBound = false;
+let _themeApplyFn = null;
 function createThemeManager(options = {}) {
   const toggleBtn = $(options.toggleBtnId || options.btnId);
   const labelEl = $(options.labelId);
@@ -927,15 +931,18 @@ function createThemeManager(options = {}) {
   }
 
   function init() {
+    // 更新 apply 指针，使全局唯一的 onChanged 监听器始终路由给本实例
+    _themeApplyFn = apply;
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
       chrome.storage.local.get({ theme: 'auto' }, (s) => {
         apply(s && s.theme);
       });
 
-      if (chrome.storage.onChanged) {
+      if (chrome.storage.onChanged && !_themeListenerBound) {
+        _themeListenerBound = true;
         chrome.storage.onChanged.addListener((changes, area) => {
           if (area === 'local' && changes.theme) {
-            apply(changes.theme.newValue);
+            if (typeof _themeApplyFn === 'function') _themeApplyFn(changes.theme.newValue);
           }
         });
       }

@@ -762,7 +762,7 @@ $('btnResetDefaults').addEventListener('click', () => {
         authError: false,
         onlineSince: null
       }, () => {
-        $('btnSave').classList.remove('has-changes');
+        setDirtyState(false);
         load();
         chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => { void chrome.runtime.lastError; });
         showToast('已恢复为默认配置，请重新填写账号密码。', 'ok');
@@ -792,7 +792,7 @@ if ($('clearAccount')) {
       acct.value = '';
       syncClearBtn();
       acct.focus();
-      $('btnSave').classList.add('has-changes');
+      setDirtyState(true);
     }
   });
 }
