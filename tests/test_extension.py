@@ -3564,7 +3564,10 @@ console.log(problems.length ? 'OPT_PROBLEMS:\n' + problems.join('\n') : 'OPT_OK'
 
         with open(os.path.join(EXT_DIR, "options.html"), "r", encoding="utf-8") as f:
             options_html = f.read()
+        with open(os.path.join(EXT_DIR, "common.js"), "r", encoding="utf-8") as f:
+            common_js = f.read()
         self.assertNotIn('id="toastBar"', options_html, "options.html 不应再残留静态隐藏的 #toastBar")
+        self.assertNotIn("toastBar", common_js, "common.js 不应再保留已移除的 #toastBar 兼容分支")
         self.assertNotIn('for="isp"', options_html, "不应把 <label for=\"isp\"> 指向已隐藏的原生 select")
         self.assertIn('id="toastContainer"', options_html)
         self.assertIn('aria-live="polite"', options_html)

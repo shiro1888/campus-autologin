@@ -1007,12 +1007,7 @@ function createToastManager(options = {}) {
       if (finished) return;
       finished = true;
       toastEl.removeEventListener('transitionend', onEnd);
-      if (toastEl.id !== 'toastBar') {
-        toastEl.remove();
-      } else {
-        toastEl.classList.remove('hide');
-        toastEl._dismissing = false;
-      }
+      toastEl.remove();
     };
     toastEl.addEventListener('transitionend', onEnd, { once: true });
     setTimeout(onEnd, 300);
