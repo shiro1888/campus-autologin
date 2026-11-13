@@ -102,8 +102,8 @@ campus-autologin/
 # 扩展结构与 DOM 契约测试（manifest / 弹窗与设置页的 DOM ID 对应关系 / 外链 noopener）
 python -m unittest discover tests -v
 
-# 端到端回归：在隔离临时克隆中验证「错误密码被拦截」；
-# 「正确凭据完整清洗」需环境变量注入历史旧凭据，历史已清洗时会明确标记 SKIP
+# 端到端回归：在隔离临时克隆中验证「错误密码被拦截」与「凭据清洗全流程」；
+# 历史已清洗时会植入临时虚构凭据构造测试历史，仅在缺少 git-filter-repo 时标记 SKIP
 powershell -File tests/test_clean_history_e2e.ps1
 
 # 重新生成扩展图标（需要 Pillow：pip install pillow）
