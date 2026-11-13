@@ -3176,6 +3176,461 @@ async function runCase(raw) {
         self.assertNotIn("toDateString() === new Date().toDateString()", bg,
                          "不应再用『必须同一天』判定 stime 有效性")
 
+    def test_content_script_hides_hud_and_guards_invalidated_lock(self):
+        """兜底退出路径必须收起 loading HUD，且上下文失效时不得无锁提交。"""
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm');
+let src = fs.readFileSync(process.argv[1], 'utf8');
+const idx = src.lastIndexOf('})();');
+if (idx === -1) { console.log('HUD_PROBLEMS: 未找到 IIFE 结尾'); process.exit(0); }
+src = src.slice(0, idx) + 'window.__withLock = withLock;\nwindow.__main = main;\n' + src.slice(idx);
+
+async function runFallbackCase(mode) {
+  const problems = [];
+  const hudMap = {};
+  const bodyChildren = [];
+  const timers = [];
+  const released = [];
+  let directLoginCalls = 0;
+
+  function mkNode(tag, id) {
+    const node = {
+      id: id || '', tagName: tag, style: {}, parentNode: null, value: '',
+      checked: false, options: [], textContent: '', lastElementChild: null,
+      dispatchEvent() {}, click() {},
+      appendChild(child) {
+        child.parentNode = this;
+        bodyChildren.push(child);
+        if (child.id) hudMap[child.id] = child;
+        return child;
+      },
+      removeChild(child) {
+        child.parentNode = null;
+        const pos = bodyChildren.indexOf(child);
+        if (pos !== -1) bodyChildren.splice(pos, 1);
+        if (child.id && hudMap[child.id] === child) delete hudMap[child.id];
+      }
+    };
+    let _html = '';
+    Object.defineProperty(node, 'innerHTML', {
+      get() { return _html; },
+      set(v) {
+        _html = String(v);
+        node.lastElementChild = mkNode('SPAN', '');
+      }
+    });
+    return node;
+  }
+
+  const userInput = mkNode('INPUT', '');
+  const passInput = mkNode('INPUT', '');
+  const submitBtn = mkNode('INPUT', '');
+  const body = mkNode('BODY', '');
+  body.innerText = '';
+
+  const storageState = {
+    account: '13800000000', password: 'pw', isp: '1',
+    contentAutoFill: true, manualLogout: false
+  };
+
+  const sandbox = {
+    console: { log() {}, warn() {}, error() {} },
+    setTimeout(fn, ms) { timers.push({ fn, ms }); return timers.length; },
+    clearTimeout() {},
+    setInterval() { return 1; },
+    clearInterval() {},
+    Event: function (t) { this.type = t; },
+    TextDecoder, Uint8Array, AbortController: undefined,
+    Date, Math, JSON, Promise, String, Number, Object, Array, RegExp, Error,
+    fetch: async (url) => {
+      if (url.indexOf('/drcom/login') !== -1) directLoginCalls += 1;
+      const buf = new TextEncoder().encode('dr1001({"result":0})').buffer;
+      return {
+        ok: true, status: 200,
+        headers: { get: () => 'application/javascript; charset=utf-8' },
+        arrayBuffer: async () => buf
+      };
+    },
+    document: {
+      readyState: 'loading',
+      body,
+      head: mkNode('HEAD', ''),
+      documentElement: mkNode('HTML', ''),
+      addEventListener() {},
+      createElement: (tag) => mkNode(String(tag || 'DIV').toUpperCase(), ''),
+      getElementById: (id) => hudMap[id] || null,
+      querySelectorAll: () => [],
+      querySelector(sel) {
+        if (sel.indexOf('DDDDD') !== -1) return userInput;
+        if (sel.indexOf('upass') !== -1) return passInput;
+        if (sel.indexOf('0MKKey') !== -1) return submitBtn;
+        return null;
+      }
+    },
+    window: { addEventListener() {}, removeEventListener() {} },
+    navigator: {}, Element: function () {},
+    chrome: {
+      runtime: {
+        lastError: null,
+        sendMessage(msg, cb) {
+          if (msg.type === 'status') {
+            cb && cb({ online: false, running: false, manualLogout: false });
+          } else if (msg.type === 'acquireAuthLock') {
+            cb && cb({ ok: true, token: 'test' });
+          } else if (msg.type === 'releaseAuthLock') {
+            released.push(msg.token);
+            cb && cb({ ok: true });
+          } else {
+            cb && cb({ ok: true });
+          }
+        }
+      },
+      storage: {
+        local: {
+          get(def, cb) {
+            cb && cb({ ...def, ...storageState });
+          }
+        }
+      }
+    }
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox);
+  vm.runInContext('window.__main()', sandbox);
+  await new Promise((r) => setTimeout(r, 20));
+
+  if (!hudMap['campus-login-hud']) {
+    problems.push(`[${mode}] 提交后未创建 loading HUD`);
+    return problems;
+  }
+
+  const fbTimer = timers.find((t) => t.ms === 5000);
+  if (!fbTimer) {
+    problems.push(`[${mode}] 未注册 5000ms 兜底定时器`);
+    return problems;
+  }
+
+  if (mode === 'paused') {
+    storageState.manualLogout = true;
+  } else if (mode === 'getSettingsError') {
+    // getSettings 内部 catch 返回 paused: true；验证在 checkStatus 后抛错的路径：
+    // 先把 checkStatus 的 fetch 改成返回拒绝态会触发内部的 checkStatus().catch -> false，
+    // 因此额外验证 paused=true 与 5s 回调里 document 异常无关的路径并注入 getSettings 异常：
+    sandbox.chrome.storage.local.get = () => { throw new Error('Extension context invalidated.'); };
+  }
+
+  fbTimer.fn();
+  await new Promise((r) => setTimeout(r, 30));
+
+  if (hudMap['campus-login-hud']) {
+    problems.push(`[${mode}] 退出兜底流程后 loading HUD 仍挂在 DOM 上`);
+  }
+  if (released.length !== 1 || released[0] !== 'test') {
+    problems.push(`[${mode}] 锁未正确释放: ${JSON.stringify(released)}`);
+  }
+  if (directLoginCalls !== 0) {
+    problems.push(`[${mode}] 不应发起 directLogin: ${directLoginCalls}`);
+  }
+  return problems;
+}
+
+(async () => {
+  const problems = [];
+  problems.push(...await runFallbackCase('paused'));
+  problems.push(...await runFallbackCase('getSettingsError'));
+
+  // 验证 withLock 在 sendMessage 同步抛错时不得无锁执行 fn
+  let unlockedRuns = 0;
+  const ctx = {
+    console: { log() {}, warn() {}, error() {} },
+    setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {},
+    document: { readyState: 'loading', addEventListener() {}, getElementById: () => null,
+      querySelector: () => null, querySelectorAll: () => [], body: {}, head: {}, documentElement: {} },
+    window: { addEventListener() {}, removeEventListener() {} },
+    chrome: {
+      runtime: { sendMessage() { throw new Error('Extension context invalidated.'); } },
+      storage: { local: { get: (d, cb) => cb && cb(d) } }
+    },
+    navigator: {}, Element: function () {},
+    Date, Math, JSON, Promise, String, Number, Object, Array, RegExp, TextDecoder, Uint8Array
+  };
+  vm.createContext(ctx);
+  vm.runInContext(src, ctx);
+  ctx.__inc = () => { unlockedRuns += 1; };
+  vm.runInContext('window.__withLock(__inc)', ctx);
+  if (unlockedRuns !== 0) problems.push('withLock 在异常分支下竟无锁执行了回调: ' + unlockedRuns);
+
+  console.log(problems.length ? 'HUD_PROBLEMS:\n' + problems.join('\n') : 'HUD_OK');
+})();
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, os.path.join(EXT_DIR, "content.js")],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"内容脚本 HUD/锁回归测试失败:\n{res.stderr}\n{res.stdout}")
+        self.assertIn("HUD_OK", res.stdout, f"内容脚本 HUD 或锁保护存在缺陷:\n{res.stdout}")
+
+    def test_options_credential_dirty_partial_save_and_auth_error_clear(self):
+        """设置页：局部保存不得冲掉未确认凭据，回车与改运营商必须清 authError。"""
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const EXT = process.argv[1];
+const html = fs.readFileSync(path.join(EXT, 'options.html'), 'utf8');
+const ids = [...html.matchAll(/id=["']([^"']+)["']/g)].map((m) => m[1]);
+const problems = [];
+
+function makeEl(id) {
+  const listeners = {};
+  const attrs = {};
+  const el = {
+    id, dataset: {}, style: {}, files: [], value: '', checked: false, disabled: false,
+    selectedIndex: 0, title: '', textContent: '', innerHTML: '', className: '',
+    options: [{ value: '1' }, { value: '2' }, { value: '3' }, { value: '4' }],
+    classList: {
+      _s: new Set(),
+      add(...c) { c.forEach((x) => this._s.add(x)); },
+      remove(...c) { c.forEach((x) => this._s.delete(x)); },
+      toggle(c, f) { if (f === undefined) f = !this._s.has(c); f ? this._s.add(c) : this._s.delete(c); return f; },
+      contains(c) { return this._s.has(c); }
+    },
+    setAttribute(k, v) { attrs[k] = String(v); },
+    removeAttribute(k) { delete attrs[k]; },
+    getAttribute(k) { return k in attrs ? attrs[k] : null; },
+    addEventListener(t, fn) { (listeners[t] = listeners[t] || []).push(fn); },
+    removeEventListener() {}, appendChild() {}, removeChild() {}, remove() {},
+    querySelectorAll() { return []; }, querySelector() { return makeEl('child'); },
+    closest() { return null; }, focus() {}, click() { el._fire('click'); },
+    _fire(t, extra) {
+      const evt = Object.assign({ type: t, target: el, preventDefault() {}, stopPropagation() {} }, extra || {});
+      (listeners[t] || []).forEach((fn) => fn(evt));
+    },
+    dispatchEvent(evt) { el._fire(evt.type, evt); }
+  };
+  return el;
+}
+
+const elements = {};
+for (const id of ids) elements[id] = makeEl(id);
+const writes = [];
+const sentMessages = [];
+const storage = {
+  account: '13800000000', password: 'pw', isp: '1', intervalMin: 10 / 60,
+  offlineIntervalMin: 1 / 60, adaptive: true, autoOnStartup: true,
+  contentAutoFill: true, instantTrigger: true, initialized: true,
+  authError: true, privacyMask: false
+};
+const chrome = {
+  storage: {
+    local: {
+      get(arg, cb) {
+        let out = {};
+        if (arg === null || arg === undefined) out = { ...storage };
+        else if (typeof arg === 'object') {
+          out = { ...arg };
+          Object.keys(arg).forEach((k) => { if (k in storage) out[k] = storage[k]; });
+        }
+        cb && cb(out);
+        return Promise.resolve(out);
+      },
+      set(patch, cb) {
+        writes.push({ ...patch });
+        Object.assign(storage, patch);
+        cb && cb();
+        return Promise.resolve();
+      }
+    },
+    onChanged: { addListener() {} }
+  },
+  runtime: {
+    getManifest: () => ({ version: '1.0.0' }), getURL: () => '',
+    openOptionsPage() {}, lastError: null,
+    sendMessage(msg, cb) {
+      sentMessages.push(msg);
+      if (!cb) return;
+      if (msg.type === 'status') {
+        cb({ reachable: true, online: false, pingMs: 20, raw: { v4ip: '10.0.0.1' },
+             manualLogout: false, running: false, pingHistory: [20] });
+      } else cb({ ok: true, online: true, message: 'ok' });
+    }
+  }
+};
+const sandbox = {
+  console: { log() {}, warn() {}, error() {} },
+  setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {},
+  Blob: function () {}, URL: { createObjectURL: () => '', revokeObjectURL() {} },
+  FileReader: function () {},
+  document: {
+    getElementById: (id) => (elements[id] = elements[id] || makeEl(String(id))),
+    querySelectorAll: () => [], querySelector: () => makeEl('q'),
+    addEventListener() {}, createElement: () => makeEl('created'),
+    createElementNS: () => makeEl('svg'),
+    body: { appendChild() {}, removeChild() {} },
+    documentElement: { setAttribute() {}, removeAttribute() {} },
+    visibilityState: 'visible'
+  },
+  window: { matchMedia: () => ({ matches: false, addEventListener() {} }),
+    addEventListener() {}, open() {}, close() {}, confirm: () => false },
+  navigator: { platform: 'Win32', userAgent: 'Chrome', language: 'zh-CN' },
+  Element: function () {}, chrome,
+  Date, Math, JSON, String, Number, Object, Array, RegExp, Set,
+  parseInt, parseFloat, isNaN, Promise, Error, Event: function (t) { this.type = t; }
+};
+sandbox.window.document = sandbox.document;
+vm.createContext(sandbox);
+vm.runInContext(fs.readFileSync(path.join(EXT, 'common.js'), 'utf8'), sandbox);
+vm.runInContext(fs.readFileSync(path.join(EXT, 'options.js'), 'utf8'), sandbox);
+
+// 1) 编辑一半账号，切换 adaptive 与 isp：不得写盘半成品账号，不得清掉脏提示；切换 isp 须清 authError
+elements.account.value = 'half_edited';
+elements.account._fire('input');
+if (!elements.btnSave.classList.contains('has-changes')) {
+  problems.push('修改账号后未标记 has-changes');
+}
+
+writes.length = 0;
+elements.adaptive.checked = false;
+elements.adaptive._fire('change');
+if (writes.length !== 1 || 'account' in writes[0] || writes[0].adaptive !== false) {
+  problems.push('切换 adaptive 不应写整表凭据: ' + JSON.stringify(writes));
+}
+if (!elements.btnSave.classList.contains('has-changes')) {
+  problems.push('切换 adaptive 后误清了未保存凭据的 has-changes 提示');
+}
+
+writes.length = 0;
+elements.isp.value = '2';
+elements.isp._fire('change');
+if (writes.length !== 1 || writes[0].isp !== '2' || writes[0].authError !== false || 'account' in writes[0]) {
+  problems.push('切换 isp 未局部写盘并清除 authError: ' + JSON.stringify(writes));
+}
+if (!elements.btnSave.classList.contains('has-changes')) {
+  problems.push('切换 isp 后误清了未保存凭据的 has-changes 提示');
+}
+
+// 2) 回车保存：写入账号密码并清 authError，且不触发 login 消息
+storage.authError = true;
+writes.length = 0;
+sentMessages.length = 0;
+elements.account.value = '13812345678';
+elements.password.value = 'test';
+elements.password._fire('keydown', { key: 'Enter' });
+if (writes.length !== 1 || writes[0].account !== '13812345678' || writes[0].authError !== false) {
+  problems.push('回车保存未写入完整凭据或未清除 authError: ' + JSON.stringify(writes));
+}
+if (sentMessages.some((m) => m.type === 'login')) {
+  problems.push('回车保存意外触发了 login');
+}
+if (elements.btnSave.classList.contains('has-changes')) {
+  problems.push('回车保存后仍残留 has-changes');
+}
+
+// 3) 一键清空与 load() 必须清除校验失败样式与错误文案
+elements.account.classList.add('field-invalid');
+elements.account.setAttribute('aria-invalid', 'true');
+elements.accountError.textContent = 'error';
+elements.clearAccount._fire('click');
+if (elements.account.classList.contains('field-invalid') || elements.accountError.textContent !== '') {
+  problems.push('点击清空账号未移除校验红框或错误提示');
+}
+
+elements.password.classList.add('field-invalid');
+elements.passwordError.textContent = 'pwd error';
+vm.runInContext('load()', sandbox);
+if (elements.password.classList.contains('field-invalid') || elements.passwordError.textContent !== '') {
+  problems.push('load() 未清除残留的密码校验错误提示');
+}
+
+console.log(problems.length ? 'OPT_PROBLEMS:\n' + problems.join('\n') : 'OPT_OK');
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, EXT_DIR],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"设置页表单交互测试失败:\n{res.stderr}\n{res.stdout}")
+        self.assertIn("OPT_OK", res.stdout, f"设置页保存或脏状态逻辑存在缺陷:\n{res.stdout}")
+
+    def test_options_auto_dark_accents_and_ui_accessibility_polish(self):
+        """options 页 auto 深色强调色、拓扑提示、死 DOM 清理与隐藏下拉守护。"""
+        with open(os.path.join(EXT_DIR, "options.css"), "r", encoding="utf-8") as f:
+            options_css = f.read()
+        for accent in ("purple", "emerald", "amber", "rose"):
+            self.assertIn(
+                f':root:not([data-theme="light"])[data-accent="{accent}"]',
+                options_css,
+                f"options.css 缺少 auto 深色模式下的 {accent} 强调色覆盖",
+            )
+
+        with open(os.path.join(EXT_DIR, "options.html"), "r", encoding="utf-8") as f:
+            options_html = f.read()
+        self.assertNotIn('id="toastBar"', options_html, "options.html 不应再残留静态隐藏的 #toastBar")
+        self.assertNotIn('for="isp"', options_html, "不应把 <label for=\"isp\"> 指向已隐藏的原生 select")
+        self.assertIn('id="toastContainer"', options_html)
+        self.assertIn('aria-live="polite"', options_html)
+        self.assertNotIn("在新标签页打开校园网门户", options_html, "拓扑网关节点 title 与实际测速刷新行为不符")
+
+        # 验证 initCustomSelects 在 wrapper 含 is-hidden 时不响应关联 label 点击
+        import subprocess
+        runner_script = r"""
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(process.argv[1], 'utf8');
+let triggered = 0;
+function mk(cls) {
+  const L = {};
+  const s = new Set(cls ? cls.split(/\s+/) : []);
+  return {
+    id: '', className: cls || '', selectedIndex: 0, options: [{ value: '1', text: 'A' }],
+    value: '1', dataset: {}, style: {}, parentNode: null,
+    classList: {
+      add: (...c) => c.forEach((x) => s.add(x)),
+      remove: (...c) => c.forEach((x) => s.delete(x)),
+      toggle: (c, f) => { const v = f === undefined ? !s.has(c) : f; v ? s.add(c) : s.delete(c); return v; },
+      contains: (c) => s.has(c)
+    },
+    setAttribute() {}, removeAttribute() {}, getAttribute() { return null; },
+    addEventListener(t, f) { (L[t] = L[t] || []).push(f); },
+    appendChild() {}, insertBefore() {},
+    querySelectorAll: () => [], querySelector: () => null, closest: () => null,
+    focus() {}, click() { triggered += 1; },
+    _fire(t) { (L[t] || []).forEach((f) => f({ preventDefault() {}, stopPropagation() {}, target: this })); }
+  };
+}
+const wrap = mk('select-wrap is-hidden');
+const sel = mk('');
+sel.id = 'isp';
+sel.parentElement = wrap;
+const label = mk('');
+const ctx = {
+  console: { log() {}, warn() {}, error() {} },
+  setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {},
+  document: {
+    getElementById: () => null,
+    querySelectorAll: (s) => (s === '.select-wrap select' ? [sel] : []),
+    querySelector: (s) => (s === 'label[for="isp"]' ? label : null),
+    addEventListener() {},
+    createElement: (tag) => mk(tag === 'button' ? 'custom-select-trigger' : ''),
+    createElementNS: () => mk('svg'),
+    documentElement: { setAttribute() {}, removeAttribute() {} }
+  },
+  window: { matchMedia: () => ({ matches: false, addEventListener() {} }), addEventListener() {}, getComputedStyle: () => ({ display: 'none' }) },
+  navigator: {}, Element: function () {}, chrome: {},
+  Date, Math, JSON, String, Number, Object, Array, RegExp, Set, Map, Promise, Error, Boolean
+};
+ctx.window.document = ctx.document;
+vm.createContext(ctx);
+vm.runInContext(src, ctx);
+vm.runInContext('initCustomSelects()', ctx);
+label._fire('click');
+console.log(triggered === 0 ? 'LABEL_GUARD_OK' : 'LABEL_GUARD_FAIL:' + triggered);
+"""
+        res = subprocess.run(
+            ["node", "-e", runner_script, os.path.join(EXT_DIR, "common.js")],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"自定义下拉标签守卫测试失败:\n{res.stderr}\n{res.stdout}")
+        self.assertIn("LABEL_GUARD_OK", res.stdout, f"隐藏 select 的 label 点击未被拦截:\n{res.stdout}")
+
 
 if __name__ == "__main__":
     unittest.main()

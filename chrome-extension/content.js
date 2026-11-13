@@ -554,7 +554,7 @@
         }
       });
     } catch (e) {
-      fn();
+      // 扩展上下文失效或消息通道异常时安静退出，避免无锁并发填单提交
     }
   }
 
@@ -664,6 +664,7 @@
                     getSettings().then(function (fresh) {
                       if (fresh.paused) {
                         done = true;
+                        hideHud();
                         report({ ok: false, online: false, message: '已手动注销，取消兜底登录' });
                         resolveFlow();
                         return;
@@ -687,12 +688,15 @@
                         });
                         resolveFlow();
                       }).catch(function () {
-                        resolveFlow();   // 异常也要结束流程，让锁释放
+                        hideHud();
+                        resolveFlow();   // 异常也要结束流程，收起 loading 浮层并释放锁
                       });
                     }).catch(function () {
+                      hideHud();
                       resolveFlow();
                     });
                   }).catch(function () {
+                    hideHud();
                     resolveFlow();
                   });
                 }, 5000);

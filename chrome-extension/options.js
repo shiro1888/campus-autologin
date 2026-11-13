@@ -20,17 +20,7 @@ const DEFAULTS = {
 const toastManager = createToastManager({ containerId: 'toastContainer', maxStack: 3 });
 function showToast(text, kind = 'info', duration = 4000) {
   toastManager.show(text, kind, duration);
-  const staticMsg = $('toastMsg');
-  if (staticMsg) staticMsg.textContent = text;
 }
-function dismissToast(toastEl) {
-  toastManager.dismiss(toastEl);
-}
-
-// 点击默认静态 Toast 胶囊立即关闭
-$('toastBar')?.addEventListener('click', () => {
-  dismissToast($('toastBar'));
-});
 
 /** 自习室防窥遮罩管理组件 (Component: createPrivacyMaskManager) */
 const privacyMask = createPrivacyMaskManager({
@@ -118,6 +108,7 @@ function updateTopology(res) {
   const authVal = $('topoAuthVal');
   const authChip = $('topoAuthChip');
   const internetVal = $('topoInternetVal');
+  const internetNode = $('topoNodeInternet');
   const linkPing = $('topoLinkPing');
   const linkAuth = $('topoLinkAuth');
 
@@ -128,6 +119,7 @@ function updateTopology(res) {
     if (authVal) authVal.textContent = '未连接';
     if (authChip) authChip.className = 'topo-chip-badge off';
     if (internetVal) internetVal.textContent = '无网络';
+    if (internetNode) internetNode.title = '在线时点击刷新连通状态，离线时点击立即登录';
     if (linkPing) linkPing.className = 'topo-link off';
     if (linkAuth) linkAuth.className = 'topo-link off';
     return;
@@ -153,16 +145,19 @@ function updateTopology(res) {
     if (authVal) authVal.textContent = '连接失败';
     if (authChip) authChip.className = 'topo-chip-badge off';
     if (internetVal) internetVal.textContent = '未连接';
+    if (internetNode) internetNode.title = '网关不可达 · 点击尝试立即登录';
     if (linkAuth) linkAuth.className = 'topo-link off';
   } else if (res.online) {
     if (authVal) authVal.textContent = '已认证 ✓';
     if (authChip) authChip.className = 'topo-chip-badge on';
     if (internetVal) internetVal.textContent = '认证放行 ✓';
+    if (internetNode) internetNode.title = '外网链路畅通 · 点击刷新连通状态';
     if (linkAuth) linkAuth.className = 'topo-link on';
   } else {
     if (authVal) authVal.textContent = res.manualLogout ? '已暂停' : '待认证';
     if (authChip) authChip.className = 'topo-chip-badge wait';
     if (internetVal) internetVal.textContent = '局域网受限';
+    if (internetNode) internetNode.title = '外网未放行 · 点击立即登录';
     if (linkAuth) linkAuth.className = 'topo-link wait';
   }
 }
@@ -182,6 +177,31 @@ const themeManager = createThemeManager({
 // 下拉选择组件（formatOptionContent / syncCustomSelect / closeAllCustomSelects / initCustomSelects）
 // 已抽象为全局通用组件，定义于 common.js。
 
+let savedCredentials = { account: '', password: '' };
+
+/** 清除单个表单字段的校验失败高亮与错误提示 */
+function clearFieldError(id) {
+  const el = $(id);
+  if (!el) return;
+  el.classList.remove('field-invalid');
+  el.removeAttribute('aria-invalid');
+  el.removeAttribute('aria-describedby');
+  const err = $(id + 'Error');
+  if (err) err.textContent = '';
+}
+
+function clearAllFieldErrors() {
+  clearFieldError('account');
+  clearFieldError('password');
+}
+
+/** 比对输入框当前凭据与已落盘凭据快照，更新未保存状态提示 */
+function syncDirtyState() {
+  const curAccount = ($('account')?.value || '').trim();
+  const curPassword = $('password')?.value || '';
+  setDirtyState(curAccount !== savedCredentials.account || curPassword !== savedCredentials.password);
+}
+
 /** 从本地存储加载配置到表单 */
 function load() {
   const verEl = $('ver');
@@ -195,12 +215,17 @@ function load() {
   }
 
   chrome.storage.local.get(DEFAULTS, (s) => {
+    clearAllFieldErrors();
     // 只接受字符串：storage 里的值可能被手改或来自旧版本。
     // 注意不能只用 String() —— String({}) 会得到字面量 "[object Object]"，照样显示难看。
     // 非字符串一律当作空值处理（下面 isp 也用同样的思路）。
     $('account').value = typeof s.account === 'string' ? s.account : '';
     syncClearBtn();
     $('password').value = typeof s.password === 'string' ? s.password : '';
+    savedCredentials = {
+      account: $('account').value.trim(),
+      password: $('password').value
+    };
     // 非法 isp（手改 storage / 旧版本残留）赋给 select 会静默失败：
     // selectedIndex 变 -1，界面显示与实际生效值脱节，统一归一到默认档
     const storedIsp = typeof s.isp === 'string' ? s.isp : String(s.isp || '1');
@@ -522,10 +547,29 @@ function setDirtyState(dirty) {
  * （设置页的「保存并连接」与后台的定时巡检）。
  */
 function save(cb) {
-  chrome.storage.local.set(readForm(), () => {
+  const data = readForm();
+  // 显式保存表单（如输入框回车 / 保存并连接）时清除凭据错误降频标记，
+  // 使新凭据或运算符配置立即恢复正常重试节奏。
+  const payload = Object.assign({}, data, { authError: false });
+  chrome.storage.local.set(payload, () => {
+    savedCredentials = { account: data.account, password: data.password };
     setDirtyState(false);
     updatePolicySummaryPill();
     syncIspQuickPills();
+    chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => {
+      void chrome.runtime.lastError;
+      if (cb) cb(true);
+    });
+  });
+}
+
+/** 局部保存即时设置，避免把未提交的半成品账号/密码连带落盘并误清脏状态 */
+function savePartialSetting(patch, cb) {
+  const payload = Object.assign({}, patch, { initialized: true });
+  chrome.storage.local.set(payload, () => {
+    updatePolicySummaryPill();
+    syncIspQuickPills();
+    syncDirtyState();
     chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => {
       void chrome.runtime.lastError;
       if (cb) cb(true);
@@ -539,9 +583,13 @@ function hasCredentials() {
   return !!(s.account && s.password);
 }
 
-// --- 监听表单变更，实时提示未保存状态 ---
-['input', 'change'].forEach((evt) => {
-  $('form').addEventListener(evt, () => setDirtyState(true));
+// --- 仅凭据输入变更需要提示「有未保存的凭据改动」 ---
+['account', 'password'].forEach((id) => {
+  const el = $(id);
+  if (el) {
+    el.addEventListener('input', syncDirtyState);
+    el.addEventListener('change', syncDirtyState);
+  }
 });
 
 // --- 保存并连接 ---
@@ -790,9 +838,10 @@ if ($('clearAccount')) {
     const acct = $('account');
     if (acct) {
       acct.value = '';
+      clearFieldError('account');
       syncClearBtn();
       acct.focus();
-      setDirtyState(true);
+      syncDirtyState();
     }
   });
 }
@@ -904,10 +953,10 @@ if ($('btnImportConfig') && $('importFileInput')) {
         toSave.authError = false;
 
         chrome.storage.local.set(toSave, () => {
+          setDirtyState(false);
           load();
           chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => { void chrome.runtime.lastError; });
           showToast('配置已成功导入并生效！', 'ok');
-          $('btnSave').classList.remove('has-changes');
         });
       } catch (err) {
         showToast('导入失败：文件格式错误 (' + err.message + ')', 'err');
@@ -950,27 +999,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 // 输入时即刻清除表单校验失败高亮与错误提示
-$('account')?.addEventListener('input', () => {
-  $('account').classList.remove('field-invalid');
-  $('account').removeAttribute('aria-invalid');
-  $('account').removeAttribute('aria-describedby');
-  const err = $('accountError');
-  if (err) err.textContent = '';
-});
-$('password')?.addEventListener('input', () => {
-  $('password').classList.remove('field-invalid');
-  $('password').removeAttribute('aria-invalid');
-  $('password').removeAttribute('aria-describedby');
-  const err = $('passwordError');
-  if (err) err.textContent = '';
-});
+$('account')?.addEventListener('input', () => clearFieldError('account'));
+$('password')?.addEventListener('input', () => clearFieldError('password'));
 
-// --- 即时保存的切换项 ---
+// --- 即时保存的切换项（局部写盘，避免把未确认的凭据输入连带写入） ---
 ['autoOnStartup', 'contentAutoFill', 'instantTrigger'].forEach((id) => {
   const el = $(id);
   if (el) {
     el.addEventListener('change', () => {
-      save(() => showToast('设置已自动保存。', 'ok'));
+      savePartialSetting({ [id]: !!el.checked }, () => showToast('设置已自动保存。', 'ok'));
     });
   }
 });
@@ -978,23 +1015,32 @@ $('password')?.addEventListener('input', () => {
 $('adaptive')?.addEventListener('change', () => {
   syncOfflineRow();
   updatePolicySummaryPill();
-  save(() => {
+  savePartialSetting({ adaptive: !!$('adaptive').checked }, () => {
     showToast($('adaptive').checked
       ? `已启用自适应重连加速（掉线重试：${fmt($('offlineIntervalMin').value)}）`
       : '已关闭自适应加速，统一使用常规间隔。', 'ok');
   });
 });
 
-// --- 下拉框改动即时保存 ---
-['intervalMin', 'offlineIntervalMin', 'isp'].forEach((id) => {
+// --- 下拉框与运营商改动即时保存 ---
+['intervalMin', 'offlineIntervalMin'].forEach((id) => {
   const el = $(id);
   if (el) {
     el.addEventListener('change', () => {
-      if (id === 'isp') syncIspQuickPills();
+      const parsed = parseFloat(el.value);
+      const val = Number.isFinite(parsed) ? parsed : DEFAULTS[id];
       updatePolicySummaryPill();
-      save(() => showToast('参数已自动保存并生效。', 'ok'));
+      savePartialSetting({ [id]: val }, () => showToast('参数已自动保存并生效。', 'ok'));
     });
   }
+});
+
+$('isp')?.addEventListener('change', () => {
+  syncIspQuickPills();
+  // 切换运营商后与弹窗保持一致，清除凭据降频标记以恢复正常重试节奏
+  savePartialSetting({ isp: $('isp').value, authError: false }, () => {
+    showToast('运营商已保存并生效。', 'ok');
+  });
 });
 
 // --- 启动初始化 ---

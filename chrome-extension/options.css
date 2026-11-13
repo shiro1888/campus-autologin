@@ -1943,7 +1943,8 @@ body {
   gap: 8px;
 }
 
-.field label {
+.field label,
+.field .field-label {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-main);
@@ -3691,8 +3692,7 @@ select:focus-visible,
   --primary-shadow: 0 4px 20px -2px rgba(124, 58, 237, 0.4);
 }
 [data-accent="purple"][data-theme="dark"],
-[data-theme="dark"] [data-accent="purple"],
-[data-theme="dark"][data-accent="purple"] {
+[data-theme="dark"] [data-accent="purple"] {
   --primary: #a855f7;
   --primary-hover: #c084fc;
 }
@@ -3704,8 +3704,7 @@ select:focus-visible,
   --primary-shadow: 0 4px 20px -2px rgba(5, 150, 105, 0.4);
 }
 [data-accent="emerald"][data-theme="dark"],
-[data-theme="dark"] [data-accent="emerald"],
-[data-theme="dark"][data-accent="emerald"] {
+[data-theme="dark"] [data-accent="emerald"] {
   --primary: #10b981;
   --primary-hover: #34d399;
 }
@@ -3717,8 +3716,7 @@ select:focus-visible,
   --primary-shadow: 0 4px 20px -2px rgba(217, 119, 6, 0.4);
 }
 [data-accent="amber"][data-theme="dark"],
-[data-theme="dark"] [data-accent="amber"],
-[data-theme="dark"][data-accent="amber"] {
+[data-theme="dark"] [data-accent="amber"] {
   --primary: #f59e0b;
   --primary-hover: #fbbf24;
 }
@@ -3730,10 +3728,28 @@ select:focus-visible,
   --primary-shadow: 0 4px 20px -2px rgba(225, 29, 72, 0.4);
 }
 [data-accent="rose"][data-theme="dark"],
-[data-theme="dark"] [data-accent="rose"],
-[data-theme="dark"][data-accent="rose"] {
+[data-theme="dark"] [data-accent="rose"] {
   --primary: #f43f5e;
   --primary-hover: #fb7185;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"])[data-accent="purple"] {
+    --primary: #a855f7;
+    --primary-hover: #c084fc;
+  }
+  :root:not([data-theme="light"])[data-accent="emerald"] {
+    --primary: #10b981;
+    --primary-hover: #34d399;
+  }
+  :root:not([data-theme="light"])[data-accent="amber"] {
+    --primary: #f59e0b;
+    --primary-hover: #fbbf24;
+  }
+  :root:not([data-theme="light"])[data-accent="rose"] {
+    --primary: #f43f5e;
+    --primary-hover: #fb7185;
+  }
 }
 
 /* ==========================================================================

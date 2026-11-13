@@ -1049,6 +1049,7 @@ function createToastManager(options = {}) {
 
     const toast = document.createElement('div');
     toast.className = `toast-bar show ${kind}`;
+    toast.setAttribute('role', 'status');
 
     const iconSpan = document.createElement('span');
     iconSpan.className = 'toast-icon';
@@ -1464,6 +1465,11 @@ function initCustomSelects(root = document) {
       const label = document.querySelector(`label[for="${select.id}"]`);
       if (label) {
         label.addEventListener('click', (e) => {
+          if (wrap.classList.contains('is-hidden')) return;
+          if (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function'
+              && window.getComputedStyle(wrap).display === 'none') {
+            return;
+          }
           e.preventDefault();
           e.stopPropagation();
           trigger.focus();
