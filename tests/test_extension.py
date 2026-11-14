@@ -3638,6 +3638,49 @@ console.log(triggered === 0 ? 'LABEL_GUARD_OK' : 'LABEL_GUARD_FAIL:' + triggered
         self.assertEqual(res.returncode, 0, f"自定义下拉标签守卫测试失败:\n{res.stderr}\n{res.stdout}")
         self.assertIn("LABEL_GUARD_OK", res.stdout, f"隐藏 select 的 label 点击未被拦截:\n{res.stdout}")
 
+    def test_command_deck_and_bento_cockpit_layout_and_async_refactor(self):
+        """校验 Popup 460px 双栏指挥台、Options 12 列一屏式 Bento 驾驶舱、响应式断点修复与 content.js 异步扁平化。"""
+        with open(os.path.join(EXT_DIR, "popup.css"), "r", encoding="utf-8") as f:
+            popup_css = f.read()
+        with open(os.path.join(EXT_DIR, "options.css"), "r", encoding="utf-8") as f:
+            options_css = f.read()
+        with open(os.path.join(EXT_DIR, "content.js"), "r", encoding="utf-8") as f:
+            content_js = f.read()
+        with open(os.path.join(EXT_DIR, "common.js"), "r", encoding="utf-8") as f:
+            common_js = f.read()
+
+        # 1. Popup 460px 双栏指挥台与 Zero CLS / Toast 防遮挡校验
+        self.assertIn("width: 460px;", popup_css)
+        self.assertIn("grid-template-columns: 196px minmax(0, 1fr);", popup_css)
+        self.assertIn("grid-template-rows: repeat(4, minmax(0, 1fr));", popup_css)
+        self.assertIn("grid-template-columns: repeat(4, 1fr);", popup_css)
+        self.assertIn("min-height: 34px;", popup_css)
+        self.assertIn(".btn-primary.online-mode .btn-shimmer", popup_css)
+        self.assertNotIn("top: 56px;", popup_css, "Popup .msg-box 不应停留在 top: 56px 遮挡 #statusTitle")
+
+        # 2. Options 12 列一屏式 Bento 驾驶舱与 5 项响应式布局修复校验
+        self.assertIn("@media (min-width: 1120px)", options_css)
+        self.assertIn("grid-template-columns: repeat(12, minmax(0, 1fr));", options_css)
+        self.assertIn("display: contents;", options_css)
+        self.assertIn("grid-column: span 5;", options_css)
+        self.assertIn("grid-column: span 4;", options_css)
+        self.assertIn("grid-column: span 3;", options_css)
+        self.assertNotIn(
+            "justify-content: space-between;\n}\n\n.tiles-3-col",
+            options_css,
+            ".dashboard-top-grid .card .card-body 不应使用 space-between 制造卡片中部断层",
+        )
+        self.assertIn("@media (max-width: 860px)", options_css)
+        self.assertIn("position: static;", options_css)
+        self.assertIn(".hero-action-buttons .btn-action.primary", options_css)
+
+        # 3. content.js proceedWithForm async/await 扁平化与 common.js View Transition 渐进增强
+        self.assertIn("withLock(async function () {", content_js)
+        self.assertIn("await checkStatus()", content_js)
+        self.assertIn("await directLogin(s.account, s.password, s.isp)", content_js)
+        self.assertNotIn("directLogin(s.account, s.password, s.isp).then(", content_js)
+        self.assertIn("startViewTransition", common_js)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -92,15 +92,15 @@
 }
 
 html {
-  width: 375px;
-  min-width: 375px;
-  max-width: 375px;
+  width: 460px;
+  min-width: 460px;
+  max-width: 460px;
 }
 
 body {
-  width: 375px;
-  min-width: 375px;
-  max-width: 375px;
+  width: 460px;
+  min-width: 460px;
+  max-width: 460px;
   min-height: auto;
   overflow-x: hidden;
   background-color: var(--bg-page);
@@ -146,13 +146,15 @@ body {
 }
 
 .popup-wrapper {
-  width: 375px;
-  max-width: 375px;
+  width: 460px;
+  max-width: 460px;
   box-sizing: border-box;
-  padding: 14px 14px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  padding: 12px 14px 10px;
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto auto;
+  gap: 8px 10px;
+  align-items: stretch;
   animation: popupEntrance 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -160,6 +162,8 @@ body {
    Header with Live Avatar Status Beacon
    ========================================================================== */
 .header {
+  grid-column: 1 / -1;
+  grid-row: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -459,10 +463,13 @@ body {
 }
 
 .status-card {
-  padding: 14px 16px;
+  grid-column: 1;
+  grid-row: 2;
+  padding: 13px 13px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 11px;
 }
 
 /* Ambient Radial Mesh Glow (Soft Diffused Calm Glow) */
@@ -683,10 +690,14 @@ body {
 .status-content {
   flex: 1;
   min-width: 0;
+  min-height: 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .status-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-main);
   line-height: 1.25;
@@ -751,9 +762,10 @@ body {
 
 .status-bottom-bar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 6px;
   position: relative;
   z-index: 2;
 }
@@ -761,6 +773,7 @@ body {
 .gw-route-pill {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
@@ -771,6 +784,7 @@ body {
   padding: 4px 9px;
   border-radius: var(--radius-pill);
   white-space: nowrap;
+  width: 100%;
   cursor: pointer;
   transition: all 0.22s var(--ease-spring);
 }
@@ -813,6 +827,7 @@ body {
 .ip-capsule {
   display: inline-flex;
   align-items: center;
+  justify-content: space-between;
   gap: 7px;
   background: var(--bg-card-subtle);
   border: 1px solid var(--border-hairline);
@@ -820,7 +835,7 @@ body {
   border-radius: var(--radius-pill);
   cursor: pointer;
   transition: all 0.25s var(--ease-spring);
-  width: fit-content;
+  width: 100%;
   position: relative;
   z-index: 2;
 }
@@ -897,26 +912,38 @@ body {
    Seamless Metrics Dock (通透无界展台)
    ========================================================================== */
 .metrics-dock {
+  grid-column: 2;
+  grid-row: 2 / 4;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .dock-item {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  padding: 7px 11px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  min-height: 66px;
-  gap: 5px;
+  justify-content: center;
+  min-height: 44px;
+  gap: 3px;
   box-shadow: var(--shadow-dock), var(--glass-highlight);
   backdrop-filter: blur(14px);
   transition: all 0.25s var(--ease-spring);
   position: relative;
   overflow: hidden;
+}
+
+/* Single-line telemetry rows (Uptime & Latency) use horizontal justification for instant scanning */
+.dock-item:nth-child(1),
+.dock-item:nth-child(3) {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 /* Jewel-toned semantic corner aura & top accent indicator for each Bento card */
@@ -1468,10 +1495,10 @@ body {
   background: var(--bg-dock);
   backdrop-filter: blur(18px) saturate(180%);
   -webkit-backdrop-filter: blur(18px) saturate(180%);
-  padding: 6px;
+  padding: 6px 8px;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -1525,7 +1552,7 @@ body {
    ========================================================================== */
 .msg-box {
   position: fixed;
-  top: 56px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%) translateY(-28px) scale(0.92);
   z-index: 99999;
@@ -1677,10 +1704,12 @@ body {
    Action Buttons with Shimmer Light Beam
    ========================================================================== */
 .actions-group {
+  grid-column: 1;
+  grid-row: 3;
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 8px;
-  margin-top: 1px;
+  gap: 6px;
+  margin-top: 0;
 }
 
 .btn-primary {
@@ -1690,8 +1719,8 @@ body {
   color: #ffffff;
   border: none;
   border-radius: var(--radius-pill);
-  padding: 0 18px;
-  height: 42px;
+  padding: 0 14px;
+  height: 38px;
   box-sizing: border-box;
   font-size: 13px;
   font-weight: 600;
@@ -1747,6 +1776,16 @@ body {
   box-shadow: 0 4px 18px -2px rgba(16, 185, 129, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.32);
 }
 
+.btn-primary.online-mode .btn-shimmer {
+  animation: none;
+  opacity: 0;
+}
+
+.btn-primary.online-mode:hover .btn-shimmer {
+  animation: btn-sweep 1.3s ease-in-out infinite;
+  opacity: 1;
+}
+
 .btn-primary.online-mode:hover {
   box-shadow: 0 8px 24px -2px rgba(16, 185, 129, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.4);
   filter: brightness(1.05);
@@ -1793,10 +1832,10 @@ body {
   color: var(--text-muted);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-pill);
-  padding: 0 15px;
-  height: 42px;
+  padding: 0 12px;
+  height: 38px;
   box-sizing: border-box;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   display: flex;
   align-items: center;
@@ -1851,11 +1890,14 @@ body {
    Footer
    ========================================================================== */
 .footer {
+  grid-column: 1 / -1;
+  grid-row: 4;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 16px;
-  padding-top: 3px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-hairline);
 }
 
 .foot-link {

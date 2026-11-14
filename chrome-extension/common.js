@@ -921,7 +921,16 @@ function createThemeManager(options = {}) {
         }
       }
       chrome.storage.local.set({ theme: next }, () => {
-        apply(next);
+        const reducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!reducedMotion && typeof document !== 'undefined' && typeof document.startViewTransition === 'function') {
+          try {
+            document.startViewTransition(() => apply(next));
+          } catch (e) {
+            apply(next);
+          }
+        } else {
+          apply(next);
+        }
         if (typeof options.onNotify === 'function') {
           const map = { auto: '跟随系统', dark: '深色模式', light: '浅色模式' };
           options.onNotify(`已切换至 ${map[next] || next}`);

@@ -603,104 +603,90 @@
           // 多标签协调：已有标签在认证中就拿不到锁，安静退出。
           // 锁由后台持有（令牌 + 40s 租期），withLock 会在流程结束后携带令牌释放；
           // 即使标签页中途被关闭，租期到期也会自动兜底释放，不会留下残留。
-          withLock(function () {
-            return new Promise(function (resolveFlow) {
-              // 拿到锁后再复查一次在线状态：等待表单期间后台 alarm 可能已完成登录，
-              // 若此刻已在线就不要再提交表单（会把刚建立的会话踢下线）。
-              checkStatus().catch(function () { return false; }).then(function (alreadyOnline) {
-                if (alreadyOnline) {
-                  done = true;
-                  hideHud();
-                  report({ ok: true, online: true, message: '页面加载时已在线，无需登录' });
-                  resolveFlow();
-                  return;
-                }
-                showHud('校园网自动登录：正在提交认证…', 'loading');
-                // 兜底：fillAndSubmit 内部任何未预期的 DOM 异常都不能让
-                // loading 态 HUD 永久挂在页面上（loading 态不会自动淡出）。
-                let submitted = false;
+          withLock(async function () {
+            // 拿到锁后再复查一次在线状态：等待表单期间后台 alarm 可能已完成登录，
+            // 若此刻已在线就不要再提交表单（会把刚建立的会话踢下线）。
+            const alreadyOnline = await checkStatus().catch(function () { return false; });
+            if (alreadyOnline) {
+              done = true;
+              hideHud();
+              report({ ok: true, online: true, message: '页面加载时已在线，无需登录' });
+              return;
+            }
+            showHud('校园网自动登录：正在提交认证…', 'loading');
+            // 兜底：fillAndSubmit 内部任何未预期的 DOM 异常都不能让
+            // loading 态 HUD 永久挂在页面上（loading 态不会自动淡出）。
+            let submitted = false;
+            try {
+              submitted = fillAndSubmit(s.account, s.password, s.isp);
+            } catch (e) {
+              submitted = false;
+            }
+            if (!submitted) {
+              // 找不到登录按钮 / 点击异常。
+              // 注意：loading 态的 HUD 不会自动淡出（只有 success/error 才会），
+              // 所以这里必须显式收掉，否则页面顶部会永久挂着「正在提交认证…」。
+              hideHud();
+              return;
+            }
+
+            report({ ok: false, state: 'submitted', online: false, message: '已自动填写并提交登录表单，等待网关响应…' });
+
+            // 兜底：5.0 秒后仍未上线且无明确错误，再用同源 fetch 尝试一次
+            await new Promise(function (resolveFallback) {
+              setTimeout(async function () {
                 try {
-                  submitted = fillAndSubmit(s.account, s.password, s.isp);
-                } catch (e) {
-                  submitted = false;
-                }
-                if (!submitted) {
-                  // 找不到登录按钮 / 点击异常。
-                  // 注意：loading 态的 HUD 不会自动淡出（只有 success/error 才会），
-                  // 所以这里必须显式收掉，否则页面顶部会永久挂着「正在提交认证…」。
-                  hideHud();
-                  resolveFlow();
-                  return;
-                }
-
-                report({ ok: false, state: 'submitted', online: false, message: '已自动填写并提交登录表单，等待网关响应…' });
-
-                // 兜底：5.0 秒后仍未上线且无明确错误，再用同源 fetch 尝试一次
-                setTimeout(function () {
-                  if (done) { resolveFlow(); return; }
+                  if (done) return;
                   if (detectPageError()) {
                     done = true;
                     showHud('登录失败：网关返回错误提示', 'error');
                     report({ ok: false, online: false, message: '登录失败：网关返回错误提示' });
-                    resolveFlow();
                     return;
                   }
-                  checkStatus().then(function (ok) {
-                    if (ok) {
-                      done = true;
-                      showHud('校园网认证成功！已在线', 'success');
-                      report({ ok: true, online: true, message: '登录成功，已确认在线' });
-                      resolveFlow();
-                      return;
-                    }
-                    if (detectPageError()) {
-                      done = true;
-                      showHud('登录失败：网关返回错误提示', 'error');
-                      report({ ok: false, online: false, message: '登录失败：网关返回错误提示' });
-                      resolveFlow();
-                      return;
-                    }
-                    // 兜底登录前复查「手动注销」标志：用户在等待期间点了注销时不得再把人登回。
-                    getSettings().then(function (fresh) {
-                      if (fresh.paused) {
-                        done = true;
-                        hideHud();
-                        report({ ok: false, online: false, message: '已手动注销，取消兜底登录' });
-                        resolveFlow();
-                        return;
-                      }
-                      directLogin(s.account, s.password, s.isp).then(function (r) {
-                        done = true;
-                        if (r.ok) {
-                          showHud('校园网认证成功！已在线', 'success');
-                        } else {
-                          const displayMsg = !r.msg ? '登录失败：认证被拒绝' : (
-                            r.msg.indexOf('登录失败') === 0 || r.msg.indexOf('当前时段') === 0 || r.msg.indexOf('认证失败') === 0
-                              ? r.msg
-                              : ('登录失败：' + r.msg)
-                          );
-                          showHud(displayMsg, 'error');
-                        }
-                        report({
-                          ok: r.ok,
-                          online: r.ok,
-                          message: r.ok ? '登录成功（兜底请求）' : ('登录失败：' + (r.msg || '认证被拒绝'))
-                        });
-                        resolveFlow();
-                      }).catch(function () {
-                        hideHud();
-                        resolveFlow();   // 异常也要结束流程，收起 loading 浮层并释放锁
-                      });
-                    }).catch(function () {
-                      hideHud();
-                      resolveFlow();
-                    });
-                  }).catch(function () {
+                  const ok = await checkStatus();
+                  if (ok) {
+                    done = true;
+                    showHud('校园网认证成功！已在线', 'success');
+                    report({ ok: true, online: true, message: '登录成功，已确认在线' });
+                    return;
+                  }
+                  if (detectPageError()) {
+                    done = true;
+                    showHud('登录失败：网关返回错误提示', 'error');
+                    report({ ok: false, online: false, message: '登录失败：网关返回错误提示' });
+                    return;
+                  }
+                  // 兜底登录前复查「手动注销」标志：用户在等待期间点了注销时不得再把人登回。
+                  const fresh = await getSettings();
+                  if (fresh.paused) {
+                    done = true;
                     hideHud();
-                    resolveFlow();
+                    report({ ok: false, online: false, message: '已手动注销，取消兜底登录' });
+                    return;
+                  }
+                  const r = await directLogin(s.account, s.password, s.isp);
+                  done = true;
+                  if (r.ok) {
+                    showHud('校园网认证成功！已在线', 'success');
+                  } else {
+                    const displayMsg = !r.msg ? '登录失败：认证被拒绝' : (
+                      r.msg.indexOf('登录失败') === 0 || r.msg.indexOf('当前时段') === 0 || r.msg.indexOf('认证失败') === 0
+                        ? r.msg
+                        : ('登录失败：' + r.msg)
+                    );
+                    showHud(displayMsg, 'error');
+                  }
+                  report({
+                    ok: r.ok,
+                    online: r.ok,
+                    message: r.ok ? '登录成功（兜底请求）' : ('登录失败：' + (r.msg || '认证被拒绝'))
                   });
-                }, 5000);
-              });
+                } catch (e) {
+                  hideHud();
+                } finally {
+                  resolveFallback();
+                }
+              }, 5000);
             });
           });
         });
