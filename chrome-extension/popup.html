@@ -84,7 +84,7 @@
       </div>
     </section>
 
-    <!-- Seamless Metrics Dock (真正的无界通透展台) -->
+    <!-- Seamless Metrics Dock (精炼单列：2短卡 + 通栏流量条 + 通栏身份栏) -->
     <section class="metrics-dock">
       <!-- 1: 在线时长 -->
       <div class="dock-item" title="当前已在线时长">
@@ -95,25 +95,7 @@
         <div class="dock-value" id="onlineDuration">—</div>
       </div>
 
-      <!-- 2: 已用流量 (专业双向数据传输图标) -->
-      <div class="dock-item" title="本期已消耗流量 (悬停查看上传/下载)">
-        <div class="dock-head">
-          <svg class="dock-icon purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M7 10l5-5 5 5"/>
-            <path d="M12 5v14"/>
-            <path d="M17 14l-5 5-5-5"/>
-          </svg>
-          <span>已用流量</span>
-          <span class="flow-sub-tag" id="popFlowSub"></span>
-        </div>
-        <div class="dock-value" id="popFlow">—</div>
-        <div class="flow-bar-wrap" id="flowBarWrap" style="display: none;" title="上传与下载比例">
-          <div class="flow-bar-dl" id="flowBarDl" style="width: 50%;"></div>
-          <div class="flow-bar-ul" id="flowBarUl" style="width: 50%;"></div>
-        </div>
-      </div>
-
-      <!-- 3: 网关延迟 (动态信号脉冲波) -->
+      <!-- 2: 网关延迟 (动态信号脉冲波) -->
       <div class="dock-item" title="网关响应延迟">
         <div class="dock-head">
           <svg class="dock-icon emerald" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
@@ -129,6 +111,24 @@
           </div>
         </div>
         <div class="dock-value" id="popPing">—</div>
+      </div>
+
+      <!-- 3: 已用流量 (通栏双向数据传输计量条) -->
+      <div class="dock-item" title="本期已消耗流量 (悬停查看上传/下载)">
+        <div class="dock-head">
+          <svg class="dock-icon purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 10l5-5 5 5"/>
+            <path d="M12 5v14"/>
+            <path d="M17 14l-5 5-5-5"/>
+          </svg>
+          <span>已用流量</span>
+          <span class="flow-sub-tag" id="popFlowSub"></span>
+        </div>
+        <div class="dock-value" id="popFlow">—</div>
+        <div class="flow-bar-wrap" id="flowBarWrap" style="display: none;" title="上传与下载比例">
+          <div class="flow-bar-dl" id="flowBarDl" style="width: 50%;"></div>
+          <div class="flow-bar-ul" id="flowBarUl" style="width: 50%;"></div>
+        </div>
       </div>
 
       <!-- 4: 当前账号 (安全认证身份徽章 + 内嵌直选面板组件) -->

@@ -12,50 +12,106 @@
   <!-- Ambient Background Aura & Tech Dot Pattern -->
   <div class="page-ambient-mesh"></div>
 
-  <!-- Header -->
-  <header class="page-header">
-    <div class="header-main">
-      <div class="logo-box">
-        <img src="icons/icon48.png" alt="Logo" class="logo-img">
-        <span class="logo-beacon" id="logoBeacon"></span>
-      </div>
-      <div class="title-group">
-        <div class="title-row">
-          <h1>校园网自动登录 · 控制中心</h1>
-          <span class="version-badge" id="ver">v1.0.0</span>
+  <!-- Notification Toast Container -->
+  <div class="toast-container" id="toastContainer" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- App Shell: Left Fixed Navigation Sidebar + Right Single-Focus Workspace -->
+  <form id="form" class="app-shell" autocomplete="off" novalidate>
+
+    <!-- Left Sticky Navigation Sidebar -->
+    <aside class="card app-sidebar" aria-label="控制中心导航">
+      <div class="sidebar-brand">
+        <div class="logo-box">
+          <img src="icons/icon48.png" alt="Logo" class="logo-img">
+          <span class="logo-beacon" id="logoBeacon"></span>
+        </div>
+        <div class="sidebar-brand-text">
+          <h1>校园网自动登录</h1>
+          <div class="sidebar-meta-row">
+            <span class="version-badge" id="ver">v1.0.0</span>
+            <span class="sidebar-sub">控制中心</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="header-actions-bar">
-      <!-- Accent Color Switcher -->
-      <div class="accent-palette-bar" id="accentPaletteBar" title="切换个性化强调色">
-        <button type="button" class="accent-dot active" data-accent="blue" title="科技蓝 (默认)"></button>
-        <button type="button" class="accent-dot" data-accent="purple" title="极光紫"></button>
-        <button type="button" class="accent-dot" data-accent="emerald" title="翡翠绿"></button>
-        <button type="button" class="accent-dot" data-accent="amber" title="落日橙"></button>
-        <button type="button" class="accent-dot" data-accent="rose" title="玫瑰粉"></button>
+      <nav class="sidebar-nav" role="tablist" aria-label="设置分类">
+        <button type="button" class="sidebar-nav-item active" id="navOverview"
+                data-section="overview" role="tab" aria-selected="true" aria-controls="panelOverview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span>实时总览</span>
+        </button>
+
+        <button type="button" class="sidebar-nav-item" id="navCredentials"
+                data-section="credentials" role="tab" aria-selected="false" aria-controls="panelCredentials">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span>账号与网络</span>
+        </button>
+
+        <button type="button" class="sidebar-nav-item" id="navAutomation"
+                data-section="automation" role="tab" aria-selected="false" aria-controls="panelAutomation">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span>保活与触发</span>
+        </button>
+
+        <button type="button" class="sidebar-nav-item" id="navBackup"
+                data-section="backup" role="tab" aria-selected="false" aria-controls="panelBackup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>备份与重置</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-save-box">
+        <span class="dock-sync-pill" id="dockSyncStatus">✓ 配置已实时同步</span>
+        <button type="submit" class="btn-main sidebar-btn-save" id="btnSave">
+          <span class="btn-shimmer"></span>
+          <svg class="btn-spinner" id="saveSpinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+          <svg class="btn-icon" id="saveIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          <span id="btnSaveText">保存并连接</span>
+          <span class="kbd-pill" title="快捷键 Ctrl+S 保存">Ctrl+S</span>
+          <span class="unsaved-dot" id="unsavedDot" title="有尚未保存的更改"></span>
+        </button>
       </div>
+    </aside>
 
-      <!-- Theme Switcher -->
-      <button type="button" class="theme-toggle-btn" id="btnThemeToggle" title="切换深色/浅色模式">
-        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        <span class="theme-label" id="themeLabel">自动</span>
-      </button>
+    <!-- Right Main Workspace Canvas -->
+    <main class="app-main">
+      <!-- Slim Workspace Utility Header -->
+      <header class="page-header main-topbar">
+        <div class="topbar-heading">
+          <h2 id="activeSectionTitle">实时状态与链路诊断</h2>
+          <p id="activeSectionDesc">全链路监控校园网认证、网关延迟与后台保活巡检流</p>
+        </div>
 
-      <a href="http://172.30.100.2/" target="_blank" rel="noopener noreferrer" class="portal-link-btn" title="访问校园网登录门户">
-        <span class="portal-dot" id="portalDot"></span>
-        <span class="portal-ip">172.30.100.2</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-      </a>
-    </div>
-  </header>
+        <div class="header-actions-bar">
+          <!-- Accent Color Switcher -->
+          <div class="accent-palette-bar" id="accentPaletteBar" title="切换个性化强调色">
+            <button type="button" class="accent-dot active" data-accent="blue" title="科技蓝 (默认)"></button>
+            <button type="button" class="accent-dot" data-accent="purple" title="极光紫"></button>
+            <button type="button" class="accent-dot" data-accent="emerald" title="翡翠绿"></button>
+            <button type="button" class="accent-dot" data-accent="amber" title="落日橙"></button>
+            <button type="button" class="accent-dot" data-accent="rose" title="玫瑰粉"></button>
+          </div>
 
+          <!-- Theme Switcher -->
+          <button type="button" class="theme-toggle-btn" id="btnThemeToggle" title="切换深色/浅色模式">
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <span class="theme-label" id="themeLabel">自动</span>
+          </button>
 
+          <a href="http://172.30.100.2/" target="_blank" rel="noopener noreferrer" class="portal-link-btn" title="访问校园网登录门户">
+            <span class="portal-dot" id="portalDot"></span>
+            <span class="portal-ip">172.30.100.2</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </div>
+      </header>
 
-  <!-- Live Telemetry & Diagnostic Dashboard (Hero Cockpit) -->
-  <section class="card status-hero" id="statusWidget">
+      <!-- Panel 1: 实时总览与链路诊断 -->
+      <section class="app-panel is-active" id="panelOverview" role="tabpanel" aria-labelledby="navOverview">
+
+        <!-- Live Telemetry & Diagnostic Dashboard (Hero Cockpit) -->
+        <section class="card status-hero" id="statusWidget">
     <div class="hero-ambient-glow"></div>
 
     <div class="hero-top-bar">
@@ -247,30 +303,25 @@
         </div>
       </div>
     </div>
-  </section>
+        </section>
+      </section>
 
-  <!-- Notification Toast Container -->
-  <div class="toast-container" id="toastContainer" role="status" aria-live="polite" aria-atomic="true"></div>
+      <!-- Panel 2: 认证账号与网络配置 -->
+      <section class="app-panel" id="panelCredentials" role="tabpanel" aria-labelledby="navCredentials" hidden>
 
-  <!-- Dashboard Body: Balanced 2-Column Dashboard (双列 2:2 黄金对称仪表盘) -->
-  <form id="form" class="dashboard-body" autocomplete="off" novalidate>
-
-    <!-- Top Row: 双列对称设置卡片 (01 凭据鉴权 与 02 智能保活) -->
-    <div class="dashboard-top-grid">
-
-      <!-- Card 1: 认证信息 -->
-      <div class="card form-card" id="cardCredentials">
-        <div class="card-header">
-          <div class="card-icon blue">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          </div>
-          <div class="card-title-box">
-            <div class="card-title-row">
-              <h2>认证凭据与网络</h2>
-              <span class="step-badge blue">01 · 凭据鉴权</span>
+        <!-- Card 1: 认证信息 -->
+        <div class="card form-card" id="cardCredentials">
+          <div class="card-header">
+            <div class="card-icon blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div class="card-title-box">
+              <div class="card-title-row">
+                <h3>认证凭据与网络</h3>
+                <span class="step-badge blue">01 · 凭据鉴权</span>
+              </div>
             </div>
           </div>
-        </div>
 
         <div class="card-body">
           <div class="grid-2-col">
@@ -335,7 +386,11 @@
         </div>
       </div>
 
-      <!-- Card 2: 智能保活策略 -->
+      </section>
+
+      <!-- Panel 3: 智能保活与自动化触发 -->
+      <section class="app-panel" id="panelAutomation" role="tabpanel" aria-labelledby="navAutomation" hidden>
+
       <div class="card form-card" id="cardPolicy">
         <div class="card-header">
           <div class="card-icon emerald">
@@ -343,7 +398,7 @@
           </div>
           <div class="card-title-box">
             <div class="card-title-row">
-              <h2>智能保活与轮询策略</h2>
+              <h3>智能保活与轮询策略</h3>
               <span class="step-badge emerald">02 · 自适应保活</span>
             </div>
           </div>
@@ -401,21 +456,19 @@
         </div>
       </div>
 
-    </div>
-
-    <!-- Middle: Card 3: 自动化触发与页面增强 (通栏 3 列精致磁贴) -->
-    <div class="card form-card full-width-card" id="cardTriggers">
-      <div class="card-header">
-        <div class="card-icon amber">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
-        </div>
-        <div class="card-title-box">
-          <div class="card-title-row">
-            <h2>自动化触发与页面增强</h2>
-            <span class="step-badge amber">03 · 自动化增强</span>
+      <!-- Card 3: 自动化触发与页面增强 -->
+      <div class="card form-card full-width-card" id="cardTriggers">
+        <div class="card-header">
+          <div class="card-icon amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+          </div>
+          <div class="card-title-box">
+            <div class="card-title-row">
+              <h3>自动化触发与页面增强</h3>
+              <span class="step-badge amber">03 · 自动化增强</span>
+            </div>
           </div>
         </div>
-      </div>
 
       <div class="card-body">
         <div class="tiles-3-col">
@@ -470,41 +523,63 @@
       </div>
     </div>
 
-    <!-- Bottom: 全局操作管理栏 (通栏底栏 Action Dock) -->
-    <div class="card actions-dock-card" id="cardActions">
-      <div class="dock-left">
-        <div class="dock-aux-group">
-          <button type="button" class="btn-aux" id="btnExportConfig" title="导出当前所有配置为 JSON 备份文件">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span>导出配置</span>
-          </button>
+      </section>
 
-          <button type="button" class="btn-aux" id="btnImportConfig" title="从 JSON 备份文件恢复配置">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <span>导入配置</span>
-          </button>
-          <input type="file" id="importFileInput" accept=".json,application/json"
-                 style="display:none" tabindex="-1" aria-hidden="true">
+      <!-- Panel 4: 配置备份、恢复与重置 -->
+      <section class="app-panel" id="panelBackup" role="tabpanel" aria-labelledby="navBackup" hidden>
+        <div class="card form-card" id="cardActions">
+          <div class="card-header">
+            <div class="card-icon purple">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </div>
+            <div class="card-title-box">
+              <div class="card-title-row">
+                <h3>配置备份、还原与重置</h3>
+                <span class="step-badge purple">04 · 数据管理</span>
+              </div>
+            </div>
+          </div>
 
-          <button type="button" class="btn-ghost-danger btn-reset-dock" id="btnResetDefaults" title="将所有设置恢复为出厂默认">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-            <span>恢复默认设置</span>
-          </button>
+          <div class="card-body backup-list">
+            <div class="backup-row">
+              <div class="backup-info">
+                <span class="backup-title">导出配置备份 (JSON)</span>
+                <span class="backup-desc">将当前认证账号、密码、运营商与保活策略保存为本地 JSON 文件，便于跨设备迁移（含明文凭据，请妥善保管）。</span>
+              </div>
+              <button type="button" class="btn-aux" id="btnExportConfig" title="导出当前所有配置为 JSON 备份文件">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>导出配置</span>
+              </button>
+            </div>
+
+            <div class="backup-row">
+              <div class="backup-info">
+                <span class="backup-title">从备份文件导入还原</span>
+                <span class="backup-desc">选择先前导出的 JSON 配置文件，系统会自动校对运营商参数与预设巡检间隔并立即生效。</span>
+              </div>
+              <button type="button" class="btn-aux" id="btnImportConfig" title="从 JSON 备份文件恢复配置">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span>导入配置</span>
+              </button>
+              <input type="file" id="importFileInput" accept=".json,application/json"
+                     style="display:none" tabindex="-1" aria-hidden="true">
+            </div>
+
+            <div class="backup-row danger-zone">
+              <div class="backup-info">
+                <span class="backup-title">恢复出厂默认设置</span>
+                <span class="backup-desc">清空已保存的校园网账号与密码，清除错误降频及运行态标记，并将所有轮询与开关还原为推荐默认值。</span>
+              </div>
+              <button type="button" class="btn-ghost-danger btn-reset-dock" id="btnResetDefaults" title="将所有设置恢复为出厂默认">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                <span>恢复默认设置</span>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div class="dock-right">
-        <span class="dock-sync-pill" id="dockSyncStatus">✓ 配置已实时同步</span>
-        <button type="submit" class="btn-main dock-btn-main" id="btnSave">
-          <span class="btn-shimmer"></span>
-          <svg class="btn-spinner" id="saveSpinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
-          <svg class="btn-icon" id="saveIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          <span id="btnSaveText">保存并连接</span>
-          <span class="kbd-pill" title="快捷键 Ctrl+S 保存">Ctrl+S</span>
-          <span class="unsaved-dot" id="unsavedDot" title="有尚未保存的更改"></span>
-        </button>
-      </div>
-    </div>
+    </main>
 
   </form>
 

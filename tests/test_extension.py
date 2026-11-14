@@ -3638,43 +3638,162 @@ console.log(triggered === 0 ? 'LABEL_GUARD_OK' : 'LABEL_GUARD_FAIL:' + triggered
         self.assertEqual(res.returncode, 0, f"自定义下拉标签守卫测试失败:\n{res.stderr}\n{res.stdout}")
         self.assertIn("LABEL_GUARD_OK", res.stdout, f"隐藏 select 的 label 点击未被拦截:\n{res.stdout}")
 
-    def test_command_deck_and_bento_cockpit_layout_and_async_refactor(self):
-        """校验 Popup 460px 双栏指挥台、Options 12 列一屏式 Bento 驾驶舱、响应式断点修复与 content.js 异步扁平化。"""
+    def test_refined_single_column_popup_and_sidebar_shell_layout_and_async_refactor(self):
+        """校验 Popup P1 356px 精炼单列、Options O1 左侧导航栏 + 单焦点工作区、交互切页及异步/View Transition 重构。"""
+        import subprocess
         with open(os.path.join(EXT_DIR, "popup.css"), "r", encoding="utf-8") as f:
             popup_css = f.read()
+        with open(os.path.join(EXT_DIR, "options.html"), "r", encoding="utf-8") as f:
+            options_html = f.read()
         with open(os.path.join(EXT_DIR, "options.css"), "r", encoding="utf-8") as f:
             options_css = f.read()
+        with open(os.path.join(EXT_DIR, "options.js"), "r", encoding="utf-8") as f:
+            options_js = f.read()
         with open(os.path.join(EXT_DIR, "content.js"), "r", encoding="utf-8") as f:
             content_js = f.read()
         with open(os.path.join(EXT_DIR, "common.js"), "r", encoding="utf-8") as f:
             common_js = f.read()
 
-        # 1. Popup 460px 双栏指挥台与 Zero CLS / Toast 防遮挡校验
-        self.assertIn("width: 460px;", popup_css)
-        self.assertIn("grid-template-columns: 196px minmax(0, 1fr);", popup_css)
-        self.assertIn("grid-template-rows: repeat(4, minmax(0, 1fr));", popup_css)
+        # 1. Popup P1 356px 精炼单列与防遮挡 Toast / 呼吸流光校验
+        self.assertIn("width: 356px;", popup_css)
+        self.assertNotIn("width: 460px;", popup_css)
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", popup_css)
+        self.assertIn(".dock-item:nth-child(3)", popup_css)
+        self.assertIn("grid-column: 1 / -1;", popup_css)
         self.assertIn("grid-template-columns: repeat(4, 1fr);", popup_css)
-        self.assertIn("min-height: 34px;", popup_css)
+        self.assertIn("top: 10px;", popup_css)
         self.assertIn(".btn-primary.online-mode .btn-shimmer", popup_css)
         self.assertNotIn("top: 56px;", popup_css, "Popup .msg-box 不应停留在 top: 56px 遮挡 #statusTitle")
 
-        # 2. Options 12 列一屏式 Bento 驾驶舱与 5 项响应式布局修复校验
-        self.assertIn("@media (min-width: 1120px)", options_css)
-        self.assertIn("grid-template-columns: repeat(12, minmax(0, 1fr));", options_css)
-        self.assertIn("display: contents;", options_css)
-        self.assertIn("grid-column: span 5;", options_css)
-        self.assertIn("grid-column: span 4;", options_css)
-        self.assertIn("grid-column: span 3;", options_css)
-        self.assertNotIn(
-            "justify-content: space-between;\n}\n\n.tiles-3-col",
-            options_css,
-            ".dashboard-top-grid .card .card-body 不应使用 space-between 制造卡片中部断层",
-        )
+        # 2. Options O1 左侧固定导航栏 + 右侧单焦点工作区与响应式断层校验
+        for oid in (
+            'id="navOverview"', 'id="navCredentials"', 'id="navAutomation"', 'id="navBackup"',
+            'id="panelOverview"', 'id="panelCredentials"', 'id="panelAutomation"', 'id="panelBackup"',
+            'id="activeSectionTitle"', 'id="activeSectionDesc"'
+        ):
+            self.assertIn(oid, options_html)
+
+        self.assertIn("grid-template-columns: 248px minmax(0, 1fr);", options_css)
+        self.assertIn(".app-sidebar", options_css)
+        self.assertIn(".sidebar-nav-item:focus-visible", options_css)
+        self.assertIn(".app-panel.is-active", options_css)
+        self.assertIn(".backup-row", options_css)
+        self.assertNotIn(".dashboard-top-grid", options_css)
+        self.assertNotIn("grid-column: span 5;", options_css)
+        self.assertIn("@media (max-width: 1160px)", options_css)
+        self.assertIn("@media (max-width: 900px)", options_css)
         self.assertIn("@media (max-width: 860px)", options_css)
         self.assertIn("position: static;", options_css)
         self.assertIn(".hero-action-buttons .btn-action.primary", options_css)
 
-        # 3. content.js proceedWithForm async/await 扁平化与 common.js View Transition 渐进增强
+        # 3. Options 侧边栏切页与表单未填凭据自动跳转凭据页行为校验（Node VM）
+        self.assertIn("function switchOptionsSection", options_js)
+        self.assertIn("function initSidebarNavigation", options_js)
+        self.assertIn("switchOptionsSection('credentials');", options_js)
+
+        nav_runner = r"""
+const fs = require('fs');
+const vm = require('vm');
+const path = require('path');
+
+function makeNode(id) {
+  const listeners = {};
+  const attrs = {};
+  const cls = new Set();
+  return {
+    id, value: '', checked: false, disabled: false, hidden: false,
+    textContent: '', className: '', innerHTML: '', dataset: {}, style: {}, files: [], options: [{ value: '1' }],
+    classList: {
+      add: (...xs) => xs.forEach((x) => cls.add(x)),
+      remove: (...xs) => xs.forEach((x) => cls.delete(x)),
+      toggle: (x, f) => { if (f === undefined) f = !cls.has(x); f ? cls.add(x) : cls.delete(x); return f; },
+      contains: (x) => cls.has(x)
+    },
+    setAttribute(k, v) { attrs[k] = String(v); },
+    getAttribute(k) { return attrs[k] ?? null; },
+    removeAttribute(k) { delete attrs[k]; },
+    addEventListener(t, fn) { (listeners[t] = listeners[t] || []).push(fn); },
+    removeEventListener() {},
+    appendChild() {}, removeChild() {}, remove() {},
+    querySelectorAll() { return []; }, querySelector() { return null; }, closest() { return null; },
+    focus() { this._focused = true; }, click() {},
+    _fire(t, extra = {}) {
+      (listeners[t] || []).forEach((fn) => fn({ target: this, preventDefault() {}, stopPropagation() {}, ...extra }));
+    }
+  };
+}
+
+const extDir = process.argv[1];
+const html = fs.readFileSync(path.join(extDir, 'options.html'), 'utf8');
+const elements = {};
+for (const m of html.matchAll(/id=["']([^"']+)["']/g)) {
+  elements[m[1]] = makeNode(m[1]);
+}
+const get = (id) => (id && typeof id === 'object') ? id : (elements[id] || (elements[id] = makeNode(String(id))));
+const sandbox = {
+  console, setTimeout: (fn) => { if (typeof fn === 'function') fn(); return 1; },
+  clearTimeout() {}, setInterval: () => 1, clearInterval() {},
+  Blob: function () {}, URL: { createObjectURL: () => '', revokeObjectURL() {} },
+  document: {
+    getElementById: get, querySelectorAll: () => [], querySelector: () => null,
+    addEventListener() {}, createElement: () => makeNode('tmp'), createElementNS: () => makeNode('svg'),
+    body: { appendChild() {}, removeChild() {} },
+    documentElement: { setAttribute() {}, removeAttribute() {} }
+  },
+  window: {
+    matchMedia: () => ({ matches: false, addEventListener() {} }),
+    addEventListener() {}, open() {}, close() {}, confirm: () => false,
+    location: { hash: '' },
+    history: { replaceState(_s, _t, url) { this._last = url; } }
+  },
+  navigator: { platform: 'Win32', userAgent: 'Chrome' },
+  Element: function () {},
+  chrome: {
+    storage: {
+      local: { get: (arg, cb) => cb && cb(arg && typeof arg === 'object' ? { ...arg } : {}), set: (_d, cb) => cb && cb() },
+      onChanged: { addListener() {} }
+    },
+    runtime: {
+      getManifest: () => ({ version: '1.3.0' }), getURL: () => '', lastError: null,
+      sendMessage: (_m, cb) => cb && cb({ reachable: false, online: false })
+    }
+  }
+};
+sandbox.window.document = sandbox.document;
+vm.createContext(sandbox);
+vm.runInContext(fs.readFileSync(path.join(extDir, 'common.js'), 'utf8'), sandbox);
+vm.runInContext(fs.readFileSync(path.join(extDir, 'options.js'), 'utf8'), sandbox);
+
+// 初始在 overview
+if (elements.panelOverview.hidden !== false || elements.navOverview.getAttribute('aria-selected') !== 'true') {
+  throw new Error('Expected initial section to be overview');
+}
+// 点击导航切换到 automation
+elements.navAutomation._fire('click');
+if (elements.panelOverview.hidden !== true || elements.panelAutomation.hidden !== false ||
+    elements.navAutomation.getAttribute('aria-selected') !== 'true' ||
+    elements.activeSectionTitle.textContent !== '智能保活与触发器') {
+  throw new Error('Failed switching to automation panel');
+}
+// 在 automation 面板提交空账号表单，应自动切换至 credentials 面板并聚焦 #account
+elements.account.value = '';
+elements.password.value = '';
+elements.form._fire('submit');
+if (elements.panelCredentials.hidden !== false || elements.panelAutomation.hidden !== true ||
+    elements.navCredentials.getAttribute('aria-selected') !== 'true' ||
+    elements.account._focused !== true) {
+  throw new Error('Submit without credentials should auto-switch to credentials panel and focus account');
+}
+console.log('SIDEBAR_NAV_OK');
+"""
+        res = subprocess.run(
+            ["node", "-e", nav_runner, EXT_DIR],
+            capture_output=True, text=True, encoding="utf-8", timeout=30
+        )
+        self.assertEqual(res.returncode, 0, f"Sidebar 导航测试失败:\n{res.stderr}\n{res.stdout}")
+        self.assertIn("SIDEBAR_NAV_OK", res.stdout)
+
+        # 4. content.js proceedWithForm async/await 扁平化与 common.js View Transition 渐进增强
         self.assertIn("withLock(async function () {", content_js)
         self.assertIn("await checkStatus()", content_js)
         self.assertIn("await directLogin(s.account, s.password, s.isp)", content_js)

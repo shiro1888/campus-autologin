@@ -592,6 +592,111 @@ function hasCredentials() {
   }
 });
 
+/** 左侧导航分段元信息与单焦点面板切换 */
+const SECTION_META = {
+  overview: {
+    navId: 'navOverview',
+    panelId: 'panelOverview',
+    title: '实时状态与链路诊断',
+    desc: '全链路监控校园网认证、网关延迟与后台保活巡检流'
+  },
+  credentials: {
+    navId: 'navCredentials',
+    panelId: 'panelCredentials',
+    title: '认证凭据与运营商',
+    desc: '管理校园网上网账号、登录密码与 R3 运营商认证后缀'
+  },
+  automation: {
+    navId: 'navAutomation',
+    panelId: 'panelAutomation',
+    title: '智能保活与触发器',
+    desc: '配置自适应巡检频率、断网瞬时重连及门户自动填单规则'
+  },
+  backup: {
+    navId: 'navBackup',
+    panelId: 'panelBackup',
+    title: '配置备份、还原与重置',
+    desc: '导出或从本地 JSON 备份恢复配置，或一键还原出厂默认值'
+  }
+};
+const SECTION_ORDER = ['overview', 'credentials', 'automation', 'backup'];
+
+/**
+ * 切换控制中心左侧导航对应的单焦点工作区视图。
+ * 无论用户从哪一页提交保存、触发凭据校验错误或从外部深链进入，均可保持视图与焦点一致。
+ */
+function switchOptionsSection(sectionKey, syncHash = true) {
+  const key = SECTION_META[sectionKey] ? sectionKey : 'overview';
+  const sectionCfg = SECTION_META[key];
+
+  for (const k of SECTION_ORDER) {
+    const item = SECTION_META[k];
+    const active = k === key;
+    const navEl = $(item.navId);
+    const panelEl = $(item.panelId);
+    if (navEl) {
+      navEl.classList.toggle('active', active);
+      navEl.setAttribute('aria-selected', active ? 'true' : 'false');
+    }
+    if (panelEl) {
+      panelEl.classList.toggle('is-active', active);
+      panelEl.hidden = !active;
+    }
+  }
+
+  const titleEl = $('activeSectionTitle');
+  const descEl = $('activeSectionDesc');
+  if (titleEl) titleEl.textContent = sectionCfg.title;
+  if (descEl) descEl.textContent = sectionCfg.desc;
+
+  if (syncHash) {
+    try {
+      if (typeof window !== 'undefined' && window.history && typeof window.history.replaceState === 'function') {
+        window.history.replaceState(null, '', '#' + key);
+      }
+    } catch (_) {
+      // 测试沙箱或无 history 环境静默跳过
+    }
+  }
+}
+
+function initSidebarNavigation() {
+  SECTION_ORDER.forEach((key, idx) => {
+    const navEl = $(SECTION_META[key].navId);
+    if (!navEl) return;
+    navEl.addEventListener('click', () => {
+      switchOptionsSection(key);
+    });
+    navEl.addEventListener('keydown', (e) => {
+      let nextIdx = -1;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        nextIdx = (idx + 1) % SECTION_ORDER.length;
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        nextIdx = (idx - 1 + SECTION_ORDER.length) % SECTION_ORDER.length;
+      } else if (e.key === 'Home') {
+        nextIdx = 0;
+      } else if (e.key === 'End') {
+        nextIdx = SECTION_ORDER.length - 1;
+      }
+      if (nextIdx !== -1) {
+        e.preventDefault();
+        const nextKey = SECTION_ORDER[nextIdx];
+        switchOptionsSection(nextKey);
+        $(SECTION_META[nextKey].navId)?.focus();
+      }
+    });
+  });
+
+  let initial = 'overview';
+  try {
+    if (typeof window !== 'undefined' && window.location && typeof window.location.hash === 'string') {
+      const h = window.location.hash.replace(/^#/, '');
+      if (SECTION_META[h]) initial = h;
+    }
+  } catch (_) {}
+  switchOptionsSection(initial, false);
+}
+
 // --- 保存并连接 ---
 $('form').addEventListener('submit', (e) => {
   e.preventDefault();
@@ -602,6 +707,8 @@ $('form').addEventListener('submit', (e) => {
       showToast('设置已保存（提示：账号或密码为空，未发起登录连接）。', 'warn');
     });
     const s = readForm();
+    // 自动切回凭据视图，避免用户停留在其他分页时校验红框与焦点不可见
+    switchOptionsSection('credentials');
     if (!s.account) {
       const acc = $('account');
       acc.classList.add('field-invalid');
@@ -1044,6 +1151,7 @@ $('isp')?.addEventListener('change', () => {
 });
 
 // --- 启动初始化 ---
+initSidebarNavigation();
 initCustomSelects();
 initIspQuickPills();
 load();
