@@ -35,6 +35,7 @@
       </div>
 
       <nav class="sidebar-nav" role="tablist" aria-label="设置分类">
+        <span class="sidebar-nav-indicator" id="sidebarNavIndicator" aria-hidden="true"></span>
         <button type="button" class="sidebar-nav-item active" id="navOverview"
                 data-section="overview" role="tab" aria-selected="true" aria-controls="panelOverview">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
@@ -75,13 +76,8 @@
 
     <!-- Right Main Workspace Canvas -->
     <main class="app-main">
-      <!-- Slim Workspace Utility Header -->
+      <!-- Slim Top-Right Utility Controls -->
       <header class="page-header main-topbar">
-        <div class="topbar-heading">
-          <h2 id="activeSectionTitle">实时状态与链路诊断</h2>
-          <p id="activeSectionDesc">全链路监控校园网认证、网关延迟与后台保活巡检流</p>
-        </div>
-
         <div class="header-actions-bar">
           <!-- Accent Color Switcher -->
           <div class="accent-palette-bar" id="accentPaletteBar" title="切换个性化强调色">
@@ -107,6 +103,7 @@
         </div>
       </header>
 
+      <div class="app-panels-stage">
       <!-- Panel 1: 实时总览与链路诊断 -->
       <section class="app-panel is-active" id="panelOverview" role="tabpanel" aria-labelledby="navOverview">
 
@@ -317,7 +314,7 @@
             </div>
             <div class="card-title-box">
               <div class="card-title-row">
-                <h3>认证凭据与网络</h3>
+                <h2>认证凭据与网络</h2>
                 <span class="step-badge blue">01 · 凭据鉴权</span>
               </div>
             </div>
@@ -398,7 +395,7 @@
           </div>
           <div class="card-title-box">
             <div class="card-title-row">
-              <h3>智能保活与轮询策略</h3>
+              <h2>智能保活与轮询策略</h2>
               <span class="step-badge emerald">02 · 自适应保活</span>
             </div>
           </div>
@@ -464,7 +461,7 @@
           </div>
           <div class="card-title-box">
             <div class="card-title-row">
-              <h3>自动化触发与页面增强</h3>
+              <h2>自动化触发与页面增强</h2>
               <span class="step-badge amber">03 · 自动化增强</span>
             </div>
           </div>
@@ -534,7 +531,7 @@
             </div>
             <div class="card-title-box">
               <div class="card-title-row">
-                <h3>配置备份、还原与重置</h3>
+                <h2>配置备份、还原与重置</h2>
                 <span class="step-badge purple">04 · 数据管理</span>
               </div>
             </div>
@@ -578,6 +575,7 @@
           </div>
         </div>
       </section>
+      </div>
 
     </main>
 

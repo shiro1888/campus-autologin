@@ -592,42 +592,46 @@ function hasCredentials() {
   }
 });
 
-/** 左侧导航分段元信息与单焦点面板切换 */
+/** 左侧导航分段映射与滑块单焦点面板切换 */
 const SECTION_META = {
-  overview: {
-    navId: 'navOverview',
-    panelId: 'panelOverview',
-    title: '实时状态与链路诊断',
-    desc: '全链路监控校园网认证、网关延迟与后台保活巡检流'
-  },
-  credentials: {
-    navId: 'navCredentials',
-    panelId: 'panelCredentials',
-    title: '认证凭据与运营商',
-    desc: '管理校园网上网账号、登录密码与 R3 运营商认证后缀'
-  },
-  automation: {
-    navId: 'navAutomation',
-    panelId: 'panelAutomation',
-    title: '智能保活与触发器',
-    desc: '配置自适应巡检频率、断网瞬时重连及门户自动填单规则'
-  },
-  backup: {
-    navId: 'navBackup',
-    panelId: 'panelBackup',
-    title: '配置备份、还原与重置',
-    desc: '导出或从本地 JSON 备份恢复配置，或一键还原出厂默认值'
-  }
+  overview: { navId: 'navOverview', panelId: 'panelOverview' },
+  credentials: { navId: 'navCredentials', panelId: 'panelCredentials' },
+  automation: { navId: 'navAutomation', panelId: 'panelAutomation' },
+  backup: { navId: 'navBackup', panelId: 'panelBackup' }
 };
 const SECTION_ORDER = ['overview', 'credentials', 'automation', 'backup'];
+let currentSectionKey = 'overview';
+
+function updateSidebarIndicator(activeNavEl, immediate = false) {
+  const ind = $('sidebarNavIndicator');
+  if (!ind || !activeNavEl || typeof activeNavEl.offsetTop !== 'number') return;
+  const w = activeNavEl.offsetWidth;
+  const h = activeNavEl.offsetHeight;
+  if (!w || !h) return;
+
+  const x = activeNavEl.offsetLeft || 0;
+  const y = activeNavEl.offsetTop || 0;
+  if (immediate) {
+    ind.style.transition = 'none';
+  }
+  ind.style.width = `${w}px`;
+  ind.style.height = `${h}px`;
+  ind.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  ind.style.opacity = '1';
+  if (immediate) {
+    // 同步读取布局尺寸冲刷无动画状态，再恢复 CSS 平滑滑块过渡
+    void ind.offsetHeight;
+    ind.style.transition = '';
+  }
+}
 
 /**
  * 切换控制中心左侧导航对应的单焦点工作区视图。
  * 无论用户从哪一页提交保存、触发凭据校验错误或从外部深链进入，均可保持视图与焦点一致。
  */
-function switchOptionsSection(sectionKey, syncHash = true) {
+function switchOptionsSection(sectionKey, syncHash = true, immediateIndicator = false) {
   const key = SECTION_META[sectionKey] ? sectionKey : 'overview';
-  const sectionCfg = SECTION_META[key];
+  currentSectionKey = key;
 
   for (const k of SECTION_ORDER) {
     const item = SECTION_META[k];
@@ -644,10 +648,7 @@ function switchOptionsSection(sectionKey, syncHash = true) {
     }
   }
 
-  const titleEl = $('activeSectionTitle');
-  const descEl = $('activeSectionDesc');
-  if (titleEl) titleEl.textContent = sectionCfg.title;
-  if (descEl) descEl.textContent = sectionCfg.desc;
+  updateSidebarIndicator($(SECTION_META[key].navId), immediateIndicator);
 
   if (syncHash) {
     try {
@@ -694,7 +695,18 @@ function initSidebarNavigation() {
       if (SECTION_META[h]) initial = h;
     }
   } catch (_) {}
-  switchOptionsSection(initial, false);
+  switchOptionsSection(initial, false, true);
+
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => {
+      updateSidebarIndicator($(SECTION_META[currentSectionKey].navId), true);
+    });
+  }
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('resize', () => {
+      updateSidebarIndicator($(SECTION_META[currentSectionKey].navId), true);
+    });
+  }
 }
 
 // --- 保存并连接 ---

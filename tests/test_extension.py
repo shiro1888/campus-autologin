@@ -3665,28 +3665,35 @@ console.log(triggered === 0 ? 'LABEL_GUARD_OK' : 'LABEL_GUARD_FAIL:' + triggered
         self.assertIn(".btn-primary.online-mode .btn-shimmer", popup_css)
         self.assertNotIn("top: 56px;", popup_css, "Popup .msg-box 不应停留在 top: 56px 遮挡 #statusTitle")
 
-        # 2. Options O1 左侧固定导航栏 + 右侧单焦点工作区与响应式断层校验
+        # 2. Options O1 左侧固定导航栏（滑块指示器 + 居中放大舞台）与响应式断层校验
         for oid in (
+            'id="sidebarNavIndicator"',
             'id="navOverview"', 'id="navCredentials"', 'id="navAutomation"', 'id="navBackup"',
-            'id="panelOverview"', 'id="panelCredentials"', 'id="panelAutomation"', 'id="panelBackup"',
-            'id="activeSectionTitle"', 'id="activeSectionDesc"'
+            'id="panelOverview"', 'id="panelCredentials"', 'id="panelAutomation"', 'id="panelBackup"'
         ):
             self.assertIn(oid, options_html)
+        self.assertNotIn('id="activeSectionTitle"', options_html)
+        self.assertNotIn('id="activeSectionDesc"', options_html)
 
-        self.assertIn("grid-template-columns: 248px minmax(0, 1fr);", options_css)
-        self.assertIn(".app-sidebar", options_css)
+        self.assertIn("scrollbar-gutter: stable;", options_css)
+        self.assertIn("max-width: 1320px;", options_css)
+        self.assertIn("margin: auto;", options_css)
+        self.assertIn("grid-template-columns: 276px minmax(0, 1fr);", options_css)
+        self.assertIn(".sidebar-nav-indicator", options_css)
+        self.assertIn(".app-panels-stage", options_css)
         self.assertIn(".sidebar-nav-item:focus-visible", options_css)
         self.assertIn(".app-panel.is-active", options_css)
         self.assertIn(".backup-row", options_css)
         self.assertNotIn(".dashboard-top-grid", options_css)
         self.assertNotIn("grid-column: span 5;", options_css)
+        self.assertNotIn(".topbar-heading", options_css)
         self.assertIn("@media (max-width: 1160px)", options_css)
         self.assertIn("@media (max-width: 900px)", options_css)
         self.assertIn("@media (max-width: 860px)", options_css)
-        self.assertIn("position: static;", options_css)
         self.assertIn(".hero-action-buttons .btn-action.primary", options_css)
 
-        # 3. Options 侧边栏切页与表单未填凭据自动跳转凭据页行为校验（Node VM）
+        # 3. Options 侧边栏滑块切页与表单未填凭据自动跳转凭据页行为校验（Node VM）
+        self.assertIn("function updateSidebarIndicator", options_js)
         self.assertIn("function switchOptionsSection", options_js)
         self.assertIn("function initSidebarNavigation", options_js)
         self.assertIn("switchOptionsSection('credentials');", options_js)
@@ -3702,6 +3709,7 @@ function makeNode(id) {
   const cls = new Set();
   return {
     id, value: '', checked: false, disabled: false, hidden: false,
+    offsetLeft: 0, offsetTop: 0, offsetWidth: 0, offsetHeight: 0,
     textContent: '', className: '', innerHTML: '', dataset: {}, style: {}, files: [], options: [{ value: '1' }],
     classList: {
       add: (...xs) => xs.forEach((x) => cls.add(x)),
@@ -3729,6 +3737,14 @@ const elements = {};
 for (const m of html.matchAll(/id=["']([^"']+)["']/g)) {
   elements[m[1]] = makeNode(m[1]);
 }
+['navOverview', 'navCredentials', 'navAutomation', 'navBackup'].forEach((id, i) => {
+  if (elements[id]) {
+    elements[id].offsetLeft = 0;
+    elements[id].offsetTop = i * 54;
+    elements[id].offsetWidth = 240;
+    elements[id].offsetHeight = 46;
+  }
+});
 const get = (id) => (id && typeof id === 'object') ? id : (elements[id] || (elements[id] = makeNode(String(id))));
 const sandbox = {
   console, setTimeout: (fn) => { if (typeof fn === 'function') fn(); return 1; },
@@ -3764,23 +3780,26 @@ vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(extDir, 'common.js'), 'utf8'), sandbox);
 vm.runInContext(fs.readFileSync(path.join(extDir, 'options.js'), 'utf8'), sandbox);
 
-// 初始在 overview
-if (elements.panelOverview.hidden !== false || elements.navOverview.getAttribute('aria-selected') !== 'true') {
-  throw new Error('Expected initial section to be overview');
+// 初始在 overview，滑块位于第一项
+if (elements.panelOverview.hidden !== false ||
+    elements.navOverview.getAttribute('aria-selected') !== 'true' ||
+    elements.sidebarNavIndicator.style.transform !== 'translate3d(0px, 0px, 0)') {
+  throw new Error('Expected initial section to be overview with indicator at 0px');
 }
-// 点击导航切换到 automation
+// 点击导航切换到 automation，滑块平滑移动到 y=108px
 elements.navAutomation._fire('click');
 if (elements.panelOverview.hidden !== true || elements.panelAutomation.hidden !== false ||
     elements.navAutomation.getAttribute('aria-selected') !== 'true' ||
-    elements.activeSectionTitle.textContent !== '智能保活与触发器') {
-  throw new Error('Failed switching to automation panel');
+    elements.sidebarNavIndicator.style.transform !== 'translate3d(0px, 108px, 0)') {
+  throw new Error('Failed switching to automation panel or moving indicator');
 }
-// 在 automation 面板提交空账号表单，应自动切换至 credentials 面板并聚焦 #account
+// 在 automation 面板提交空账号表单，应自动切换至 credentials 面板、滑块移至 y=54px 并聚焦 #account
 elements.account.value = '';
 elements.password.value = '';
 elements.form._fire('submit');
 if (elements.panelCredentials.hidden !== false || elements.panelAutomation.hidden !== true ||
     elements.navCredentials.getAttribute('aria-selected') !== 'true' ||
+    elements.sidebarNavIndicator.style.transform !== 'translate3d(0px, 54px, 0)' ||
     elements.account._focused !== true) {
   throw new Error('Submit without credentials should auto-switch to credentials panel and focus account');
 }
