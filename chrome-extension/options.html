@@ -61,6 +61,35 @@
         </button>
       </nav>
 
+      <div class="sidebar-utilities" aria-label="外观与门户快捷控制">
+        <div class="sidebar-utility-row">
+          <div class="accent-palette-bar" id="accentPaletteBar" title="切换个性化强调色">
+            <button type="button" class="accent-dot active" data-accent="blue" title="科技蓝 (默认)" aria-label="强调色：科技蓝"></button>
+            <button type="button" class="accent-dot" data-accent="purple" title="极光紫" aria-label="强调色：极光紫"></button>
+            <button type="button" class="accent-dot" data-accent="emerald" title="翡翠绿" aria-label="强调色：翡翠绿"></button>
+            <button type="button" class="accent-dot" data-accent="amber" title="落日橙" aria-label="强调色：落日橙"></button>
+            <button type="button" class="accent-dot" data-accent="rose" title="玫瑰粉" aria-label="强调色：玫瑰粉"></button>
+          </div>
+
+          <button type="button" class="theme-toggle-btn" id="btnThemeToggle" title="切换深色/浅色模式">
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <span class="theme-label" id="themeLabel">自动</span>
+          </button>
+        </div>
+
+        <a href="http://172.30.100.2/" target="_blank" rel="noopener noreferrer" class="portal-link-btn sidebar-portal-link" title="访问校园网登录门户">
+          <span class="portal-link-main">
+            <span class="portal-dot" id="portalDot"></span>
+            <span class="portal-ip">172.30.100.2</span>
+          </span>
+          <span class="portal-link-ext">
+            <span>门户</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </span>
+        </a>
+      </div>
+
       <div class="sidebar-save-box">
         <span class="dock-sync-pill" id="dockSyncStatus">✓ 配置已实时同步</span>
         <button type="submit" class="btn-main sidebar-btn-save" id="btnSave">
@@ -76,33 +105,6 @@
 
     <!-- Right Main Workspace Canvas -->
     <main class="app-main">
-      <!-- Slim Top-Right Utility Controls -->
-      <header class="page-header main-topbar">
-        <div class="header-actions-bar">
-          <!-- Accent Color Switcher -->
-          <div class="accent-palette-bar" id="accentPaletteBar" title="切换个性化强调色">
-            <button type="button" class="accent-dot active" data-accent="blue" title="科技蓝 (默认)"></button>
-            <button type="button" class="accent-dot" data-accent="purple" title="极光紫"></button>
-            <button type="button" class="accent-dot" data-accent="emerald" title="翡翠绿"></button>
-            <button type="button" class="accent-dot" data-accent="amber" title="落日橙"></button>
-            <button type="button" class="accent-dot" data-accent="rose" title="玫瑰粉"></button>
-          </div>
-
-          <!-- Theme Switcher -->
-          <button type="button" class="theme-toggle-btn" id="btnThemeToggle" title="切换深色/浅色模式">
-            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-            <span class="theme-label" id="themeLabel">自动</span>
-          </button>
-
-          <a href="http://172.30.100.2/" target="_blank" rel="noopener noreferrer" class="portal-link-btn" title="访问校园网登录门户">
-            <span class="portal-dot" id="portalDot"></span>
-            <span class="portal-ip">172.30.100.2</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          </a>
-        </div>
-      </header>
-
       <div class="app-panels-stage">
       <!-- Panel 1: 实时总览与链路诊断 -->
       <section class="app-panel is-active" id="panelOverview" role="tabpanel" aria-labelledby="navOverview">

@@ -198,21 +198,8 @@ body {
 
 
 /* ==========================================================================
-   Page Header
+   Sidebar Brand, Utilities & Badges
    ========================================================================== */
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 2px;
-}
-
-.header-main {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
 .logo-box {
   position: relative;
   width: 52px;
@@ -270,25 +257,6 @@ body {
   50% { transform: scale(1.2); }
 }
 
-.title-group {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.title-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.title-row h1 {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-main);
-  letter-spacing: -0.02em;
-}
-
 .version-badge {
   font-size: 12px;
   font-weight: 600;
@@ -299,24 +267,37 @@ body {
   border-radius: var(--radius-pill);
 }
 
+/* --- Sidebar Utility Dock (Accent Palette, Theme Toggle, Portal Link) --- */
+.sidebar-utilities {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
-.header-actions-bar {
+.sidebar-utility-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
 }
 
 /* --- Accent Palette Bar --- */
 .accent-palette-bar {
   display: inline-flex;
   align-items: center;
+  justify-content: space-evenly;
+  flex: 1;
+  min-width: 0;
+  height: 32px;
   gap: 6px;
-  background: var(--bg-card);
+  background: var(--stat-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-pill);
-  padding: 5px 8px;
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(12px);
+  padding: 0 10px;
 }
 
 .accent-dot {
@@ -358,18 +339,18 @@ body {
 .theme-toggle-btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  background: var(--bg-card);
+  flex-shrink: 0;
+  height: 32px;
+  gap: 6px;
+  background: var(--stat-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-pill);
-  padding: 6px 14px;
+  padding: 0 12px;
   color: var(--text-muted);
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  box-shadow: var(--shadow-sm);
   transition: all 0.25s var(--ease-spring);
-  backdrop-filter: blur(12px);
 }
 
 .theme-toggle-btn:hover {
@@ -395,24 +376,46 @@ body {
 .portal-link-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 34px;
   gap: 8px;
-  background: var(--bg-card);
+  background: var(--stat-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-pill);
-  padding: 6px 15px;
-  box-shadow: var(--shadow-sm);
+  padding: 0 12px;
   text-decoration: none;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   transition: all 0.25s var(--ease-spring);
-  backdrop-filter: blur(12px);
+}
+
+.portal-link-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.portal-link-ext {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-light);
+  transition: color 0.2s ease;
 }
 
 .portal-link-btn:hover {
   border-color: var(--primary);
   color: var(--primary);
   transform: translateY(-1px);
+}
+
+.portal-link-btn:hover .portal-link-ext {
+  color: var(--primary);
 }
 
 .portal-link-btn:active {
@@ -3272,10 +3275,10 @@ input[aria-invalid="true"] {
 }
 
 .app-sidebar {
-  padding: 24px 18px 20px;
+  padding: 20px 18px 18px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
   overflow: visible;
 }
 
@@ -3283,7 +3286,7 @@ input[aria-invalid="true"] {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 2px 4px 16px;
+  padding: 2px 4px 14px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -3414,12 +3417,10 @@ input[aria-invalid="true"] {
 }
 
 .sidebar-save-box {
-  margin-top: auto;
-  padding-top: 16px;
-  border-top: 1px dashed var(--border-color);
+  padding-top: 2px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
 }
 
 .sidebar-save-box .dock-sync-pill {
@@ -3444,18 +3445,10 @@ input[aria-invalid="true"] {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-}
-
-.main-topbar {
-  justify-content: flex-end;
-  min-height: 36px;
-  padding: 0 2px;
-  gap: 12px;
-  flex-wrap: wrap;
 }
 
 .app-panels-stage {
+  flex: 1;
   min-height: 500px;
   display: flex;
   flex-direction: column;
@@ -3692,8 +3685,30 @@ input[aria-invalid="true"] {
     padding: 10px 12px;
   }
 
+  .sidebar-utilities {
+    margin-top: 2px;
+    padding-top: 10px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .sidebar-utility-row {
+    width: auto;
+    flex: 1;
+    min-width: 210px;
+  }
+
+  .sidebar-portal-link {
+    width: auto;
+    flex: 0 0 auto;
+  }
+
   .sidebar-save-box {
     margin-top: 2px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
@@ -3775,11 +3790,6 @@ input[aria-invalid="true"] {
     width: 100%;
     justify-content: flex-start;
   }
-
-  .header-actions-bar {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
 }
 
 @media (max-width: 480px) {
@@ -3791,25 +3801,23 @@ input[aria-invalid="true"] {
     gap: 14px;
   }
 
-  .page-header {
-    justify-content: flex-start;
-  }
-
   .sidebar-brand .logo-box {
     width: 38px;
     height: 38px;
   }
 
-  .header-actions-bar {
+  .sidebar-utilities {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sidebar-utility-row,
+  .sidebar-portal-link {
     width: 100%;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    gap: 8px;
   }
 
   .accent-palette-bar {
-    padding: 4px 6px;
+    padding: 0 8px;
     gap: 4px;
   }
 
@@ -3820,7 +3828,7 @@ input[aria-invalid="true"] {
 
   .theme-toggle-btn,
   .portal-link-btn {
-    padding: 5px 10px;
+    padding: 0 10px;
     font-size: 12px;
   }
 

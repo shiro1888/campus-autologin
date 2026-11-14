@@ -1180,7 +1180,7 @@ if (/Mac/i.test(navigator.platform || navigator.userAgent)) {
 // --- 智能前台状态轮询组件 (Component: createVisibilityPoller) ---
 const statusPoller = createVisibilityPoller(refreshStatus, 15000);
 
-// --- 强调色切换选择器 (Component: createAccentPicker) ---
+// --- 个性化强调色切换选择器 (Component: createAccentPicker) ---
 const accentPicker = createAccentPicker({
   barId: 'accentPaletteBar',
   onNotify: (msg) => showToast(msg, 'ok')
