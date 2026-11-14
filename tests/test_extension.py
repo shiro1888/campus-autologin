@@ -3707,7 +3707,8 @@ console.log(triggered === 0 ? 'LABEL_GUARD_OK' : 'LABEL_GUARD_FAIL:' + triggered
         self.assertNotIn(".topbar-heading", options_css)
         self.assertIn("@media (max-width: 1160px)", options_css)
         self.assertIn("@media (max-width: 900px)", options_css)
-        self.assertIn("@media (max-width: 860px)", options_css)
+        # 拓扑条垂直堆叠断点从 860px 上移至 1040px，避免 901–1040px 区间横向裁切 .topo-internet
+        self.assertIn("@media (max-width: 1040px)", options_css)
         self.assertIn(".hero-action-buttons .btn-action.primary", options_css)
 
         # 3. Options 侧边栏滑块切页与表单未填凭据自动跳转凭据页行为校验（Node VM）

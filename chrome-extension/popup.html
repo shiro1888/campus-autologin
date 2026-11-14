@@ -11,8 +11,8 @@
     <!-- Header -->
     <header class="header">
       <div class="brand">
-        <div class="brand-avatar-box" id="brandAvatar" title="点击打开控制中心" role="button" tabindex="0">
-          <img src="icons/icon32.png" alt="Logo" class="brand-img">
+        <div class="brand-avatar-box" id="brandAvatar" title="点击打开控制中心" aria-label="打开控制中心" role="button" tabindex="0">
+          <img src="icons/icon32.png" alt="" class="brand-img">
           <span class="avatar-beacon" id="avatarBeacon"></span>
         </div>
         <div class="brand-meta">
@@ -21,7 +21,7 @@
       </div>
       <div class="header-tools">
         <span class="ver-pill" id="ver" title="点击打开控制中心" role="button" tabindex="0">v1.0.0</span>
-        <button type="button" id="btnThemeToggle" class="icon-btn theme-btn" title="切换深色/浅色模式">
+        <button type="button" id="btnThemeToggle" class="icon-btn theme-btn" title="切换深色/浅色模式" aria-label="切换深色/浅色模式">
           <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
             <circle cx="12" cy="12" r="5"/>
             <line x1="12" y1="1" x2="12" y2="3"/>
@@ -37,7 +37,7 @@
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
           </svg>
         </button>
-        <button type="button" id="btnRefresh" class="icon-btn" title="刷新状态">
+        <button type="button" id="btnRefresh" class="icon-btn" title="刷新状态" aria-label="刷新状态">
           <svg class="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
           </svg>
@@ -136,10 +136,10 @@
         <div class="dock-head">
           <svg class="dock-icon blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           <span>认证账号</span>
-          <span class="isp-badge" id="accountIsp" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" title="点击展开运营商直选面板 (校园/电信/联通/其他)">校园</span>
+          <span class="isp-badge" id="accountIsp" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-controls="ispQuickSheet" title="点击展开运营商直选面板 (校园/电信/联通/其他)">校园</span>
         </div>
         <div class="dock-value-row">
-          <div class="dock-value mono ellipsis" id="account" title="点击切换自习室防窥模式">—</div>
+          <div class="dock-value mono ellipsis" id="account" role="button" tabindex="0" aria-label="切换账号防窥遮罩" title="点击切换自习室防窥模式">—</div>
           <div class="dock-btn-group">
             <button type="button" class="dock-copy-btn" id="btnToggleMask" title="自习室防窥模式开关" aria-label="自习室防窥模式开关">
               <svg id="maskIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

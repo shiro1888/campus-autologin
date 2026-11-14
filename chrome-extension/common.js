@@ -18,7 +18,7 @@ const HTML_ESCAPE_RE = /[&<>"']/g;
 
 /** HTML 特殊字符安全转义 */
 function escapeHtml(str) {
-  return String(str || '').replace(HTML_ESCAPE_RE, (m) => HTML_ESCAPE_MAP[m]);
+  return (str === null || str === undefined ? '' : String(str)).replace(HTML_ESCAPE_RE, (m) => HTML_ESCAPE_MAP[m]);
 }
 
 /**
@@ -593,6 +593,7 @@ function createCopyTrigger(options = {}) {
 function createConfirmModal(cfg = {}) {
   let activeResolve = null;
   let lastFocused = null;
+  let focusTimer = null;
 
   const getOverlay = () => $(cfg.overlayId || 'confirmModalOverlay');
   const getTitle = () => $(cfg.titleId || 'confirmModalTitle');
@@ -631,6 +632,10 @@ function createConfirmModal(cfg = {}) {
   const self = { settle };
 
   function close(result) {
+    if (focusTimer) {
+      clearTimeout(focusTimer);
+      focusTimer = null;
+    }
     const overlay = getOverlay();
     if (!overlay || !overlay.classList.contains('open')) return;
     overlay.classList.remove('open');
@@ -715,8 +720,10 @@ function createConfirmModal(cfg = {}) {
 
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden', 'false');
-    setTimeout(() => {
-      if (confirmBtn) confirmBtn.focus();
+    if (focusTimer) clearTimeout(focusTimer);
+    focusTimer = setTimeout(() => {
+      focusTimer = null;
+      if (overlay.classList.contains('open') && confirmBtn) confirmBtn.focus();
     }, 40);
 
     return new Promise((resolve) => {
@@ -733,7 +740,12 @@ function createConfirmModal(cfg = {}) {
     });
   }
 
-  return { confirm, open, close };
+  return {
+    confirm,
+    open,
+    close,
+    isOpen: () => !!(getOverlay() && getOverlay().classList.contains('open'))
+  };
 }
 
 /**
@@ -792,7 +804,8 @@ function createActivityTimeline(cfg = {}) {
           const timeShort = String(item.time || '').split(' ').pop() || '—';
           const fromText = escapeHtml(item.from || '巡检');
           const msgText = escapeHtml(normalizeStatusMessage(item.message || ''));
-          const countNum = Number(item.count) || 1;
+          const rawCount = Number(item.count);
+          const countNum = Number.isFinite(rawCount) && rawCount > 1 ? Math.floor(rawCount) : 1;
           const countHtml = countNum > 1 ? `<span class="timeline-repeat-badge" title="连续相同状态合并计数">×${countNum}</span>` : '';
 
           return (
@@ -825,30 +838,49 @@ function createActivityTimeline(cfg = {}) {
   }
 
   const toggleBtn = getToggleBtn();
+  const onToggleClick = () => toggle();
   if (toggleBtn) {
-    toggleBtn.addEventListener('click', () => toggle());
+    toggleBtn.addEventListener('click', onToggleClick);
   }
 
-  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
-    document.addEventListener('mousedown', (e) => {
-      if (!isOpen || !e || !e.target) return;
+  const onDocMouseDown = (e) => {
+    if (!isOpen || !e || !e.target) return;
+    const drawer = getDrawer();
+    const btn = getToggleBtn();
+    if (drawer && typeof drawer.contains === 'function' && drawer.contains(e.target)) return;
+    if (btn && typeof btn.contains === 'function' && btn.contains(e.target)) return;
+    toggle(false);
+  };
+  const onDocKeyDown = (e) => {
+    if (isOpen && e && e.key === 'Escape') {
       const drawer = getDrawer();
       const btn = getToggleBtn();
-      if (drawer && typeof drawer.contains === 'function' && drawer.contains(e.target)) return;
-      if (btn && typeof btn.contains === 'function' && btn.contains(e.target)) return;
+      const wasFocusedInside = !!(drawer && typeof drawer.contains === 'function' &&
+        typeof document !== 'undefined' && document.activeElement &&
+        drawer.contains(document.activeElement));
       toggle(false);
-    });
-    document.addEventListener('keydown', (e) => {
-      if (isOpen && e && e.key === 'Escape') {
-        toggle(false);
+      if (wasFocusedInside && btn && typeof btn.focus === 'function') {
+        btn.focus();
       }
-    });
+    }
+  };
+
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('mousedown', onDocMouseDown);
+    document.addEventListener('keydown', onDocKeyDown);
   }
 
   return {
     render,
     toggle,
-    getLogs: () => cachedLogs.slice()
+    getLogs: () => cachedLogs.slice(),
+    destroy() {
+      if (toggleBtn) toggleBtn.removeEventListener('click', onToggleClick);
+      if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+        document.removeEventListener('mousedown', onDocMouseDown);
+        document.removeEventListener('keydown', onDocKeyDown);
+      }
+    }
   };
 }
 
@@ -1124,6 +1156,12 @@ function createPasswordToggle(options = {}) {
   const timeoutMs = options.timeoutMs || 10000;
   let rehideTimer = null;
 
+  function syncBtnState(revealed) {
+    if (toggleBtn) {
+      toggleBtn.setAttribute('aria-pressed', revealed ? 'true' : 'false');
+    }
+  }
+
   function rehide() {
     if (rehideTimer) {
       clearTimeout(rehideTimer);
@@ -1132,6 +1170,7 @@ function createPasswordToggle(options = {}) {
     if (inputEl && inputEl.type === 'text') {
       inputEl.type = 'password';
       if (eyeIcon) eyeIcon.innerHTML = ICONS.eyeOpen;
+      syncBtnState(false);
       if (typeof options.onToggle === 'function') options.onToggle(false);
     }
   }
@@ -1140,6 +1179,7 @@ function createPasswordToggle(options = {}) {
     if (!inputEl) return;
     const isCurrentlyPassword = inputEl.type === 'password';
     inputEl.type = isCurrentlyPassword ? 'text' : 'password';
+    syncBtnState(isCurrentlyPassword);
 
     if (rehideTimer) {
       clearTimeout(rehideTimer);
@@ -1159,6 +1199,7 @@ function createPasswordToggle(options = {}) {
   }
 
   if (toggleBtn) {
+    syncBtnState(inputEl?.type === 'text');
     toggleBtn.addEventListener('click', toggle);
   }
 
@@ -1340,6 +1381,15 @@ function initCustomSelects(root = document) {
     trigger.setAttribute('aria-haspopup', 'listbox');
     trigger.setAttribute('aria-expanded', 'false');
     trigger.setAttribute('aria-controls', menuId);
+    if (select.id && typeof document !== 'undefined' && typeof document.querySelector === 'function') {
+      const assocLabel = document.querySelector(`label[for="${select.id}"]`);
+      if (assocLabel) {
+        if (!assocLabel.id) assocLabel.id = `${select.id}-label`;
+        trigger.setAttribute('aria-labelledby', assocLabel.id);
+      } else if (typeof select.getAttribute === 'function' && select.getAttribute('aria-label')) {
+        trigger.setAttribute('aria-label', select.getAttribute('aria-label'));
+      }
+    }
 
     const labelWrap = document.createElement('div');
     labelWrap.className = 'custom-select-label';
@@ -1529,10 +1579,13 @@ function createPrivacyMaskManager(options = {}) {
   const toggleBtn = $(options.toggleBtnId);
   const iconEl = $(options.iconId);
   let isMasked = false;
+  let storageListener = null;
+  let clickListener = null;
 
   function render() {
     if (toggleBtn) {
       toggleBtn.classList.toggle('active', isMasked);
+      toggleBtn.setAttribute('aria-pressed', isMasked ? 'true' : 'false');
       const title = isMasked
         ? (options.maskedTitle || '当前：自习室防窥（点击显示明文）')
         : (options.unmaskedTitle || '当前：明文显示（点击开启自习室防窥）');
@@ -1573,19 +1626,21 @@ function createPrivacyMaskManager(options = {}) {
         render();
       });
       if (chrome.storage.onChanged) {
-        chrome.storage.onChanged.addListener((changes, area) => {
+        storageListener = (changes, area) => {
           if (area === 'local' && changes.privacyMask) {
             isMasked = !!changes.privacyMask.newValue;
             render();
           }
-        });
+        };
+        chrome.storage.onChanged.addListener(storageListener);
       }
     }
     if (toggleBtn) {
-      toggleBtn.addEventListener('click', (e) => {
+      clickListener = (e) => {
         e.preventDefault();
         toggle();
-      });
+      };
+      toggleBtn.addEventListener('click', clickListener);
     }
   }
 
@@ -1595,7 +1650,16 @@ function createPrivacyMaskManager(options = {}) {
     isMasked: () => isMasked,
     toggle,
     setMasked,
-    render
+    render,
+    destroy() {
+      if (storageListener && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged &&
+          typeof chrome.storage.onChanged.removeListener === 'function') {
+        chrome.storage.onChanged.removeListener(storageListener);
+      }
+      if (clickListener && toggleBtn && typeof toggleBtn.removeEventListener === 'function') {
+        toggleBtn.removeEventListener('click', clickListener);
+      }
+    }
   };
 }
 
@@ -1617,7 +1681,9 @@ function createAccentPicker(options = {}) {
   function sync(current) {
     const dots = document.querySelectorAll(dotSelector);
     dots.forEach((dot) => {
-      dot.classList.toggle('active', dot.dataset.accent === current);
+      const active = dot.dataset.accent === current;
+      dot.classList.toggle('active', active);
+      dot.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
   }
 

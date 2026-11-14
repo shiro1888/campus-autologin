@@ -259,7 +259,7 @@ function refresh(onComplete) {
     } else {
       durationTicker.stop();
       if (paused) {
-        setStatus('已手动注销 · 自动登录暂停', '点「立即登录」可恢复自动重连', 'wait');
+        setStatus('已手动注销 · 自动登录暂停', '点「恢复登录」可恢复自动重连', 'wait');
       } else if (res.unparseable) {
         setStatus('未识别的网络', '当前网络需要网页登录（非校园网认证页）', 'wait');
       } else {
@@ -374,7 +374,7 @@ if (popGwTag) {
   });
 }
 
-$('account')?.addEventListener('click', (e) => {
+const handleAccountAction = (e) => {
   e.stopPropagation();
   if (!currentAccount) {
     if (chrome.runtime && chrome.runtime.openOptionsPage) {
@@ -385,6 +385,14 @@ $('account')?.addEventListener('click', (e) => {
     return;
   }
   privacyMask.toggle();
+};
+
+$('account')?.addEventListener('click', handleAccountAction);
+$('account')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    handleAccountAction(e);
+  }
 });
 
 $('msgBox')?.addEventListener('click', () => {
@@ -425,13 +433,25 @@ $('btnRefresh')?.addEventListener('click', () => refresh());
 const accountIspEl = $('accountIsp');
 const ispQuickSheet = $('ispQuickSheet');
 
-function toggleIspSheet(forceOpen) {
+function toggleIspSheet(forceOpen, restoreFocus = false) {
   if (!ispQuickSheet) return;
+  const wasFocusedInside = typeof document !== 'undefined' && document.activeElement &&
+    ispQuickSheet.contains(document.activeElement);
   const open = typeof forceOpen === 'boolean' ? forceOpen : !ispQuickSheet.classList.contains('open');
   ispQuickSheet.classList.toggle('open', open);
   ispQuickSheet.setAttribute('aria-hidden', open ? 'false' : 'true');
   if (accountIspEl) {
     accountIspEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (!open && (restoreFocus || wasFocusedInside)) {
+      accountIspEl.focus();
+    }
+  }
+  if (open) {
+    const activeBtn = ispQuickSheet.querySelector('.isp-sheet-btn.active') ||
+      ispQuickSheet.querySelector('.isp-sheet-btn');
+    if (activeBtn && typeof activeBtn.focus === 'function') {
+      activeBtn.focus();
+    }
   }
 }
 
@@ -459,12 +479,32 @@ if (accountIspEl && ispQuickSheet) {
     const meta = getIspMeta(next);
     chrome.storage.local.set({ isp: next, authError: false }, () => {
       syncIspDisplay(next);
-      toggleIspSheet(false);
+      toggleIspSheet(false, true);
       chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => {
         void chrome.runtime.lastError;
       });
       setMsg('已切换运营商: ' + meta.full, 'ok', 2000);
     });
+  });
+
+  ispQuickSheet.addEventListener('keydown', (e) => {
+    const btns = Array.from(ispQuickSheet.querySelectorAll('.isp-sheet-btn'));
+    const curIdx = btns.indexOf(document.activeElement);
+    if (curIdx === -1) return;
+    let nextIdx = -1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      nextIdx = (curIdx + 1) % btns.length;
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      nextIdx = (curIdx - 1 + btns.length) % btns.length;
+    } else if (e.key === 'Home') {
+      nextIdx = 0;
+    } else if (e.key === 'End') {
+      nextIdx = btns.length - 1;
+    }
+    if (nextIdx !== -1) {
+      e.preventDefault();
+      btns[nextIdx]?.focus();
+    }
   });
 
   document.addEventListener('click', (e) => {
@@ -475,7 +515,7 @@ if (accountIspEl && ispQuickSheet) {
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && ispQuickSheet.classList.contains('open')) {
-      toggleIspSheet(false);
+      toggleIspSheet(false, true);
     }
   });
 }

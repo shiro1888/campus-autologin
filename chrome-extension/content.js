@@ -209,17 +209,22 @@
     ) {
       return '当前时段禁止使用校园网（夜间断网/宵禁时段）';
     }
-    if (low.indexOf('userid error2') !== -1 || low.indexOf('password error') !== -1 || low.indexOf('error2') !== -1) {
-      return '密码错误，请检查密码';
-    }
-    if (low.indexOf('userid error1') !== -1 || low.indexOf('error1') !== -1) {
-      return '账号不存在，请检查账号';
-    }
-    if (low.indexOf('userid error3') !== -1) {
-      return '账号已被锁定，请联系网络中心';
-    }
-    if (low.indexOf('userid error4') !== -1 || low.indexOf('out of service') !== -1) {
-      return '账号已欠费或已停机';
+    const errorPatterns = [
+      [['userid error2', 'password error', 'error2'], '密码错误，请检查密码'],
+      [['userid error1', 'error1'], '账号不存在，请检查账号'],
+      [['userid error3'], '账号已被锁定，请联系网络中心'],
+      [['userid error4', 'out of service'], '账号已欠费或已停机'],
+      [['userid error5'], '账号状态异常，请联系网络中心'],
+      [['userid error6'], '该账号已在别处登录'],
+      [['userid error0', 'error3'], '账号或密码错误'],
+      [['supplicant version too low'], '客户端版本过低'],
+      [['auth error'], '认证失败']
+    ];
+    for (let i = 0; i < errorPatterns.length; i++) {
+      const keys = errorPatterns[i][0];
+      for (let j = 0; j < keys.length; j++) {
+        if (low.indexOf(keys[j]) !== -1) return errorPatterns[i][1];
+      }
     }
     return s;
   }
@@ -526,7 +531,11 @@
           released = true;
           window.removeEventListener('pagehide', release);
           window.removeEventListener('beforeunload', release);
-          try { chrome.runtime.sendMessage({ type: 'releaseAuthLock', token: token }); } catch (e) {}
+          try {
+            chrome.runtime.sendMessage({ type: 'releaseAuthLock', token: token }, function () {
+              void chrome.runtime.lastError;
+            });
+          } catch (e) {}
         }
 
         // 关键：btn.click() 若触发表单提交，页面会立刻开始导航，旧文档的 JS

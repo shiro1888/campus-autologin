@@ -258,6 +258,7 @@ function syncIspQuickPills() {
     const active = btn.getAttribute('data-isp') === cur;
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-checked', active ? 'true' : 'false');
+    btn.tabIndex = active ? 0 : -1;
   });
 }
 
@@ -265,15 +266,38 @@ function initIspQuickPills() {
   const wrap = $('ispQuickPills');
   const sel = $('isp');
   if (!wrap || !sel) return;
-  wrap.addEventListener('click', (e) => {
-    const btn = e.target.closest('.isp-pill');
-    if (!btn) return;
-    const ispVal = btn.getAttribute('data-isp');
+  const selectPill = (btn) => {
+    const ispVal = btn?.getAttribute?.('data-isp');
     if (ispVal && sel.value !== ispVal) {
       sel.value = ispVal;
       syncCustomSelect('isp');
       syncIspQuickPills();
       sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  };
+  wrap.addEventListener('click', (e) => {
+    const btn = e.target.closest('.isp-pill');
+    if (btn) selectPill(btn);
+  });
+  wrap.addEventListener('keydown', (e) => {
+    const pills = Array.from(wrap.querySelectorAll('.isp-pill'));
+    const idx = pills.indexOf(e.target.closest('.isp-pill'));
+    if (idx === -1) return;
+    let nextIdx = -1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      nextIdx = (idx + 1) % pills.length;
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      nextIdx = (idx - 1 + pills.length) % pills.length;
+    } else if (e.key === 'Home') {
+      nextIdx = 0;
+    } else if (e.key === 'End') {
+      nextIdx = pills.length - 1;
+    }
+    if (nextIdx !== -1) {
+      e.preventDefault();
+      const targetBtn = pills[nextIdx];
+      selectPill(targetBtn);
+      targetBtn?.focus();
     }
   });
 }
@@ -330,16 +354,23 @@ function snapToPresetValue(id, value) {
   return best;
 }
 
-/** 自适应关闭时，置灰「掉线重连间隔」（保持双列布局对称不坍塌） */
+/** 自适应关闭时，置灰「掉线重连间隔」（保持双列布局对称不坍塌并禁用键盘操作） */
 function syncOfflineRow() {
   const row = $('offlineRow');
   if (!row) return;
-  if ($('adaptive').checked) {
-    row.classList.remove('is-disabled');
-    row.style.display = '';
-  } else {
-    row.classList.add('is-disabled');
-    row.style.display = '';
+  const enabled = !!($('adaptive') && $('adaptive').checked);
+  row.classList.toggle('is-disabled', !enabled);
+  row.style.display = '';
+  const sel = $('offlineIntervalMin');
+  if (sel) {
+    sel.disabled = !enabled;
+    sel.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+  }
+  const trigger = typeof row.querySelector === 'function' ? row.querySelector('.custom-select-trigger') : null;
+  if (trigger) {
+    trigger.disabled = !enabled;
+    trigger.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+    trigger.tabIndex = enabled ? 0 : -1;
   }
 }
 
@@ -627,8 +658,14 @@ function updateSidebarIndicator(activeNavEl, immediate = false) {
   ind.style.transform = `translate3d(${x}px, ${y}px, 0)`;
   ind.style.opacity = '1';
   if (immediate) {
-    // 同步读取布局尺寸冲刷无动画状态，再恢复 CSS 平滑滑块过渡
-    void ind.offsetHeight;
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => {
+        ind.style.transition = '';
+      });
+    } else {
+      ind.style.transition = '';
+    }
+  } else if (ind.style.transition === 'none') {
     ind.style.transition = '';
   }
 }
@@ -649,6 +686,7 @@ function switchOptionsSection(sectionKey, syncHash = true, immediateIndicator = 
     if (navEl) {
       navEl.classList.toggle('active', active);
       navEl.setAttribute('aria-selected', active ? 'true' : 'false');
+      navEl.tabIndex = active ? 0 : -1;
     }
     if (panelEl) {
       panelEl.classList.toggle('is-active', active);
@@ -782,9 +820,10 @@ $('form').addEventListener('submit', (e) => {
   });
 });
 
-// 全局快捷键 Ctrl+S / Cmd+S 快速保存
+// 全局快捷键 Ctrl+S / Cmd+S 快速保存（确认框打开时忽略，避免穿透误提交）
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    if (confirmModal.isOpen && confirmModal.isOpen()) return;
     e.preventDefault();
     const btn = $('btnSave');
     if (btn && !btn.disabled) {
@@ -825,6 +864,8 @@ $('btnLoginNow').addEventListener('click', () => {
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
+        clearFieldError('account');
+        clearFieldError('password');
         save(() => {
           showToast('设置已自动保存', 'ok');
         });
@@ -844,6 +885,16 @@ createCopyTrigger({
   onCopied: (ip) => showToast('已复制本机 IP: ' + ip, 'ok'),
   onError: () => showToast('复制失败', 'err')
 });
+
+if ($('stIp')) {
+  $('stIp').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      $('cardStatIp')?.click();
+    }
+  });
+}
 
 // --- 点击物理 MAC 快捷复制 (Component: createCopyTrigger) ---
 createCopyTrigger({
@@ -1206,6 +1257,9 @@ const accentPicker = createAccentPicker({
 
 window.addEventListener('pagehide', () => {
   durationTicker.stop();
+  passwordToggle.rehide();
+  if (activityTimeline.destroy) activityTimeline.destroy();
+  if (privacyMask.destroy) privacyMask.destroy();
 });
 
 

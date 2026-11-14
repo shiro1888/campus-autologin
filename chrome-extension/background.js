@@ -476,7 +476,7 @@ async function saveResult(result, trigger) {
     if (result && result.message) {
       const entry = {
         time: result.time || nowText(),
-        message: String(result.message),
+        message: redactCredentials(result.message),
         ok: !!result.ok,
         online: !!result.online,
         pending: !!(result.pending || result.state === 'submitted'),
@@ -484,7 +484,7 @@ async function saveResult(result, trigger) {
         count: 1
       };
       const head = eventLogs[0];
-      if (head && head.message === entry.message && head.ok === entry.ok && head.online === entry.online) {
+      if (head && head.message === entry.message && head.ok === entry.ok && head.online === entry.online && !!head.pending === !!entry.pending) {
         head.time = entry.time;
         head.from = entry.from;
         head.count = (Number(head.count) || 1) + 1;
@@ -1168,6 +1168,9 @@ async function ensureAlarm() {
     // 按 connState==='offline' 设成「掉线间隔 1 秒」，浏览器又回到每秒空唤醒。
     if (settings.manualLogout) {
       period = clampInterval(settings.intervalMin);   // 空闲巡检
+    } else if (connState === 'unreachable' || connState === 'unparseable') {
+      // 离开校园网后即使此前触发过凭据错误，也应进入指数退避，避免按 intervalMin 持续空唤醒
+      period = backoffPeriod(settings);
     } else if (settings.authError) {
       // 密码错 / 账号不存在等：按 1 秒重试一万次也不会成功，
       // 反而每天打出上万次无效认证。降到常规间隔，等用户改好凭据再说。
@@ -1176,8 +1179,6 @@ async function ensureAlarm() {
       period = clampInterval(settings.intervalMin);   // 关闭自适应：统一常规间隔
     } else if (connState === 'offline') {
       period = clampInterval(hasCredentials ? settings.offlineIntervalMin : settings.intervalMin);
-    } else if (connState === 'unreachable' || connState === 'unparseable') {
-      period = backoffPeriod(settings);
     } else {
       period = clampInterval(settings.intervalMin);
     }
