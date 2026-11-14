@@ -74,7 +74,7 @@ function updateAccountDisplay() {
     accEl.textContent = '未设置账号';
     accEl.classList.remove('masked');
     accEl.classList.add('unset');
-    accEl.title = '尚未设置认证账号，点击前往「偏好设置」填写';
+    accEl.title = '尚未设置认证账号，点击前往「控制中心」填写';
     if (maskBtn) {
       maskBtn.classList.remove('active');
       maskBtn.disabled = true;
