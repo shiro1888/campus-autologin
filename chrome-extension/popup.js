@@ -289,7 +289,7 @@ $('btnLogin')?.addEventListener('click', () => {
   btn.disabled = true;
   btn.classList.add('loading');
   $('btnLoginText').textContent = '通信中…';
-  setMsg('正在连接校园网门户验证…', 'info');
+  setMsg('正在连接校园网登录网站验证…', 'info');
 
   chrome.runtime.sendMessage({ type: 'login' }, (res) => {
     btn.disabled = false;
@@ -316,12 +316,12 @@ const logoutConfirmCtrl = createConfirmButton('btnLogout', {
   onConfirm() {
     const btn = $('btnLogout');
     btn.disabled = true;
-    setMsg('正在向门户请求注销下线…', 'info');
+    setMsg('正在向登录网站请求注销下线…', 'info');
 
     chrome.runtime.sendMessage({ type: 'logout' }, (res) => {
       btn.disabled = false;
       if (chrome.runtime.lastError || !res) {
-        setMsg('注销请求超时，请到门户手动操作', 'err');
+        setMsg('注销请求超时，请到登录网站手动操作', 'err');
         return;
       }
       setMsg(res.message || '注销完成', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));

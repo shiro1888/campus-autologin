@@ -89,7 +89,7 @@ const logoutConfirmBtn = createConfirmButton({
     chrome.runtime.sendMessage({ type: 'logout' }, (res) => {
       btn.disabled = false;
       if (chrome.runtime.lastError || !res) {
-        showToast('注销超时，请到门户手动注销', 'err');
+        showToast('注销超时，请到登录网站手动注销', 'err');
         return;
       }
       showToast(res.message || '注销完成', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));
@@ -763,7 +763,7 @@ $('form').addEventListener('submit', (e) => {
   btn.disabled = true;
   btn.classList.add('loading');
   $('btnSaveText').textContent = '正在保存并连接…';
-  showToast('正在向校园网门户发起验证…', 'info');
+  showToast('正在向校园网登录网站发起验证…', 'info');
 
   save(() => {
     chrome.runtime.sendMessage({ type: 'login' }, (res) => {
