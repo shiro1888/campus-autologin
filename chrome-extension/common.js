@@ -760,6 +760,8 @@ function sanitizeEventLogs(list) {
 function createActivityTimeline(cfg = {}) {
   let isOpen = false;
   let cachedLogs = [];
+  let lastBadgeText = null;
+  let lastRenderedHtml = null;
 
   const getDrawer = () => $(cfg.drawerId);
   const getList = () => $(cfg.listId);
@@ -773,35 +775,40 @@ function createActivityTimeline(cfg = {}) {
     const listEl = getList();
     const badgeEl = getCountBadge();
     if (badgeEl) {
-      badgeEl.textContent = cachedLogs.length ? `日志 (${cachedLogs.length})` : '日志';
+      const nextBadge = cachedLogs.length ? `日志 (${cachedLogs.length})` : '日志';
+      if (lastBadgeText !== nextBadge) {
+        lastBadgeText = nextBadge;
+        badgeEl.textContent = nextBadge;
+      }
     }
     if (!listEl) return;
 
-    if (!cachedLogs.length) {
-      listEl.innerHTML = '<div class="timeline-empty">暂无事件记录，后台巡检与认证操作将实时记录于此</div>';
-      return;
+    const nextHtml = !cachedLogs.length
+      ? '<div class="timeline-empty">暂无事件记录，后台巡检与认证操作将实时记录于此</div>'
+      : cachedLogs.map((item) => {
+          const isPending = !!item.pending;
+          const isOk = !isPending && !!item.ok;
+          const stateCls = isPending ? 'wait' : (isOk ? 'ok' : 'err');
+          const timeShort = String(item.time || '').split(' ').pop() || '—';
+          const fromText = escapeHtml(item.from || '巡检');
+          const msgText = escapeHtml(normalizeStatusMessage(item.message || ''));
+          const countNum = Number(item.count) || 1;
+          const countHtml = countNum > 1 ? `<span class="timeline-repeat-badge" title="连续相同状态合并计数">×${countNum}</span>` : '';
+
+          return (
+            `<div class="timeline-item ${stateCls}">` +
+              `<span class="timeline-dot"></span>` +
+              `<span class="timeline-time mono">${escapeHtml(timeShort)}</span>` +
+              `<span class="timeline-from">${fromText}</span>` +
+              `<span class="timeline-msg">${msgText}</span>` +
+              countHtml +
+            `</div>`
+          );
+        }).join('');
+    if (lastRenderedHtml !== nextHtml) {
+      lastRenderedHtml = nextHtml;
+      listEl.innerHTML = nextHtml;
     }
-
-    listEl.innerHTML = cachedLogs.map((item) => {
-      const isPending = !!item.pending;
-      const isOk = !isPending && !!item.ok;
-      const stateCls = isPending ? 'wait' : (isOk ? 'ok' : 'err');
-      const timeShort = String(item.time || '').split(' ').pop() || '—';
-      const fromText = escapeHtml(item.from || '巡检');
-      const msgText = escapeHtml(normalizeStatusMessage(item.message || ''));
-      const countNum = Number(item.count) || 1;
-      const countHtml = countNum > 1 ? `<span class="timeline-repeat-badge" title="连续相同状态合并计数">×${countNum}</span>` : '';
-
-      return (
-        `<div class="timeline-item ${stateCls}">` +
-          `<span class="timeline-dot"></span>` +
-          `<span class="timeline-time mono">${escapeHtml(timeShort)}</span>` +
-          `<span class="timeline-from">${fromText}</span>` +
-          `<span class="timeline-msg">${msgText}</span>` +
-          countHtml +
-        `</div>`
-      );
-    }).join('');
   }
 
   function toggle(forceState) {
@@ -820,6 +827,22 @@ function createActivityTimeline(cfg = {}) {
   const toggleBtn = getToggleBtn();
   if (toggleBtn) {
     toggleBtn.addEventListener('click', () => toggle());
+  }
+
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('mousedown', (e) => {
+      if (!isOpen || !e || !e.target) return;
+      const drawer = getDrawer();
+      const btn = getToggleBtn();
+      if (drawer && typeof drawer.contains === 'function' && drawer.contains(e.target)) return;
+      if (btn && typeof btn.contains === 'function' && btn.contains(e.target)) return;
+      toggle(false);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (isOpen && e && e.key === 'Escape') {
+        toggle(false);
+      }
+    });
   }
 
   return {
