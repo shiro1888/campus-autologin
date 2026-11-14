@@ -1610,7 +1610,7 @@ function createAccentPicker(options = {}) {
     blue: '科技蓝（默认）',
     purple: '极光紫',
     emerald: '翡翠绿',
-    amber: '琥珀金',
+    amber: '落日橙',
     rose: '玫瑰粉'
   }, options.names);
 

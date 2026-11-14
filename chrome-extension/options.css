@@ -19,7 +19,7 @@
   --warning: #f59e0b;
   --warning-border: rgba(245, 158, 11, 0.4);
   --warning-bg: rgba(245, 158, 11, 0.08);
-  --warning-text: #b45309;
+  --warning-text: #92400e;
 
   --bg-page: #f8fafc;
   --bg-dot-color: rgba(15, 23, 42, 0.045);
@@ -69,7 +69,7 @@
   --border-subtle: rgba(255, 255, 255, 0.05);
 
   --success-text: #34d399;
-  --danger-text: #f87171;
+  --danger-text: #fca5a5;
   --warning-text: #fbbf24;
 
   --shadow-card: 0 10px 35px -5px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -95,7 +95,7 @@
     --border-subtle: rgba(255, 255, 255, 0.05);
 
     --success-text: #34d399;
-    --danger-text: #f87171;
+    --danger-text: #fca5a5;
     --warning-text: #fbbf24;
 
     --shadow-card: 0 10px 35px -5px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -750,14 +750,14 @@ body {
 }
 
 .hero-health-pill.fast {
-  color: var(--success);
+  color: var(--success-text);
   background: rgba(16, 185, 129, 0.12);
   border-color: rgba(16, 185, 129, 0.35);
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
 }
 
 .hero-health-pill.good {
-  color: #059669;
+  color: #047857;
   background: rgba(16, 185, 129, 0.1);
   border-color: rgba(16, 185, 129, 0.28);
 }
@@ -768,7 +768,7 @@ body {
 
 .hero-health-pill.normal,
 .hero-health-pill.wait {
-  color: #d97706;
+  color: #92400e;
   background: rgba(245, 158, 11, 0.12);
   border-color: rgba(245, 158, 11, 0.35);
 }
@@ -779,7 +779,7 @@ body {
 }
 
 .hero-health-pill.offline {
-  color: var(--danger);
+  color: var(--danger-text);
   background: rgba(239, 68, 68, 0.1);
   border-color: rgba(239, 68, 68, 0.3);
 }
@@ -865,7 +865,7 @@ body {
 
 .btn-action.confirming {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-text);
   border-color: var(--danger-border);
   box-shadow: 0 0 0 2px var(--danger-glow);
   font-weight: 700;
@@ -914,13 +914,13 @@ body {
 
 .latency-badge.fast {
   background: rgba(16, 185, 129, 0.15);
-  color: var(--success);
+  color: var(--success-text);
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .latency-badge.good {
   background: rgba(6, 182, 212, 0.15);
-  color: #0891b2;
+  color: #0e7490;
   border: 1px solid rgba(6, 182, 212, 0.3);
 }
 
@@ -931,7 +931,7 @@ body {
 
 .latency-badge.normal {
   background: rgba(245, 158, 11, 0.15);
-  color: #d97706;
+  color: #92400e;
   border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
@@ -941,7 +941,7 @@ body {
 
 .latency-badge.slow {
   background: rgba(239, 68, 68, 0.15);
-  color: var(--danger);
+  color: var(--danger-text);
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
@@ -1361,7 +1361,7 @@ body {
 
 .topo-chip-badge.fast,
 .topo-chip-badge.on {
-  color: var(--success);
+  color: var(--success-text);
   background: rgba(16, 185, 129, 0.12);
   border-color: rgba(16, 185, 129, 0.35);
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.12);
@@ -1369,7 +1369,7 @@ body {
 
 .topo-chip-badge.normal,
 .topo-chip-badge.wait {
-  color: #d97706;
+  color: #92400e;
   background: rgba(245, 158, 11, 0.12);
   border-color: rgba(245, 158, 11, 0.35);
   box-shadow: 0 2px 8px rgba(245, 158, 11, 0.12);
@@ -1381,7 +1381,7 @@ body {
 
 .topo-chip-badge.slow,
 .topo-chip-badge.off {
-  color: var(--danger);
+  color: var(--danger-text);
   background: rgba(239, 68, 68, 0.1);
   border-color: rgba(239, 68, 68, 0.3);
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.1);
@@ -1561,7 +1561,7 @@ body {
 }
 
 .stat-copy-pill.copied {
-  color: #059669 !important;
+  color: #047857 !important;
   background: rgba(16, 185, 129, 0.15) !important;
   border-color: rgba(16, 185, 129, 0.4) !important;
   animation: beacon-pop 0.3s var(--ease-spring);
@@ -1691,7 +1691,7 @@ body {
 }
 
 .stat-badge.blue { background: #dbeafe; color: #2563eb; }
-.stat-badge.amber { background: #fef3c7; color: #d97706; }
+.stat-badge.amber { background: #fef3c7; color: #b45309; }
 .stat-badge.emerald { background: #d1fae5; color: #059669; }
 .stat-badge.purple { background: #f3e8ff; color: #9333ea; }
 .stat-badge.gray { background: #f1f5f9; color: #475569; }
@@ -1779,7 +1779,7 @@ body {
   font-weight: 600;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
-  color: #059669;
+  color: #047857;
   background: rgba(16, 185, 129, 0.12);
   border: 1px solid rgba(16, 185, 129, 0.28);
   white-space: nowrap;
@@ -1794,7 +1794,7 @@ body {
 }
 
 .stat-policy-pill.regular {
-  color: #2563eb;
+  color: #1d4ed8;
   background: rgba(37, 99, 235, 0.1);
   border-color: rgba(37, 99, 235, 0.25);
 }
@@ -1864,7 +1864,7 @@ body {
 
 .card-icon.blue { background: #dbeafe; color: #2563eb; }
 .card-icon.emerald { background: #d1fae5; color: #059669; }
-.card-icon.amber { background: #fef3c7; color: #d97706; }
+.card-icon.amber { background: #fef3c7; color: #b45309; }
 .card-icon.purple { background: #ede9fe; color: #7c3aed; }
 
 .form-card:hover .card-icon.blue { box-shadow: 0 0 16px rgba(59, 130, 246, 0.35); }
@@ -2627,7 +2627,7 @@ input[aria-invalid="true"] {
 
 .switch-icon-box.amber {
   background: rgba(245, 158, 11, 0.12);
-  color: #d97706;
+  color: #b45309;
 }
 [data-theme="dark"] .switch-icon-box.amber { color: #fbbf24; }
 
@@ -2700,6 +2700,13 @@ input[aria-invalid="true"] {
   color: #ffffff;
   background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--primary) 28%, transparent) 0%, transparent 75%),
               color-mix(in srgb, var(--primary) 16%, var(--bg-card));
+}
+
+/* 深色下激活标签内的「默认」小 chip 是 var(--primary) 纯色底 + 白字（#3b82f6 仅 3.68:1，10px 小字需 4.5）；
+   固定为更深一档品牌蓝保证对比度（白字 6.7:1），不随强调色变亮色系导致白字失比。 */
+[data-theme="dark"] .isp-pill.active .isp-pill-tag {
+  background: #1d4ed8;
+  color: #ffffff;
 }
 
 .isp-pill-name {
@@ -2845,7 +2852,7 @@ input[aria-invalid="true"] {
   font-weight: 600;
   padding: 5px 12px;
   border-radius: var(--radius-pill);
-  color: #059669;
+  color: #047857;
   background: rgba(16, 185, 129, 0.1);
   border: 1px solid rgba(16, 185, 129, 0.25);
   white-space: nowrap;
@@ -2859,7 +2866,7 @@ input[aria-invalid="true"] {
 }
 
 .dock-sync-pill.dirty {
-  color: #d97706;
+  color: #92400e;
   background: rgba(245, 158, 11, 0.12);
   border-color: rgba(245, 158, 11, 0.35);
 }
@@ -3271,8 +3278,13 @@ input[aria-invalid="true"] {
 [data-theme="light"] .toast-bar.warn {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(245, 158, 11, 0.35);
-  color: #d97706;
+  color: #92400e;
   box-shadow: 0 14px 32px -4px rgba(245, 158, 11, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* 浅色下 warn 图标默认继承深色主题的 #f59e0b，在琥珀淡底上仅 1.88:1（图形需 3:1），随文字提深 */
+[data-theme="light"] .toast-bar.warn .toast-icon {
+  color: var(--warning-text);
 }
 
 /* ==========================================================================
@@ -4221,7 +4233,7 @@ select:focus-visible,
 }
 
 .log-action-btn.danger:hover {
-  color: var(--danger);
+  color: var(--danger-text);
   border-color: rgba(239, 68, 68, 0.4);
   background: rgba(239, 68, 68, 0.08);
 }
