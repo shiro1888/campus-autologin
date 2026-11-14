@@ -3654,12 +3654,17 @@ console.log(triggered === 0 ? 'LABEL_GUARD_OK' : 'LABEL_GUARD_FAIL:' + triggered
         with open(os.path.join(EXT_DIR, "common.js"), "r", encoding="utf-8") as f:
             common_js = f.read()
 
-        # 1. Popup P1 356px 精炼单列与防遮挡 Toast / 呼吸流光校验
+        # 1. Popup P1 356px 精炼单列与防遮挡 Toast / 呼吸流光 / 账号卡排布校验
+        with open(os.path.join(EXT_DIR, "popup.html"), "r", encoding="utf-8") as f:
+            popup_html = f.read()
         self.assertIn("width: 356px;", popup_css)
         self.assertNotIn("width: 460px;", popup_css)
         self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", popup_css)
         self.assertIn(".dock-item:nth-child(3)", popup_css)
         self.assertIn("grid-column: 1 / -1;", popup_css)
+        self.assertIn(".account-meta-col", popup_css)
+        self.assertIn(".account-ctrl-group", popup_css)
+        self.assertIn('id="accountDockItem">', popup_html, "外层 #accountDockItem 不应带全局原生 title 遮挡内部操作按钮")
         self.assertIn("grid-template-columns: repeat(4, 1fr);", popup_css)
         self.assertIn("top: 10px;", popup_css)
         self.assertIn(".btn-primary.online-mode .btn-shimmer", popup_css)

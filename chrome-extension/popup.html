@@ -87,7 +87,7 @@
     <!-- Seamless Metrics Dock (精炼单列：2短卡 + 通栏流量条 + 通栏身份栏) -->
     <section class="metrics-dock">
       <!-- 1: 在线时长 -->
-      <div class="dock-item" title="当前已在线时长">
+      <div class="dock-item">
         <div class="dock-head">
           <svg class="dock-icon amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <span>在线时长</span>
@@ -96,7 +96,7 @@
       </div>
 
       <!-- 2: 网关延迟 (动态信号脉冲波) -->
-      <div class="dock-item" title="网关响应延迟">
+      <div class="dock-item">
         <div class="dock-head">
           <svg class="dock-icon emerald" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
           <span>网关延迟</span>
@@ -114,7 +114,7 @@
       </div>
 
       <!-- 3: 已用流量 (通栏双向数据传输计量条) -->
-      <div class="dock-item" title="本期已消耗流量 (悬停查看上传/下载)">
+      <div class="dock-item">
         <div class="dock-head">
           <svg class="dock-icon purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M7 10l5-5 5 5"/>
@@ -132,14 +132,16 @@
       </div>
 
       <!-- 4: 当前账号 (安全认证身份徽章 + 内嵌直选面板组件) -->
-      <div class="dock-item" id="accountDockItem" title="当前登录上网账号与运营商">
-        <div class="dock-head">
-          <svg class="dock-icon blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          <span>认证账号</span>
-          <span class="isp-badge" id="accountIsp" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" title="点击展开运营商直选面板 (校园/电信/联通/其他)">校园</span>
-        </div>
-        <div class="dock-value-row">
+      <div class="dock-item" id="accountDockItem">
+        <div class="account-meta-col">
+          <div class="dock-head">
+            <svg class="dock-icon blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>认证账号</span>
+          </div>
           <div class="dock-value mono ellipsis" id="account" title="点击切换自习室防窥模式">—</div>
+        </div>
+        <div class="account-ctrl-group">
+          <span class="isp-badge" id="accountIsp" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" title="点击展开运营商直选面板 (校园/电信/联通/其他)">校园</span>
           <div class="dock-btn-group">
             <button type="button" class="dock-copy-btn" id="btnToggleMask" title="自习室防窥模式开关" aria-label="自习室防窥模式开关">
               <svg id="maskIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
