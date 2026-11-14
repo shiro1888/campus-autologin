@@ -151,7 +151,6 @@ body {
   background-color: var(--bg-page);
   background-image: radial-gradient(var(--bg-dot-color) 1px, transparent 1px);
   background-size: 24px 24px;
-  background-attachment: fixed;
   color: var(--text-main);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", sans-serif;
   font-size: 14.5px;
@@ -232,7 +231,7 @@ body {
   border-radius: 50%;
   background: var(--text-light);
   border: 2px solid var(--bg-page);
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .logo-beacon.on {
@@ -350,7 +349,7 @@ body {
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  transition: all 0.25s var(--ease-spring);
+  transition: border-color 0.2s ease, color 0.2s ease, transform 0.25s var(--ease-spring), background-color 0.2s ease;
 }
 
 .theme-toggle-btn:hover {
@@ -388,7 +387,7 @@ body {
   color: var(--text-muted);
   font-size: 12.5px;
   font-weight: 500;
-  transition: all 0.25s var(--ease-spring);
+  transition: border-color 0.2s ease, color 0.2s ease, transform 0.25s var(--ease-spring), background-color 0.2s ease;
 }
 
 .portal-link-main {
@@ -427,7 +426,7 @@ body {
   height: 8px;
   border-radius: 50%;
   background: var(--text-light);
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .portal-dot.on {
@@ -493,6 +492,7 @@ body {
   pointer-events: none;
   opacity: 0.85;
   background: radial-gradient(circle, rgba(16, 185, 129, 0.16) 0%, transparent 70%);
+  will-change: transform, opacity;
   animation: hero-glow-breathe 8s ease-in-out infinite alternate;
   transition: background 0.5s ease;
 }
@@ -700,8 +700,8 @@ body {
 }
 
 @keyframes dot-glow {
-  0% { transform: scale(0.94); filter: brightness(0.95); }
-  100% { transform: scale(1.08); filter: brightness(1.2); }
+  0% { transform: scale(0.94); opacity: 0.82; }
+  100% { transform: scale(1.08); opacity: 1; }
 }
 
 @keyframes beacon-wave {
@@ -2574,21 +2574,23 @@ input[aria-invalid="true"] {
 }
 [data-theme="dark"] .switch-icon-box.emerald { color: #34d399; }
 
-/* Adaptive Turbo Breathing Energy Glow */
+/* Adaptive Turbo Breathing Energy Glow (compositor-only transform & opacity) */
 .switch-row.feature-tile:has(#adaptive:checked) .switch-icon-box.emerald {
   animation: turbo-glow-pulse 2.6s ease-in-out infinite;
   background: rgba(16, 185, 129, 0.18);
   border: 1px solid rgba(16, 185, 129, 0.45);
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.34), inset 0 0 6px rgba(16, 185, 129, 0.18);
+  will-change: transform, opacity;
 }
 
 @keyframes turbo-glow-pulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
     transform: scale(1);
+    opacity: 0.9;
   }
   50% {
-    box-shadow: 0 0 16px rgba(16, 185, 129, 0.5), inset 0 0 8px rgba(16, 185, 129, 0.25);
     transform: scale(1.05);
+    opacity: 1;
   }
 }
 

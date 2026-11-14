@@ -434,7 +434,7 @@ body {
   box-shadow: var(--shadow-card), var(--glass-highlight);
   position: relative;
   overflow: hidden;
-  transition: all 0.35s var(--ease-smooth);
+  transition: border-color 0.35s var(--ease-smooth), box-shadow 0.35s var(--ease-smooth);
 }
 
 [data-theme="dark"] .card {
@@ -477,7 +477,8 @@ body {
   border-radius: 50%;
   opacity: 0.65;
   filter: blur(24px);
-  transition: all 0.5s ease;
+  will-change: transform, opacity;
+  transition: opacity 0.4s ease;
   background: radial-gradient(circle at 35% 35%, rgba(148, 163, 184, 0.12) 0%, transparent 70%);
 }
 
@@ -656,8 +657,8 @@ body {
 }
 
 @keyframes dot-glow {
-  0% { transform: scale(0.94); filter: brightness(0.95); }
-  100% { transform: scale(1.08); filter: brightness(1.2); }
+  0% { transform: scale(0.94); opacity: 0.82; }
+  100% { transform: scale(1.08); opacity: 1; }
 }
 
 @keyframes beacon-wave {
@@ -924,7 +925,7 @@ body {
   gap: 5px;
   box-shadow: var(--shadow-dock), var(--glass-highlight);
   backdrop-filter: blur(14px);
-  transition: all 0.25s var(--ease-spring);
+  transition: transform 0.25s var(--ease-spring), border-color 0.2s ease, box-shadow 0.25s ease;
   position: relative;
   overflow: hidden;
 }
@@ -1296,7 +1297,7 @@ body {
   border-radius: 5px;
   cursor: help;
   position: relative;
-  transition: all 0.25s var(--ease-smooth);
+  transition: background-color 0.25s var(--ease-smooth), border-color 0.25s var(--ease-smooth);
 }
 
 .dock-sparkline:hover {

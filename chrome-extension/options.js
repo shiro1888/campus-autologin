@@ -601,6 +601,8 @@ const SECTION_META = {
 };
 const SECTION_ORDER = ['overview', 'credentials', 'automation', 'backup'];
 let currentSectionKey = 'overview';
+let lastIndicatorW = 0;
+let lastIndicatorH = 0;
 
 function updateSidebarIndicator(activeNavEl, immediate = false) {
   const ind = $('sidebarNavIndicator');
@@ -614,8 +616,14 @@ function updateSidebarIndicator(activeNavEl, immediate = false) {
   if (immediate) {
     ind.style.transition = 'none';
   }
-  ind.style.width = `${w}px`;
-  ind.style.height = `${h}px`;
+  if (w !== lastIndicatorW) {
+    ind.style.width = `${w}px`;
+    lastIndicatorW = w;
+  }
+  if (h !== lastIndicatorH) {
+    ind.style.height = `${h}px`;
+    lastIndicatorH = h;
+  }
   ind.style.transform = `translate3d(${x}px, ${y}px, 0)`;
   ind.style.opacity = '1';
   if (immediate) {
@@ -703,9 +711,19 @@ function initSidebarNavigation() {
     });
   }
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    let resizeRaf = 0;
     window.addEventListener('resize', () => {
-      updateSidebarIndicator($(SECTION_META[currentSectionKey].navId), true);
-    });
+      if (resizeRaf) return;
+      const run = () => {
+        resizeRaf = 0;
+        updateSidebarIndicator($(SECTION_META[currentSectionKey].navId), true);
+      };
+      if (typeof requestAnimationFrame === 'function') {
+        resizeRaf = requestAnimationFrame(run);
+      } else {
+        run();
+      }
+    }, { passive: true });
   }
 }
 
