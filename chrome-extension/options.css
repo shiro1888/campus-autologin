@@ -104,7 +104,7 @@
 }
 
 html {
-  overflow-x: hidden;
+  overflow-x: clip;
   scrollbar-gutter: stable;
 }
 
@@ -161,9 +161,9 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding: clamp(20px, 4vh, 48px) 32px;
+  padding: clamp(16px, 3vh, 40px) 32px;
   position: relative;
-  overflow-x: hidden;
+  overflow-x: clip;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
@@ -3333,6 +3333,7 @@ input[aria-invalid="true"] {
   left: 0;
   width: 100%;
   height: 46px;
+  box-sizing: border-box;
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
@@ -3340,10 +3341,8 @@ input[aria-invalid="true"] {
   pointer-events: none;
   z-index: 0;
   opacity: 0;
-  will-change: transform, width, height;
-  transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
-              width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-              height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+  will-change: transform;
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
               opacity 0.2s ease,
               background-color 0.2s ease,
               border-color 0.2s ease;
@@ -3373,7 +3372,9 @@ input[aria-invalid="true"] {
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 12px 14px 12px 16px;
+  height: 46px;
+  box-sizing: border-box;
+  padding: 0 14px 0 16px;
   border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: transparent;
@@ -3455,7 +3456,7 @@ input[aria-invalid="true"] {
 }
 
 .app-panels-stage {
-  min-height: 540px;
+  min-height: 500px;
   display: flex;
   flex-direction: column;
 }
@@ -3465,10 +3466,39 @@ input[aria-invalid="true"] {
 }
 
 .app-panel.is-active {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   animation: panel-fade-in 0.2s ease-out;
+}
+
+#panelOverview.is-active .status-hero {
+  flex: 1;
+  justify-content: space-between;
+}
+
+#panelCredentials.is-active .form-card,
+#panelAutomation.is-active #cardPolicy,
+#panelBackup.is-active .form-card {
+  flex: 1;
+}
+
+#panelCredentials .card-body {
+  flex: 1;
+  justify-content: flex-start;
+  gap: 28px;
+  padding-top: 8px;
+}
+
+#panelCredentials input[type="text"],
+#panelCredentials input[type="password"] {
+  min-height: 48px;
+}
+
+#panelCredentials .isp-pill {
+  min-height: 92px;
+  padding: 16px 14px;
 }
 
 @keyframes panel-fade-in {
@@ -3481,9 +3511,9 @@ input[aria-invalid="true"] {
 }
 
 .tiles-3-col {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .tiles-3-col .switch-row.feature-tile {
@@ -3491,8 +3521,21 @@ input[aria-invalid="true"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 15px 18px;
+  gap: 9px;
+  padding: 13px 12px;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.tiles-3-col .switch-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+
+.tiles-3-col .switch-icon-box svg {
+  width: 16px;
+  height: 16px;
 }
 
 .tiles-3-col .switch-info {
@@ -3502,27 +3545,28 @@ input[aria-invalid="true"] {
 
 .tiles-3-col .switch-title {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
 
 .tiles-3-col .switch-title span:first-child {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-main);
-  line-height: 1.35;
+  line-height: 1.38;
 }
 
 /* --- Panel 4: Backup, Restore & Reset Utility List --- */
 .backup-list {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
 .backup-row {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3606,6 +3650,32 @@ input[aria-invalid="true"] {
     min-height: 0;
   }
 
+  .app-panel.is-active,
+  #panelOverview.is-active .status-hero,
+  #panelCredentials.is-active .form-card,
+  #panelCredentials .card-body,
+  #panelAutomation.is-active #cardPolicy,
+  #panelBackup.is-active .form-card,
+  #panelBackup .backup-list,
+  .backup-row {
+    flex: none;
+  }
+
+  #panelCredentials .isp-pill {
+    min-height: 0;
+  }
+
+  .tiles-3-col {
+    grid-template-columns: 1fr;
+  }
+
+  .tiles-3-col .switch-title {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
   .sidebar-nav {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3617,6 +3687,7 @@ input[aria-invalid="true"] {
   }
 
   .sidebar-nav-item {
+    height: auto;
     justify-content: center;
     padding: 10px 12px;
   }
