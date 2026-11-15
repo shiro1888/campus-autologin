@@ -1581,30 +1581,26 @@ body {
 /* ==========================================================================
    Floating Glass Capsule Toast (Sonner / 灵动岛毛玻璃通知)
    ========================================================================== */
+/* 提示条以「流内插入」方式显示：DOM 中它位于各 section 之后、footer 之前，
+   显示时由 .popup-wrapper（flex column）在底部撑开一行。
+   早期用 position:fixed; top:10px 浮在页面上，在真实 356px 视口下左右只留 33px，
+   会盖住 header 的 logo 与标题；且 pointer-events:auto 会吞掉版本胶囊与主题按钮的
+   点击。改为流内后不遮挡任何控件，也不再拦截点击，长文本仍可换行滚动。 */
 .msg-box {
-  position: fixed;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%) translateY(-28px) scale(0.92);
-  z-index: 99999;
-  display: flex;
+  position: relative;
+  display: none;            /* 隐藏时不占位，也不给 wrapper 的 gap 留空 */
   align-items: center;
   gap: 8px;
+  width: 100%;
   padding: 7px 16px;
   border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 600;
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease, visibility 0.22s;
+  box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.18);
   white-space: normal;
   word-break: break-word;
-  width: max-content;
-  max-width: calc(100% - 32px);
   box-sizing: border-box;
   max-height: 80px;
   overflow-y: auto;
@@ -1613,10 +1609,9 @@ body {
 }
 
 .msg-box.show {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(-50%) translateY(0) scale(1);
+  display: flex;
   pointer-events: auto;
+  animation: msgBoxIn 0.24s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .msg-box:hover {
@@ -1624,7 +1619,18 @@ body {
 }
 
 .msg-box:active {
-  transform: translateX(-50%) scale(0.96);
+  transform: scale(0.985);
+}
+
+@keyframes msgBoxIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .msg-icon {

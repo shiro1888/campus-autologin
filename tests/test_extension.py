@@ -3665,7 +3665,17 @@ console.log(triggered === 0 ? 'LABEL_GUARD_OK' : 'LABEL_GUARD_FAIL:' + triggered
         self.assertIn(".dock-value-row", popup_css)
         self.assertIn('id="accountDockItem">', popup_html, "外层 #accountDockItem 不应带全局原生 title 遮挡内部操作按钮")
         self.assertIn("grid-template-columns: repeat(2, 1fr);", popup_css)
-        self.assertIn("top: 10px;", popup_css)
+        # 提示条必须留在流内：fixed + top:10px 在真实 356px 视口下左右只留 33px，
+        # 会盖住 header 的 logo 与标题，且 pointer-events:auto 会吞掉版本胶囊/主题按钮
+        # 的点击。这里断言「不遮挡」的本质，而不是某个像素值。
+        msg_rule = re.search(r"\.msg-box\s*\{([^}]*)\}", popup_css)
+        self.assertIsNotNone(msg_rule, "未找到 .msg-box 规则")
+        self.assertNotIn("position: fixed", msg_rule.group(1),
+                         "Popup 提示条不应 fixed 浮层覆盖 header/状态区")
+        self.assertIn("display: none", msg_rule.group(1),
+                      "提示条隐藏时应不占位，否则 .popup-wrapper 的 gap 会在底部留白")
+        self.assertRegex(popup_css, r"\.msg-box\.show\s*\{[^}]*display:\s*flex",
+                         "提示条显示时应回到流内 flex，而非绝对定位浮层")
         self.assertIn(".btn-primary.online-mode .btn-shimmer", popup_css)
         self.assertNotIn("top: 56px;", popup_css, "Popup .msg-box 不应停留在 top: 56px 遮挡 #statusTitle")
 
