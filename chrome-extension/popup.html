@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>校园网自动登录</title>
   <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="shared.css">
 </head>
 <body>
   <div class="popup-wrapper">
@@ -114,7 +115,7 @@
       </div>
 
       <!-- 3: 已用流量 -->
-      <div class="dock-item flow-dock-item" id="flowDockItem" tabindex="0" aria-describedby="popFlowTip">
+      <div class="dock-item flow-dock-item" id="flowDockItem" tabindex="0">
         <div class="dock-head">
           <svg class="dock-icon purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M7 10l5-5 5 5"/>
@@ -129,7 +130,6 @@
           <div class="flow-bar-dl" id="flowBarDl" style="width: 50%;"></div>
           <div class="flow-bar-ul" id="flowBarUl" style="width: 50%;"></div>
         </div>
-        <div class="flow-hover-tip" id="popFlowTip" role="tooltip"></div>
       </div>
 
       <!-- 4: 当前账号 (安全认证身份徽章 + 内嵌直选面板组件) -->

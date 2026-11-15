@@ -197,6 +197,8 @@ class TestExtensionStructure(unittest.TestCase):
             "createAccentPicker",
             "createVisibilityPoller",
             "triggerPulseAnimation",
+            "setTooltip",
+            "initHoverTooltips",
             "classifyPing",
             "resolveSessionDuration",
             "getIspMeta",
@@ -3680,9 +3682,23 @@ console.log(triggered === 0 ? 'LABEL_GUARD_OK' : 'LABEL_GUARD_FAIL:' + triggered
                       "提示条隐藏时应不占位，否则 .popup-wrapper 的 gap 会在底部留白")
         self.assertRegex(popup_css, r"\.msg-box\.show\s*\{[^}]*display:\s*flex",
                          "提示条显示时应展示为 flex 胶囊")
-        self.assertIn('id="popFlowTip"', popup_html)
-        self.assertIn(".flow-hover-tip", popup_css)
+        with open(os.path.join(EXT_DIR, "shared.css"), "r", encoding="utf-8") as f:
+            shared_css = f.read()
+        with open(os.path.join(EXT_DIR, "options.js"), "r", encoding="utf-8") as f:
+            options_js = f.read()
+        self.assertIn('href="shared.css"', popup_html)
+        self.assertIn('href="shared.css"', options_html)
+        self.assertIn(".ui-hover-tip", shared_css)
+        self.assertIn(".ui-hover-tip.place-bottom", shared_css)
         self.assertIn('id="flowDockItem"', popup_html)
+        self.assertIn('id="cardStatFlow"', options_html)
+        self.assertNotIn('id="popFlowTip"', popup_html, "应统一复用全局 .ui-hover-tip，不再单独保留私有 #popFlowTip")
+        self.assertNotIn(".flow-hover-tip", popup_css, "popup.css 不应保留独立的私有 .flow-hover-tip 样式")
+        self.assertIn("initHoverTooltips();", popup_js)
+        self.assertIn("initHoverTooltips();", options_js)
+        self.assertNotIn(".title =", popup_js, "popup.js 应统一使用 setTooltip 写入自定义提示，避免弹出异构原生白框")
+        self.assertNotIn(".title =", options_js, "options.js 应统一使用 setTooltip 写入自定义提示，避免弹出异构原生白框")
+        self.assertIn("cardEl: 'cardStatFlow'", options_js)
         self.assertIn("if (btn.classList.contains('online-mode'))", popup_js)
         self.assertIn(".btn-primary.online-mode .btn-shimmer", popup_css)
         online_btn_rule = re.search(r"\.btn-primary\.online-mode\s*\{([^}]*)\}", popup_css)
@@ -4159,6 +4175,135 @@ assert.ok(!menu.children.some(c => c.classList && c.classList.contains('focused'
         self.assertIn("right: 46px;", options_css)
         self.assertIn("color: #b91c1c;", options_css)
         self.assertIn("color: #b91c1c;", popup_css)
+
+    def test_unified_hover_tooltips_runtime(self):
+        """全局统一悬浮提示管理器必须接管所有 [title] 与 [data-tip]，并自动夹逼与上下翻转。"""
+        import subprocess
+        common_path = os.path.join(EXT_DIR, "common.js")
+        js = f"""
+const fs = require('fs'), vm = require('vm'), assert = require('assert');
+function makeClassList() {{
+  const s = new Set();
+  return {{
+    add(...a) {{ a.forEach(x => s.add(x)); }},
+    remove(...a) {{ a.forEach(x => s.delete(x)); }},
+    toggle(c, f) {{ if (f === undefined) f = !s.has(c); f ? s.add(c) : s.delete(c); return f; }},
+    contains(c) {{ return s.has(c); }}
+  }};
+}}
+function makeNode(id, tag, rect, attrs = {{}}) {{
+  const attrMap = new Map(Object.entries(attrs));
+  const node = {{
+    id, tagName: tag || 'DIV', children: [], parentElement: null,
+    style: {{}}, dataset: {{}}, classList: makeClassList(),
+    className: '', textContent: '', innerHTML: '',
+    offsetWidth: 160, offsetHeight: 28,
+    appendChild(c) {{ c.parentElement = this; this.children.push(c); return c; }},
+    getAttribute(k) {{ return attrMap.has(k) ? attrMap.get(k) : null; }},
+    setAttribute(k, v) {{ attrMap.set(k, String(v)); }},
+    removeAttribute(k) {{ attrMap.delete(k); }},
+    hasAttribute(k) {{ return attrMap.has(k); }},
+    getBoundingClientRect() {{ return rect || {{ left: 260, right: 330, top: 200, bottom: 220, width: 70, height: 20 }}; }},
+    closest(sel) {{
+      let cur = this;
+      while (cur) {{
+        const parts = sel.split(',').map(x => x.trim());
+        for (const p of parts) {{
+          if (p === '[data-tip]' && cur.hasAttribute('data-tip')) return cur;
+          if (p === '[title]' && cur.hasAttribute('title')) return cur;
+        }}
+        cur = cur.parentElement;
+      }}
+      return null;
+    }},
+    querySelector(sel) {{
+      if (sel === '.ui-hover-tip-text') return this.children.find(c => c.className === 'ui-hover-tip-text') || null;
+      if (sel === '.ui-hover-tip-arrow') return this.children.find(c => c.className === 'ui-hover-tip-arrow') || null;
+      return null;
+    }},
+    querySelectorAll(sel) {{
+      if (sel === '.spark-bar') return this.children;
+      if (sel === '[title]') return taggedTitleEls.filter(e => e.hasAttribute('title'));
+      return [];
+    }},
+    contains(other) {{
+      let cur = other;
+      while (cur) {{ if (cur === this) return true; cur = cur.parentElement; }}
+      return false;
+    }},
+    matches() {{ return true; }}
+  }};
+  return node;
+}}
+const sparkWrap = makeNode('popPingSparkline', 'DIV', {{ left: 280, right: 340, top: 180, bottom: 200, width: 60, height: 20 }}, {{ title: '心跳延迟波动走势' }});
+const bar1 = makeNode('', 'SPAN', {{ left: 325, right: 330, top: 184, bottom: 196, width: 5, height: 12 }});
+bar1.className = 'spark-bar';
+sparkWrap.appendChild(bar1);
+const flowCard = makeNode('flowDockItem', 'DIV', {{ left: 13, right: 175, top: 240, bottom: 308, width: 162, height: 68 }});
+const flowTotal = makeNode('popFlow', 'DIV');
+const flowWrap = makeNode('flowBarWrap', 'DIV');
+const flowDl = makeNode('flowBarDl', 'DIV');
+const flowUl = makeNode('flowBarUl', 'DIV');
+const headerBtn = makeNode('btnThemeToggle', 'BUTTON', {{ left: 278, right: 306, top: 8, bottom: 36, width: 28, height: 28 }}, {{ title: '切换深色/浅色模式' }});
+const taggedTitleEls = [sparkWrap, headerBtn];
+const byId = {{ popPingSparkline: sparkWrap, flowDockItem: flowCard, popFlow: flowTotal, flowBarWrap: flowWrap, flowBarDl: flowDl, flowBarUl: flowUl, btnThemeToggle: headerBtn }};
+const body = makeNode('body', 'BODY');
+const listeners = {{}};
+const ctx = {{
+  console, Math, Number, String, Array, Object, Set, Map,
+  setTimeout, clearTimeout,
+  document: {{
+    body,
+    documentElement: {{ clientWidth: 356, clientHeight: 421, setAttribute() {{}}, removeAttribute() {{}} }},
+    getElementById(id) {{ return byId[id] || null; }},
+    createElement(tag) {{
+      const n = makeNode('', tag.toUpperCase());
+      byId[n.id] = n;
+      return n;
+    }},
+    querySelectorAll(sel) {{ return sel === '[title]' ? taggedTitleEls.filter(e => e.hasAttribute('title')) : []; }},
+    contains() {{ return true; }},
+    addEventListener(t, fn) {{ (listeners[t] = listeners[t] || []).push(fn); }}
+  }},
+  window: {{ innerWidth: 356, innerHeight: 421, addEventListener() {{}} }}
+}};
+ctx.globalThis = ctx;
+vm.runInNewContext(fs.readFileSync({common_path!r}, 'utf8'), ctx);
+ctx.initHoverTooltips();
+assert.strictEqual(sparkWrap.hasAttribute('title'), false, '静态 [title] 必须转换为 data-tip 并清理原生 title');
+assert.strictEqual(headerBtn.getAttribute('data-tip'), '切换深色/浅色模式');
+
+const spark = ctx.createSparkline('popPingSparkline', 1);
+spark([21]);
+assert.strictEqual(bar1.hasAttribute('title'), false, 'createSparkline 不得残留原生 title');
+assert.ok(bar1.getAttribute('data-tip').includes('21 ms'), 'bar 应写入自定义 data-tip');
+
+const fm = ctx.createFlowMeter({{ cardEl: 'flowDockItem', totalEl: 'popFlow', wrapEl: 'flowBarWrap', dlBarEl: 'flowBarDl', ulBarEl: 'flowBarUl' }});
+fm.render({{ flow: 1048576, actdf: 524288, actuf: 524288 }}, true);
+assert.strictEqual(flowCard.hasAttribute('title'), false);
+assert.ok(flowCard.getAttribute('data-tip').includes('下载 50%'), '流量卡片应写入完整分布 data-tip');
+
+const fire = (t, ev) => (listeners[t] || []).forEach(fn => fn(ev));
+// 1. 悬停右侧火花柱状条：不得超出 356px 右边界，指针应精确定位
+fire('mouseover', {{ target: bar1 }});
+const tipEl = body.children.find(c => c.id === 'uiHoverTip');
+assert.ok(tipEl && tipEl.classList.contains('show'), 'mouseover 必须展示统一 #uiHoverTip');
+assert.ok(tipEl.querySelector('.ui-hover-tip-text').textContent.includes('21 ms'));
+const tipLeft = parseInt(tipEl.style.left, 10);
+assert.ok(tipLeft >= 8 && tipLeft + tipEl.offsetWidth <= 356 - 8, '窄弹窗右侧 tooltip 不得溢出视口: left=' + tipLeft);
+assert.strictEqual(tipEl.classList.contains('place-bottom'), false);
+
+// 2. 悬停顶部按钮：上方空间不足自动翻转到下方 (.place-bottom)
+fire('mouseover', {{ target: headerBtn }});
+assert.ok(tipEl.classList.contains('place-bottom'), '靠近顶部时应自动翻转到元素下方');
+
+// 3. 按 Escape 关闭悬浮提示
+fire('keydown', {{ key: 'Escape' }});
+assert.strictEqual(tipEl.classList.contains('show'), false);
+assert.strictEqual(tipEl.getAttribute('aria-hidden'), 'true');
+"""
+        res = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=False)
+        self.assertEqual(res.returncode, 0, f"统一 tooltip 运行时测试失败:\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}")
 
 
 if __name__ == "__main__":

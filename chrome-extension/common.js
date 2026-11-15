@@ -7,6 +7,23 @@
 /** 简化 DOM ID 查询（亦支持直接传入 DOM 元素） */
 const $ = (idOrEl) => (typeof idOrEl === 'string' ? document.getElementById(idOrEl) : idOrEl);
 
+/**
+ * 统一更新元素悬浮提示文案：写入 data-tip 并清理原生 title，
+ * 由全局 initHoverTooltips() 使用一致的深色圆角浮层渲染，避免浏览器弹出异构白底系统框。
+ */
+function setTooltip(el, text) {
+  if (!el) return;
+  const clean = text === null || text === undefined ? '' : String(text).trim();
+  if (typeof el.setAttribute === 'function' && typeof el.removeAttribute === 'function') {
+    if (clean) el.setAttribute('data-tip', clean);
+    else el.removeAttribute('data-tip');
+    el.removeAttribute('title');
+  }
+  if ('title' in el && !clean) {
+    el.title = '';
+  }
+}
+
 const HTML_ESCAPE_MAP = {
   '&': '&amp;',
   '<': '&lt;',
@@ -325,25 +342,27 @@ function createSparkline(containerId, maxBars = 8) {
         if (val === -1) {
           bar.style.height = '42%';
           bar.className = 'spark-bar timeout' + (isLatest ? ' latest' : '');
-          bar.title = `心跳 #${historyIdx + 1}: 超时 / 丢包`;
+          setTooltip(bar, `心跳 #${historyIdx + 1}: 超时 / 丢包`);
         } else {
           const pct = Math.max(22, Math.min(100, Math.round((val / maxPing) * 100)));
           bar.style.height = `${pct}%`;
           const info = classifyPing(val, true);
           bar.className = `spark-bar ${info.grade}` + (isLatest ? ' latest' : '');
-          bar.title = `心跳 #${historyIdx + 1}: ${val} ms (${info.label})`;
+          setTooltip(bar, `心跳 #${historyIdx + 1}: ${val} ms (${info.label})`);
         }
       } else {
         bar.style.height = '18%';
         bar.className = 'spark-bar empty';
-        bar.title = '等待心跳…';
+        setTooltip(bar, '等待心跳…');
       }
     });
 
     if (validPings.length) {
-      container.title = `心跳延迟走势 (均值: ${avgPing}ms · 最低: ${minPing}ms · 最高: ${Math.max(...validPings)}ms)`;
+      setTooltip(container, `心跳延迟走势 (均值: ${avgPing}ms · 最低: ${minPing}ms · 最高: ${Math.max(...validPings)}ms)`);
     } else if (history.length) {
-      container.title = '最近心跳: 网络连接超时或不可达';
+      setTooltip(container, '最近心跳: 网络连接超时或不可达');
+    } else {
+      setTooltip(container, '心跳延迟波动走势');
     }
   };
 }
@@ -358,10 +377,16 @@ function createFlowMeter(cfg = {}) {
   const total = () => getEl('totalEl', 'totalId');
   const detail = () => getEl('detailEl', 'detailId');
   const subTag = () => getEl('subTagEl', 'subTagId');
-  const tip = () => getEl('tipEl', 'tipId');
   const wrap = () => getEl('wrapEl', 'wrapId');
   const dlBar = () => getEl('dlBarEl', 'dlId') || getEl('dlBarEl', 'dlBarId');
   const ulBar = () => getEl('ulBarEl', 'ulId') || getEl('ulBarEl', 'ulBarId');
+
+  function clearFlowTips(cardEl, totalEl, wrapEl) {
+    setTooltip(cardEl, '');
+    setTooltip(totalEl, '');
+    setTooltip(wrapEl, '');
+    if (cardEl) cardEl.classList.remove('has-flow-tip');
+  }
 
   function render(rawData, online) {
     const raw = rawData || {};
@@ -369,7 +394,6 @@ function createFlowMeter(cfg = {}) {
     const totalEl = total();
     const detailEl = detail();
     const subTagEl = subTag();
-    const tipEl = tip();
     const wrapEl = wrap();
     const dlBarEl = dlBar();
     const ulBarEl = ulBar();
@@ -392,22 +416,18 @@ function createFlowMeter(cfg = {}) {
           subTagEl.classList.add('visible');
         }
 
-        if (tipEl) {
-          tipEl.textContent = breakdown;
-          if (cardEl) cardEl.classList.add('has-flow-tip');
-          if (totalEl) {
-            totalEl.removeAttribute('title');
-            totalEl.setAttribute('aria-label', `已用 ${totalFormatted}，${breakdown}`);
-          }
-          if (wrapEl) {
-            wrapEl.removeAttribute('title');
-            wrapEl.setAttribute('aria-label', breakdown);
-          }
+        if (cardEl) {
+          setTooltip(cardEl, breakdown);
+          cardEl.classList.add('has-flow-tip');
+          setTooltip(totalEl, '');
+          setTooltip(wrapEl, '');
         } else {
-          if (cardEl) cardEl.classList.remove('has-flow-tip');
-          if (wrapEl) wrapEl.title = `下载 ${exactDlPct}% (${fmtFlow(dl)}) · 上传 ${exactUlPct}% (${fmtFlow(ul)})`;
-          if (totalEl) totalEl.title = `已用: ${totalFormatted} (下载: ${fmtFlow(dl)} / 上传: ${fmtFlow(ul)})`;
+          setTooltip(wrapEl, breakdown);
+          setTooltip(totalEl, `已用: ${totalFormatted} (下载: ${fmtFlow(dl)} / 上传: ${fmtFlow(ul)})`);
         }
+
+        if (totalEl) totalEl.setAttribute('aria-label', `已用 ${totalFormatted}，${breakdown}`);
+        if (wrapEl) wrapEl.setAttribute('aria-label', breakdown);
 
         if (dlBarEl && ulBarEl && wrapEl) {
           const barDlPct = Math.max(6, Math.min(94, exactDlPct));
@@ -418,8 +438,7 @@ function createFlowMeter(cfg = {}) {
         }
       } else {
         if (subTagEl) subTagEl.classList.remove('visible');
-        if (tipEl) tipEl.textContent = '';
-        if (cardEl) cardEl.classList.remove('has-flow-tip');
+        clearFlowTips(cardEl, totalEl, wrapEl);
         if (wrapEl) wrapEl.style.display = 'none';
       }
 
@@ -431,15 +450,11 @@ function createFlowMeter(cfg = {}) {
         }
       }
     } else {
-      if (totalEl) {
-        totalEl.textContent = online ? '计量中' : '—';
-        totalEl.removeAttribute('title');
-      }
+      if (totalEl) totalEl.textContent = online ? '计量中' : '—';
       if (detailEl) detailEl.textContent = '流量明细: —';
       if (wrapEl) wrapEl.style.display = 'none';
       if (subTagEl) subTagEl.classList.remove('visible');
-      if (tipEl) tipEl.textContent = '';
-      if (cardEl) cardEl.classList.remove('has-flow-tip');
+      clearFlowTips(cardEl, totalEl, wrapEl);
     }
   }
 
@@ -448,17 +463,12 @@ function createFlowMeter(cfg = {}) {
     const totalEl = total();
     const detailEl = detail();
     const subTagEl = subTag();
-    const tipEl = tip();
     const wrapEl = wrap();
-    if (totalEl) {
-      totalEl.textContent = '—';
-      totalEl.removeAttribute('title');
-    }
+    if (totalEl) totalEl.textContent = '—';
     if (detailEl) detailEl.textContent = '流量明细: —';
     if (wrapEl) wrapEl.style.display = 'none';
     if (subTagEl) subTagEl.classList.remove('visible');
-    if (tipEl) tipEl.textContent = '';
-    if (cardEl) cardEl.classList.remove('has-flow-tip');
+    clearFlowTips(cardEl, totalEl, wrapEl);
   }
 
   return {
@@ -844,7 +854,7 @@ function createActivityTimeline(cfg = {}) {
           const msgText = escapeHtml(normalizeStatusMessage(item.message || ''));
           const rawCount = Number(item.count);
           const countNum = Number.isFinite(rawCount) && rawCount > 1 ? Math.floor(rawCount) : 1;
-          const countHtml = countNum > 1 ? `<span class="timeline-repeat-badge" title="连续相同状态合并计数">×${countNum}</span>` : '';
+          const countHtml = countNum > 1 ? `<span class="timeline-repeat-badge" data-tip="连续相同状态合并计数">×${countNum}</span>` : '';
 
           return (
             `<div class="timeline-item ${stateCls}">` +
@@ -1376,7 +1386,7 @@ function createNetworkHealthMeter(options = {}) {
     const data = (resOrData && typeof resOrData.grade === 'string') ? resOrData : evaluate(resOrData);
     if (badgeEl) {
       badgeEl.className = `hero-health-pill ${data.grade}`;
-      badgeEl.title = `${data.text} (${data.desc})`;
+      setTooltip(badgeEl, `${data.text} (${data.desc})`);
     }
     if (scoreEl) {
       scoreEl.textContent = data.text;
@@ -1749,7 +1759,7 @@ function createPrivacyMaskManager(options = {}) {
       const title = isMasked
         ? (options.maskedTitle || '当前：自习室防窥（点击显示明文）')
         : (options.unmaskedTitle || '当前：明文显示（点击开启自习室防窥）');
-      toggleBtn.title = title;
+      setTooltip(toggleBtn, title);
       toggleBtn.setAttribute('aria-label', title);
     }
     if (iconEl && ICONS) {
@@ -1967,5 +1977,237 @@ function triggerPulseAnimation(selectorOrElements, className = 'val-pulse') {
     });
   } else {
     elements.forEach((node) => node.classList.add(className));
+  }
+}
+
+/**
+ * 组件 18：全局统一悬浮提示浮层管理器 (Unified Hover Tooltip Portal)
+ * 将页面内所有 [title] 与 [data-tip] 统一托管为深色圆角浮层（#uiHoverTip），
+ * 自动处理窄视口左右贴边夹逼、上方不足时向下翻转及小三角指针精准对齐。
+ */
+let _hoverTooltipsBound = false;
+function initHoverTooltips() {
+  if (_hoverTooltipsBound || typeof document === 'undefined' || !document.body || typeof document.createElement !== 'function') {
+    return;
+  }
+  _hoverTooltipsBound = true;
+
+  const existing = $('uiHoverTip');
+  const tipEl = existing || document.createElement('div');
+  tipEl.id = 'uiHoverTip';
+  tipEl.className = 'ui-hover-tip';
+  tipEl.setAttribute('role', 'tooltip');
+  tipEl.setAttribute('aria-hidden', 'true');
+
+  let textEl = tipEl.querySelector ? tipEl.querySelector('.ui-hover-tip-text') : null;
+  let arrowEl = tipEl.querySelector ? tipEl.querySelector('.ui-hover-tip-arrow') : null;
+  if (!textEl) {
+    textEl = document.createElement('span');
+    textEl.className = 'ui-hover-tip-text';
+    tipEl.appendChild(textEl);
+  }
+  if (!arrowEl) {
+    arrowEl = document.createElement('span');
+    arrowEl.className = 'ui-hover-tip-arrow';
+    arrowEl.setAttribute('aria-hidden', 'true');
+    tipEl.appendChild(arrowEl);
+  }
+  if (!existing) {
+    document.body.appendChild(tipEl);
+  }
+
+  let activeTarget = null;
+  let suppressedTarget = null;
+  let ariaAttached = false;
+  let lastFocusWasKeyboard = false;
+
+  function promoteTitle(el) {
+    if (!el || typeof el.getAttribute !== 'function') return '';
+    const rawTitle = el.getAttribute('title');
+    if (rawTitle !== null) {
+      const clean = rawTitle.trim();
+      if (clean) {
+        el.setAttribute('data-tip', clean);
+      } else {
+        el.removeAttribute('data-tip');
+      }
+      el.removeAttribute('title');
+      return clean;
+    }
+    return (el.getAttribute('data-tip') || '').trim();
+  }
+
+  function sweepTitles(root) {
+    if (!root || typeof root.querySelectorAll !== 'function') return;
+    if (typeof root.hasAttribute === 'function' && root.hasAttribute('title')) {
+      promoteTitle(root);
+    }
+    root.querySelectorAll('[title]').forEach(promoteTitle);
+  }
+
+  sweepTitles(document);
+
+  function hideTip() {
+    if (ariaAttached && activeTarget && typeof activeTarget.removeAttribute === 'function') {
+      activeTarget.removeAttribute('aria-describedby');
+    }
+    ariaAttached = false;
+    activeTarget = null;
+    tipEl.classList.remove('show', 'place-bottom');
+    tipEl.setAttribute('aria-hidden', 'true');
+  }
+
+  function showTip(target) {
+    if (!target || (typeof document.contains === 'function' && !document.contains(target))) {
+      hideTip();
+      return;
+    }
+    const text = promoteTitle(target);
+    if (!text || typeof target.getBoundingClientRect !== 'function') {
+      hideTip();
+      return;
+    }
+    const r = target.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) {
+      hideTip();
+      return;
+    }
+
+    if (activeTarget !== target && ariaAttached && activeTarget && typeof activeTarget.removeAttribute === 'function') {
+      activeTarget.removeAttribute('aria-describedby');
+      ariaAttached = false;
+    }
+
+    // 先重置位置到左上角，确保 width: max-content 在真实 max-width 约束下自然排版后再测量
+    tipEl.style.left = '0px';
+    tipEl.style.top = '0px';
+    textEl.textContent = text;
+
+    const tipW = tipEl.offsetWidth || 120;
+    const tipH = tipEl.offsetHeight || 28;
+    const vw = (document.documentElement && document.documentElement.clientWidth) || (typeof window !== 'undefined' && window.innerWidth) || 356;
+    const vh = (document.documentElement && document.documentElement.clientHeight) || (typeof window !== 'undefined' && window.innerHeight) || 600;
+
+    const pad = 8;
+    const gap = 8;
+    const centerX = r.left + r.width / 2;
+    const left = Math.max(pad, Math.min(vw - tipW - pad, centerX - tipW / 2));
+
+    const spaceAbove = r.top;
+    const spaceBelow = vh - r.bottom;
+    const placeBottom = spaceAbove < tipH + gap + 6 && spaceBelow > spaceAbove;
+    const rawTop = placeBottom ? (r.bottom + gap) : (r.top - tipH - gap);
+    const top = Math.max(4, Math.min(vh - tipH - 4, rawTop));
+
+    const arrowMin = 12;
+    const arrowMax = Math.max(arrowMin, tipW - 12);
+    const arrowLeft = Math.max(arrowMin, Math.min(arrowMax, centerX - left));
+
+    tipEl.classList.toggle('place-bottom', placeBottom);
+    tipEl.style.left = Math.round(left) + 'px';
+    tipEl.style.top = Math.round(top) + 'px';
+    arrowEl.style.left = Math.round(arrowLeft) + 'px';
+
+    if (activeTarget !== target && typeof target.hasAttribute === 'function' && !target.hasAttribute('aria-describedby')) {
+      target.setAttribute('aria-describedby', 'uiHoverTip');
+      ariaAttached = true;
+    }
+    activeTarget = target;
+    tipEl.setAttribute('aria-hidden', 'false');
+    tipEl.classList.add('show');
+  }
+
+  function findTipTarget(node) {
+    if (!node || typeof node.closest !== 'function') return null;
+    return node.closest('[data-tip], [title]');
+  }
+
+  if (typeof MutationObserver === 'function' && typeof Node === 'function' && document.body instanceof Node) {
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type === 'attributes') {
+          if (m.attributeName === 'title') {
+            promoteTitle(m.target);
+          }
+          if (m.target === activeTarget) {
+            showTip(activeTarget);
+          }
+        } else if (m.type === 'childList' && m.addedNodes && m.addedNodes.length) {
+          m.addedNodes.forEach((n) => {
+            if (n && n.nodeType === 1) sweepTitles(n);
+          });
+        }
+      }
+    });
+    observer.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['title', 'data-tip']
+    });
+  }
+
+  document.addEventListener('mouseover', (e) => {
+    const next = findTipTarget(e && e.target);
+    if (!next) {
+      suppressedTarget = null;
+      hideTip();
+      return;
+    }
+    if (suppressedTarget && next === suppressedTarget) return;
+    suppressedTarget = null;
+    showTip(next);
+  });
+
+  document.addEventListener('mouseout', (e) => {
+    if (suppressedTarget && (!e || !e.relatedTarget || (typeof suppressedTarget.contains === 'function' && !suppressedTarget.contains(e.relatedTarget)))) {
+      suppressedTarget = null;
+    }
+    if (!e || !e.relatedTarget) {
+      hideTip();
+    }
+  });
+
+  document.addEventListener('pointerdown', () => {
+    lastFocusWasKeyboard = false;
+    suppressedTarget = activeTarget;
+    hideTip();
+  }, true);
+
+  document.addEventListener('keydown', (e) => {
+    if (!e) return;
+    if (e.key === 'Escape') {
+      suppressedTarget = activeTarget;
+      hideTip();
+      return;
+    }
+    if (e.key === 'Tab' || (typeof e.key === 'string' && e.key.startsWith('Arrow')) || e.key === 'Home' || e.key === 'End') {
+      lastFocusWasKeyboard = true;
+    }
+  }, true);
+
+  document.addEventListener('focusin', (e) => {
+    const t = e && e.target;
+    let isFocusVisible = false;
+    try {
+      isFocusVisible = !!(t && typeof t.matches === 'function' && t.matches(':focus-visible'));
+    } catch (_) {
+      isFocusVisible = false;
+    }
+    if (!lastFocusWasKeyboard && !isFocusVisible) return;
+    const tipTarget = findTipTarget(t);
+    if (tipTarget) showTip(tipTarget);
+  });
+
+  document.addEventListener('focusout', () => {
+    hideTip();
+  });
+
+  document.addEventListener('scroll', hideTip, true);
+
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('blur', hideTip);
+    window.addEventListener('resize', hideTip);
+    window.addEventListener('pagehide', hideTip);
   }
 }

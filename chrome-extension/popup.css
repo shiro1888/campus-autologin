@@ -986,80 +986,8 @@ body {
   overflow: hidden;
 }
 
-.flow-dock-item {
-  overflow: visible;
-}
-
 .flow-dock-item.has-flow-tip {
   cursor: help;
-}
-
-.flow-dock-item.has-flow-tip:hover,
-.flow-dock-item.has-flow-tip:focus-within {
-  z-index: 25;
-}
-
-.flow-hover-tip {
-  position: absolute;
-  left: 0;
-  bottom: calc(100% + 7px);
-  width: max-content;
-  max-width: 320px;
-  padding: 6px 10px;
-  border-radius: 10px;
-  background: #0f172a;
-  color: #f8fafc;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.35;
-  white-space: nowrap;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 10px 24px -6px rgba(15, 23, 42, 0.42);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(4px) scale(0.97);
-  transform-origin: bottom left;
-  transition: opacity 0.16s ease, transform 0.2s var(--ease-spring), visibility 0.16s;
-  pointer-events: none;
-  z-index: 30;
-}
-
-.flow-hover-tip::after {
-  content: "";
-  position: absolute;
-  left: 24px;
-  top: 100%;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 5px solid #0f172a;
-}
-
-[data-theme="dark"] .flow-hover-tip {
-  background: #1e293b;
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.65);
-}
-
-[data-theme="dark"] .flow-hover-tip::after {
-  border-top-color: #1e293b;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .flow-hover-tip {
-    background: #1e293b;
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.65);
-  }
-  :root:not([data-theme="light"]) .flow-hover-tip::after {
-    border-top-color: #1e293b;
-  }
-}
-
-.flow-dock-item.has-flow-tip:hover .flow-hover-tip,
-.flow-dock-item.has-flow-tip:focus-within .flow-hover-tip {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0) scale(1);
 }
 
 .dock-value-row {

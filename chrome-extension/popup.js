@@ -16,7 +16,6 @@ const popupFlowMeter = createFlowMeter({
   cardEl: 'flowDockItem',
   totalEl: 'popFlow',
   subTagEl: 'popFlowSub',
-  tipEl: 'popFlowTip',
   wrapEl: 'flowBarWrap',
   dlBarEl: 'flowBarDl',
   ulBarEl: 'flowBarUl'
@@ -90,18 +89,18 @@ function updateAccountDisplay() {
     accEl.textContent = '未设置账号';
     accEl.classList.remove('masked');
     accEl.classList.add('unset');
-    accEl.title = '尚未设置认证账号，点击前往「控制中心」填写';
+    setTooltip(accEl, '尚未设置认证账号，点击前往「控制中心」填写');
     accEl.setAttribute('aria-label', '尚未设置认证账号，点击前往控制中心填写');
     if (maskBtn) {
       maskBtn.classList.remove('active');
       maskBtn.disabled = true;
-      maskBtn.title = '未设置账号，无需防窥';
+      setTooltip(maskBtn, '未设置账号，无需防窥');
       maskBtn.style.opacity = '0.35';
       maskBtn.style.pointerEvents = 'none';
     }
     if (copyBtn) {
       copyBtn.disabled = true;
-      copyBtn.title = '未设置账号，无法复制';
+      setTooltip(copyBtn, '未设置账号，无法复制');
       copyBtn.style.opacity = '0.35';
       copyBtn.style.pointerEvents = 'none';
     }
@@ -125,12 +124,12 @@ function updateAccountDisplay() {
     const maskedText = maskAccount(currentAccount);
     accEl.textContent = maskedText;
     accEl.classList.add('masked');
-    accEl.title = '自习室防窥模式（点击切换明文显示）';
+    setTooltip(accEl, '自习室防窥模式（点击切换明文显示）');
     accEl.setAttribute('aria-label', `认证账号 ${maskedText}，已开启防窥遮罩，点击显示明文`);
   } else {
     accEl.textContent = currentAccount;
     accEl.classList.remove('masked');
-    accEl.title = `点击开启自习室防窥: ${currentAccount}`;
+    setTooltip(accEl, `点击开启自习室防窥: ${currentAccount}`);
     accEl.setAttribute('aria-label', `认证账号 ${currentAccount}，点击开启防窥遮罩`);
   }
 }
@@ -146,7 +145,7 @@ function syncIspDisplay(ispCode) {
   const ispEl = $('accountIsp');
   if (ispEl) {
     ispEl.textContent = meta.short;
-    ispEl.title = `认证运营商: ${meta.full} (点击直选切换)`;
+    setTooltip(ispEl, `认证运营商: ${meta.full} (点击直选切换)`);
   }
   const sheet = $('ispQuickSheet');
   if (sheet) {
@@ -235,7 +234,9 @@ function refresh(onComplete, opts = {}) {
       if (popPing) {
         popPing.textContent = '—';
         popPing.className = 'dock-value mono';
+        setTooltip(popPing, '');
       }
+      setTooltip($('onlineDuration'), '');
       renderPingSparkline(-1);
       popupFlowMeter.reset();
       const btnLogin = $('btnLogin');
@@ -258,7 +259,7 @@ function refresh(onComplete, opts = {}) {
     if (pingEl) {
       pingEl.textContent = pingInfo.text;
       pingEl.className = `dock-value mono ping-${pingInfo.grade}`;
-      pingEl.title = pingInfo.tooltip;
+      setTooltip(pingEl, pingInfo.tooltip);
     }
     renderPingSparkline(hist || pingInfo.fallbackMs);
 
@@ -273,6 +274,7 @@ function refresh(onComplete, opts = {}) {
         : '未能连接到校园网，请检查 Wi-Fi 或插好网线', 'off');
       setLocalIp('');
       $('onlineDuration').textContent = '网络断开';
+      setTooltip($('onlineDuration'), '');
       $('btnLogin').classList.remove('online-mode');
       $('btnLoginText').textContent = paused ? '恢复登录' : '立即登录';
       $('btnLogout').disabled = true;
@@ -289,11 +291,11 @@ function refresh(onComplete, opts = {}) {
       const dur = resolveSessionDuration(res, rawData);
       if (dur.durationInput != null) {
         durationTicker.start(dur.durationInput);
-        $('onlineDuration').title = dur.popupTitle;
+        setTooltip($('onlineDuration'), dur.popupTitle);
       } else {
         durationTicker.stop();
         $('onlineDuration').textContent = '在线中';
-        $('onlineDuration').title = '已在线';
+        setTooltip($('onlineDuration'), '已在线');
       }
     } else {
       durationTicker.stop();
@@ -312,6 +314,7 @@ function refresh(onComplete, opts = {}) {
       const ip = [rawData.v4ip, rawData.ss5].find((v) => v && v !== '0.0.0.0') || '';
       setLocalIp(ip);
       $('onlineDuration').textContent = '未在线';
+      setTooltip($('onlineDuration'), '');
     }
 
     triggerTelemetryFade();
@@ -611,6 +614,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 initAccent();
+initHoverTooltips();
 refresh();
 
 // 页面隐藏/关闭时清理计时器

@@ -40,6 +40,9 @@ const durationTicker = createTicker((text) => {
 const renderOptPingSparkline = createSparkline('optPingSparkline', 8);
 
 const optFlowMeter = createFlowMeter({
+  cardEl: 'cardStatFlow',
+  totalEl: 'stFlow',
+  detailEl: 'stFlowDetail',
   wrapId: 'optFlowBarWrap',
   dlId: 'optFlowBarDl',
   ulId: 'optFlowBarUl'
@@ -119,7 +122,7 @@ function updateTopology(res) {
     if (authVal) authVal.textContent = '未连接';
     if (authChip) authChip.className = 'topo-chip-badge off';
     if (internetVal) internetVal.textContent = '无网络';
-    if (internetNode) internetNode.title = '在线时点击刷新连通状态，离线时点击立即登录';
+    setTooltip(internetNode, '在线时点击刷新连通状态，离线时点击立即登录');
     if (linkPing) linkPing.className = 'topo-link off';
     if (linkAuth) linkAuth.className = 'topo-link off';
     return;
@@ -145,19 +148,19 @@ function updateTopology(res) {
     if (authVal) authVal.textContent = '连接失败';
     if (authChip) authChip.className = 'topo-chip-badge off';
     if (internetVal) internetVal.textContent = '未连接';
-    if (internetNode) internetNode.title = '网关不可达 · 点击尝试立即登录';
+    setTooltip(internetNode, '网关不可达 · 点击尝试立即登录');
     if (linkAuth) linkAuth.className = 'topo-link off';
   } else if (res.online) {
     if (authVal) authVal.textContent = '已认证 ✓';
     if (authChip) authChip.className = 'topo-chip-badge on';
     if (internetVal) internetVal.textContent = '认证放行 ✓';
-    if (internetNode) internetNode.title = '外网链路畅通 · 点击刷新连通状态';
+    setTooltip(internetNode, '外网链路畅通 · 点击刷新连通状态');
     if (linkAuth) linkAuth.className = 'topo-link on';
   } else {
     if (authVal) authVal.textContent = res.manualLogout ? '已暂停' : '待认证';
     if (authChip) authChip.className = 'topo-chip-badge wait';
     if (internetVal) internetVal.textContent = '局域网受限';
-    if (internetNode) internetNode.title = '外网未放行 · 点击立即登录';
+    setTooltip(internetNode, '外网未放行 · 点击立即登录');
     if (linkAuth) linkAuth.className = 'topo-link wait';
   }
 }
@@ -501,19 +504,7 @@ function refreshStatus(cb) {
     renderOptPingSparkline(hist || pingMeta.fallbackMs);
 
     // Flow & Traffic Detail (下行 / 上行 / 总计明细)
-    if (raw.flow !== undefined) {
-      $('stFlow').textContent = fmtFlow(raw.flow);
-      optFlowMeter.update(raw);
-      const sub = [];
-      if (raw.actdf !== undefined && raw.actuf !== undefined) {
-        sub.push(`↓ ${fmtFlow(raw.actdf)} · ↑ ${fmtFlow(raw.actuf)}`);
-      }
-      $('stFlowDetail').textContent = sub.length ? sub.join(' · ') : '校园网流量统计';
-    } else {
-      $('stFlow').textContent = res.online ? '计量中' : '—';
-      $('stFlowDetail').textContent = '流量明细: —';
-      optFlowMeter.reset();
-    }
+    optFlowMeter.render(raw, res.online);
 
     if (!res.reachable) {
       durationTicker.stop();
@@ -1280,6 +1271,7 @@ $('isp')?.addEventListener('change', () => {
 initSidebarNavigation();
 initCustomSelects();
 initIspQuickPills();
+initHoverTooltips();
 load();
 
 // 适配 macOS / Windows 键盘快捷键指示徽章
@@ -1287,7 +1279,7 @@ if (/Mac/i.test(navigator.platform || navigator.userAgent)) {
   const kbdPill = document.querySelector('.kbd-pill');
   if (kbdPill) {
     kbdPill.textContent = '⌘S';
-    kbdPill.title = '快捷键 ⌘S 保存';
+    setTooltip(kbdPill, '快捷键 ⌘S 保存');
   }
 }
 

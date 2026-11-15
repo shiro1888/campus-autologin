@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>校园网自动登录 · 控制中心</title>
   <link rel="stylesheet" href="options.css">
+  <link rel="stylesheet" href="shared.css">
 </head>
 <body>
 <div class="page-container">
@@ -246,7 +247,7 @@
         <div class="stat-sub text-muted">172.30.100.2 响应耗时</div>
       </div>
 
-      <div class="stat-card">
+      <div class="stat-card flow-stat-card" id="cardStatFlow" tabindex="0">
         <div class="stat-label">
           <div class="stat-badge purple">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -259,7 +260,7 @@
         </div>
         <div class="stat-val" id="stFlow">—</div>
         <div class="stat-sub text-muted" id="stFlowDetail">流量明细: —</div>
-        <div class="flow-bar-wrap" id="optFlowBarWrap" style="display: none;" title="上传与下载比例">
+        <div class="flow-bar-wrap" id="optFlowBarWrap" style="display: none;">
           <div class="flow-bar-dl" id="optFlowBarDl" style="width: 50%;"></div>
           <div class="flow-bar-ul" id="optFlowBarUl" style="width: 50%;"></div>
         </div>
