@@ -3677,6 +3677,28 @@ console.log(triggered === 0 ? 'LABEL_GUARD_OK' : 'LABEL_GUARD_FAIL:' + triggered
         self.assertRegex(popup_css, r"\.msg-box\.show\s*\{[^}]*display:\s*flex",
                          "提示条显示时应回到流内 flex，而非绝对定位浮层")
         self.assertIn(".btn-primary.online-mode .btn-shimmer", popup_css)
+        online_btn_rule = re.search(r"\.btn-primary\.online-mode\s*\{([^}]*)\}", popup_css)
+        self.assertIsNotNone(online_btn_rule, "未找到 .btn-primary.online-mode 规则")
+        self.assertIn("var(--primary-gradient)", online_btn_rule.group(1),
+                      "Popup 在线主按钮应跟随当前主题 --primary-gradient，而非硬编码深绿")
+        self.assertIn("var(--primary-shadow)", online_btn_rule.group(1))
+        self.assertNotIn("#047857", online_btn_rule.group(1))
+        self.assertNotIn("#065f46", online_btn_rule.group(1))
+
+        isp_badge_rule = re.search(r"\.isp-badge\s*\{([^}]*)\}", popup_css)
+        self.assertIsNotNone(isp_badge_rule, "未找到 .isp-badge 规则")
+        self.assertIn("var(--primary)", isp_badge_rule.group(1),
+                      "Popup 运营商胶囊应跟随主题强调色 --primary")
+        self.assertNotIn("rgba(59, 130, 246", isp_badge_rule.group(1))
+
+        ambient_rule = re.search(r"\.page-ambient-mesh\s*\{([^}]*)\}", options_css)
+        self.assertIsNotNone(ambient_rule, "未找到 .page-ambient-mesh 规则")
+        self.assertIn("var(--primary)", ambient_rule.group(1))
+
+        badge_primary_rule = re.search(r"\.badge-primary\s*\{([^}]*)\}", options_css)
+        self.assertIsNotNone(badge_primary_rule, "未找到 .badge-primary 规则")
+        self.assertIn("var(--primary)", badge_primary_rule.group(1))
+
         self.assertNotIn("top: 56px;", popup_css, "Popup .msg-box 不应停留在 top: 56px 遮挡 #statusTitle")
 
         # 2. Options O1 左侧固定导航栏（滑块指示器 + 居中放大舞台）与响应式断层校验
