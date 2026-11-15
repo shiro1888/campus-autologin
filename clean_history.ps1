@@ -73,8 +73,8 @@ if (Get-Command "git-filter-repo" -ErrorAction SilentlyContinue) {
     $hasTool = $true
 } else {
     try {
-        $pyCheck = Start-Process python -ArgumentList "-m git_filter_repo --version" -NoNewWindow -Wait -PassThru -ErrorAction Stop
-        if ($pyCheck.ExitCode -eq 0) {
+        & python -m git_filter_repo --version *> $null
+        if ($LASTEXITCODE -eq 0) {
             $hasTool = $true
         }
     } catch {
@@ -100,7 +100,7 @@ if (-not $Password) {
     if ($secPass) {
         $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secPass)
         try {
-            $Password = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr).Trim()
+            $Password = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
         } finally {
             [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
         }
@@ -148,10 +148,10 @@ if ($originBefore) { $originalOriginUrl = ($originBefore | Select-Object -First 
 Write-Host "  [2/5] 开始重写 Git 历史对象（脱敏账号密码并移除历史 config.json）..." -ForegroundColor Green
 $rules = [System.Collections.Generic.List[string]]::new()
 if (-not [string]::IsNullOrWhiteSpace($Password)) {
-    $rules.Add("${Password}==>REDACTED_CAMPUS_PASSWORD")
+    $rules.Add("literal:${Password}==>REDACTED_CAMPUS_PASSWORD")
 }
 if (-not [string]::IsNullOrWhiteSpace($Account)) {
-    $rules.Add("${Account}==>REDACTED_CAMPUS_ACCOUNT")
+    $rules.Add("literal:${Account}==>REDACTED_CAMPUS_ACCOUNT")
 }
 
 $rulesFile = Join-Path $env:TEMP ("campus_filter_rules_" + [System.Guid]::NewGuid().ToString("N") + ".txt")

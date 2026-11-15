@@ -3844,9 +3844,291 @@ console.log('SIDEBAR_NAV_OK');
         # 4. content.js proceedWithForm async/await 扁平化与 common.js View Transition 渐进增强
         self.assertIn("withLock(async function () {", content_js)
         self.assertIn("await checkStatus()", content_js)
-        self.assertIn("await directLogin(s.account, s.password, s.isp)", content_js)
-        self.assertNotIn("directLogin(s.account, s.password, s.isp).then(", content_js)
+        self.assertIn("await directLogin(fresh.account, fresh.password, fresh.isp)", content_js)
+        self.assertNotIn("directLogin(fresh.account, fresh.password, fresh.isp).then(", content_js)
         self.assertIn("startViewTransition", common_js)
+
+    def test_audit_regression_invariants(self):
+        """审计回归测试：JSONP 锚定、残余在线不解除暂停、自定义下拉回车提交、配置导入校验与洗史字面量前缀。"""
+        import subprocess
+        bg_path = os.path.join(EXT_DIR, "background.js").replace(os.sep, "/")
+        common_path = os.path.join(EXT_DIR, "common.js").replace(os.sep, "/")
+
+        js = f"""
+const fs = require('fs');
+const vm = require('vm');
+const assert = require('assert');
+
+// 1. background.js: parseJsonp 锚定 + logoutResidualOnline 状态保持
+const bgStore = {{ manualLogout: true, logoutResidualOnline: true, account: 'u1', password: 'p1' }};
+let nextOnline = true;
+const bgCtx = {{
+  console,
+  setTimeout,
+  clearTimeout,
+  setInterval,
+  clearInterval,
+  URL,
+  URLSearchParams,
+  TextDecoder,
+  AbortController,
+  AbortSignal,
+  fetch: async () => ({{
+    ok: true,
+    status: 200,
+    arrayBuffer: async () => Buffer.from(
+      nextOnline ? 'dr1002({{"result":1,"uid":"u1","v46ip":"10.0.0.2"}})' : 'dr1002({{"result":0}})'
+    )
+  }}),
+  chrome: {{
+    storage: {{
+      local: {{
+        get: (k, cb) => {{
+          let out;
+          if (k === null || k === undefined) {{
+            out = JSON.parse(JSON.stringify(bgStore));
+          }} else if (Array.isArray(k)) {{
+            out = {{}};
+            k.forEach(x => {{ if (x in bgStore) out[x] = bgStore[x]; }});
+          }} else if (typeof k === 'object') {{
+            out = {{ ...k }};
+            for (const key of Object.keys(k)) {{
+              if (key in bgStore && bgStore[key] !== undefined) out[key] = bgStore[key];
+            }}
+          }} else {{
+            out = JSON.parse(JSON.stringify(bgStore));
+          }}
+          if (typeof cb === 'function') {{ cb(out); return undefined; }}
+          return Promise.resolve(out);
+        }},
+        set: (v, cb) => {{ Object.assign(bgStore, v); if (cb) cb(); return Promise.resolve(); }},
+        remove: (ks, cb) => {{ (Array.isArray(ks) ? ks : [ks]).forEach(k => delete bgStore[k]); if (cb) cb(); return Promise.resolve(); }}
+      }}
+    }},
+    runtime: {{
+      id: 'test-ext',
+      onInstalled: {{ addListener: () => {{}} }},
+      onStartup: {{ addListener: () => {{}} }},
+      onMessage: {{ addListener: () => {{}} }},
+      getManifest: () => ({{ version: '1.0.0' }})
+    }},
+    alarms: {{
+      get: async () => null,
+      create: () => {{}},
+      clear: async () => true,
+      onAlarm: {{ addListener: () => {{}} }}
+    }},
+    action: {{
+      setBadgeText: async () => {{}},
+      setBadgeBackgroundColor: async () => {{}},
+      setBadgeTextColor: async () => {{}},
+      setTitle: async () => {{}}
+    }},
+    commands: {{ onCommand: {{ addListener: () => {{}} }} }},
+    webNavigation: {{
+      onCommitted: {{ addListener: () => {{}} }},
+      onBeforeNavigate: {{ addListener: () => {{}} }},
+      onErrorOccurred: {{ addListener: () => {{}} }},
+      onCompleted: {{ addListener: () => {{}} }}
+    }}
+  }}
+}};
+vm.runInNewContext(fs.readFileSync({bg_path!r}, 'utf8'), bgCtx);
+
+assert.strictEqual(bgCtx.parseJsonp('dr1001({{"result":0}})').result, 0, '合法 JSONP 应解析成功');
+assert.strictEqual(bgCtx.parseJsonp('<script>dr1001({{"result":0}})</script>'), null, 'HTML 包裹 JSONP 必须拒绝');
+assert.strictEqual(bgCtx.parseJsonp('<html>dr1001({{"result":0}})'), null, 'HTML 片段 JSONP 必须拒绝');
+
+// 2. common.js: initCustomSelects ArrowDown 仅高亮，Enter 提交并清理 aria-activedescendant
+function makeEl(tag) {{
+  const attrs = {{}};
+  const listeners = {{}};
+  const classSet = new Set();
+  let _selIdx = 0;
+  let _val = '';
+  const el = {{
+    tagName: tag.toUpperCase(),
+    id: '',
+    get value() {{ return _val; }},
+    set value(v) {{
+      _val = String(v);
+      const idx = el.options.findIndex(o => o.value === _val);
+      if (idx >= 0) _selIdx = idx;
+    }},
+    get selectedIndex() {{ return _selIdx; }},
+    set selectedIndex(i) {{
+      _selIdx = i;
+      if (el.options[i]) _val = el.options[i].value;
+    }},
+    options: [],
+    children: [],
+    parentNode: null,
+    style: {{}},
+    dataset: {{}},
+    get className() {{ return Array.from(classSet).join(' '); }},
+    set className(v) {{
+      classSet.clear();
+      String(v || '').trim().split(/\\s+/).filter(Boolean).forEach(c => classSet.add(c));
+    }},
+    classList: {{
+      add: (...c) => c.forEach(x => classSet.add(x)),
+      remove: (...c) => c.forEach(x => classSet.delete(x)),
+      contains: c => classSet.has(c),
+      toggle: (c, f) => (f === undefined ? (classSet.has(c) ? (classSet.delete(c), false) : (classSet.add(c), true)) : (f ? classSet.add(c) : classSet.delete(c), f))
+    }},
+    setAttribute: (k, v) => {{ attrs[k] = String(v); if (k === 'id') el.id = String(v); }},
+    getAttribute: k => (k in attrs ? attrs[k] : null),
+    removeAttribute: k => {{ delete attrs[k]; }},
+    addEventListener: (t, fn) => {{ (listeners[t] = listeners[t] || []).push(fn); }},
+    removeEventListener: (t, fn) => {{ listeners[t] = (listeners[t] || []).filter(f => f !== fn); }},
+    dispatchEvent: ev => {{
+      if (ev && !ev.target) ev.target = el;
+      (listeners[ev.type] || []).forEach(fn => fn(ev));
+    }},
+    click: () => el.dispatchEvent({{ type: 'click', target: el, preventDefault: () => {{}}, stopPropagation: () => {{}} }}),
+    appendChild: c => {{ c.parentNode = el; el.children.push(c); return c; }},
+    insertAdjacentElement: (_pos, c) => {{ c.parentNode = el; el.children.push(c); return c; }},
+    contains: target => {{
+      if (target === el) return true;
+      return el.children.some(ch => ch.contains && ch.contains(target));
+    }},
+    querySelectorAll: s => {{
+      if (s === '.custom-select-option') return el.children.filter(c => c.classList.contains('custom-select-option'));
+      if (s === '.custom-select-option.focused') return el.children.filter(c => c.classList.contains('custom-select-option') && c.classList.contains('focused'));
+      return [];
+    }},
+    querySelector: s => {{
+      if (s === 'select') return el.children.find(c => c.tagName === 'SELECT') || null;
+      if (s === '.custom-select-trigger') return el.children.find(c => c.classList.contains('custom-select-trigger')) || null;
+      if (s === '.custom-select-option.active') return el.children.find(c => c.classList.contains('custom-select-option') && c.classList.contains('active')) || null;
+      if (s.startsWith('#')) {{
+        const idTarget = s.slice(1);
+        return el.children.find(c => c.id === idTarget) || null;
+      }}
+      return null;
+    }},
+    closest: selStr => (selStr === '.select-wrap' && (el === wrap || el.parentNode === wrap) ? wrap : null),
+    focus: () => {{}},
+    scrollIntoView: () => {{}},
+    getBoundingClientRect: () => ({{ top: 0, bottom: 40, left: 0, right: 200, width: 200, height: 40 }}),
+    textContent: '',
+    innerHTML: ''
+  }};
+  return el;
+}}
+
+const wrap = makeEl('div');
+wrap.classList.add('select-wrap');
+const sel = makeEl('select');
+sel.id = 'testSelect';
+const opt1 = makeEl('option'); opt1.value = '1'; opt1.textContent = '一秒';
+const opt2 = makeEl('option'); opt2.value = '5'; opt2.textContent = '五秒';
+sel.options = [opt1, opt2];
+sel.selectedIndex = 0;
+sel.value = '1';
+wrap.appendChild(sel);
+
+const lbl = makeEl('label');
+lbl.setAttribute('for', 'testSelect');
+lbl.textContent = '检查间隔';
+
+let docListeners = {{}};
+const commonDoc = {{
+  createElement: tag => makeEl(tag),
+  createElementNS: (_ns, tag) => makeEl(tag),
+  querySelectorAll: s => {{
+    if (s === '.select-wrap') return [wrap];
+    if (s === '.select-wrap.open') return wrap.classList.contains('open') ? [wrap] : [];
+    return [];
+  }},
+  querySelector: s => (s === 'label[for="testSelect"]' ? lbl : null),
+  addEventListener: (t, fn) => {{ (docListeners[t] = docListeners[t] || []).push(fn); }},
+  removeEventListener: (t, fn) => {{ docListeners[t] = (docListeners[t] || []).filter(f => f !== fn); }},
+  documentElement: makeEl('html'),
+  body: makeEl('body')
+}};
+const commonCtx = {{
+  document: commonDoc,
+  location: {{ href: '' }},
+  innerHeight: 800,
+  matchMedia: () => ({{ matches: false, addEventListener: () => {{}} }}),
+  getComputedStyle: () => ({{ display: 'block' }}),
+  addEventListener: () => {{}},
+  removeEventListener: () => {{}},
+  chrome: {{}},
+  console, setTimeout, clearTimeout, setInterval, clearInterval,
+  CustomEvent: class CustomEvent {{ constructor(t) {{ this.type = t; }} }},
+  Event: class Event {{ constructor(t) {{ this.type = t; }} }}
+}};
+commonCtx.window = commonCtx;
+commonCtx.self = commonCtx;
+commonCtx.globalThis = commonCtx;
+vm.runInNewContext(fs.readFileSync({common_path!r}, 'utf8'), commonCtx);
+commonCtx.initCustomSelects();
+const trig = wrap.children.find(c => c.classList && c.classList.contains('custom-select-trigger'));
+const menu = wrap.children.find(c => c.classList && c.classList.contains('custom-select-menu'));
+assert.ok(trig && menu, '应生成自定义下拉触发按钮与菜单');
+trig.dispatchEvent({{ type: 'keydown', key: 'ArrowDown', preventDefault: () => {{}} }});
+assert.strictEqual(sel.value, '1', '初次 ArrowDown 仅打开菜单，不应直接提交新值');
+assert.ok(trig.getAttribute('aria-activedescendant'), '展开时应设置 aria-activedescendant');
+trig.dispatchEvent({{ type: 'keydown', key: 'ArrowDown', preventDefault: () => {{}} }});
+assert.strictEqual(sel.value, '1', '导航高亮期间未按 Enter/Space 不应提前改 select.value');
+trig.dispatchEvent({{ type: 'keydown', key: 'Escape', preventDefault: () => {{}}, stopPropagation: () => {{}} }});
+assert.strictEqual(sel.value, '1', 'Escape 关闭不应提交高亮项');
+assert.strictEqual(trig.getAttribute('aria-activedescendant'), null, '关闭后必须移除 aria-activedescendant');
+trig.dispatchEvent({{ type: 'keydown', key: 'ArrowDown', preventDefault: () => {{}} }});
+trig.dispatchEvent({{ type: 'keydown', key: 'ArrowDown', preventDefault: () => {{}} }});
+trig.dispatchEvent({{ type: 'keydown', key: 'Enter', preventDefault: () => {{}} }});
+assert.strictEqual(sel.value, '5', 'Enter 后才应提交当前高亮选项');
+assert.strictEqual(trig.getAttribute('aria-activedescendant'), null, '提交关闭后必须移除 aria-activedescendant');
+assert.ok(!menu.children.some(c => c.classList && c.classList.contains('focused')), '关闭后不应残留 .focused 类');
+
+(async () => {{
+  const r1 = await bgCtx.autoLogin('alarm');
+  assert.strictEqual(r1.skipped, true);
+  assert.strictEqual(r1.paused, true);
+  assert.strictEqual(r1.online, true);
+  assert.strictEqual(bgStore.manualLogout, true, 'logoutResidualOnline 期间不能清除 manualLogout');
+  assert.strictEqual(bgStore.logoutResidualOnline, true);
+
+  nextOnline = false;
+  const r2 = await bgCtx.autoLogin('alarm');
+  assert.strictEqual(r2.skipped, true);
+  assert.strictEqual(r2.paused, true);
+  assert.strictEqual(r2.online, false);
+  assert.strictEqual(bgStore.manualLogout, true, '注销恢复离线后仍需保持手动暂停');
+  assert.strictEqual(bgStore.logoutResidualOnline, false, '确认真正离线后才清理 logoutResidualOnline');
+}})().catch(err => {{ console.error(err); process.exit(1); }});
+"""
+        res = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=False)
+        self.assertEqual(res.returncode, 0, f"Node 行为校验失败:\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}")
+
+        # 3. content.js 与 clean_history.ps1 / CSS / options.js 关键不变量断言
+        with open(os.path.join(EXT_DIR, "content.js"), "r", encoding="utf-8") as f:
+            content_js = f.read()
+        self.assertIn("if (!trimmed || trimmed.charAt(0) === '<') return null;", content_js)
+        self.assertIn(r"const m = trimmed.match(/^(?:[a-zA-Z_$][\w$.]*\s*)?\(\s*(\{[\s\S]*\})\s*\)\s*;?\s*$/);", content_js)
+
+        with open(os.path.join(EXT_DIR, "options.js"), "r", encoding="utf-8") as f:
+            options_js = f.read()
+        self.assertIn("if (!data || typeof data !== 'object' || Array.isArray(data))", options_js)
+        self.assertIn("if (Object.keys(toSave).length === 0)", options_js)
+
+        with open(os.path.join(PROJECT_DIR, "clean_history.ps1"), "r", encoding="utf-8") as f:
+            clean_ps1 = f.read()
+        self.assertIn('literal:${Password}==>REDACTED_CAMPUS_PASSWORD', clean_ps1)
+        self.assertIn('literal:${Account}==>REDACTED_CAMPUS_ACCOUNT', clean_ps1)
+        self.assertNotIn("PtrToStringBSTR($bstr).Trim()", clean_ps1)
+
+        with open(os.path.join(EXT_DIR, "options.css"), "r", encoding="utf-8") as f:
+            options_css = f.read()
+        with open(os.path.join(EXT_DIR, "popup.css"), "r", encoding="utf-8") as f:
+            popup_css = f.read()
+        self.assertNotIn('[data-theme="auto"]', options_css)
+        self.assertIn(':root:not([data-theme="light"])', options_css)
+        self.assertIn("right: 46px;", options_css)
+        self.assertIn("color: #b91c1c;", options_css)
+        self.assertIn("color: #b91c1c;", popup_css)
 
 
 if __name__ == "__main__":

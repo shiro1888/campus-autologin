@@ -22,15 +22,15 @@
   const FILL_TIMEOUT_MS = 20000;   // 等待表单出现的最长时间
   const POLL_MS = 300;
 
-  let done = false;   // 防止重复执行
-
   // ---------------------------------------------------------------------
   // 工具
   // ---------------------------------------------------------------------
 
   function parseJsonp(text) {
     if (!text) return null;
-    const m = String(text).match(/\(\s*(\{[\s\S]*\})\s*\)/);
+    const trimmed = String(text).trim();
+    if (!trimmed || trimmed.charAt(0) === '<') return null;
+    const m = trimmed.match(/^(?:[a-zA-Z_$][\w$.]*\s*)?\(\s*(\{[\s\S]*\})\s*\)\s*;?\s*$/);
     if (!m) return null;
     try {
       return JSON.parse(m[1]);
@@ -45,6 +45,10 @@
         chrome.storage.local.get(
           { account: '', password: '', isp: '1', contentAutoFill: true, manualLogout: false },
           function (s) {
+            if (chrome.runtime && chrome.runtime.lastError) {
+              resolve({ account: '', password: '', isp: '1', enabled: false, paused: true });
+              return;
+            }
             resolve({
               account: (s && s.account) || '',
               password: (s && s.password) || '',
@@ -271,12 +275,11 @@
   // 填写表单
   // ---------------------------------------------------------------------
 
-  /** 触发 input / change 事件，让依赖 jQuery 的页面感知到值变化 */
+  /** 触发标准 input / change 事件，让门户页面脚本感知到值变化 */
   function fire(el) {
     try {
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
-      if (window.jQuery) window.jQuery(el).trigger('input').trigger('change');
     } catch (e) {
       /* 忽略 */
     }
@@ -377,7 +380,6 @@
   function waitForForm(cb) {
     const started = Date.now();
     (function poll() {
-      if (done) return;
       const hasUser = document.querySelector('input[name="DDDDD"]');
       const hasPass = document.querySelector('input[name="upass"]');
       if (hasUser && hasPass) {
@@ -617,9 +619,15 @@
             // 若此刻已在线就不要再提交表单（会把刚建立的会话踢下线）。
             const alreadyOnline = await checkStatus().catch(function () { return false; });
             if (alreadyOnline) {
-              done = true;
               hideHud();
               report({ ok: true, online: true, message: '页面加载时已在线，无需登录' });
+              return;
+            }
+            // 提交表单前再次核对设置与 manualLogout：等待表单及 status 查询期间
+            // 用户可能已在弹出面板/快捷键中点击了注销或关闭了自动填写。
+            const latestSettings = await getSettings();
+            if (latestSettings.paused || !latestSettings.enabled || !latestSettings.account || !latestSettings.password) {
+              hideHud();
               return;
             }
             showHud('校园网自动登录：正在提交认证…', 'loading');
@@ -627,7 +635,7 @@
             // loading 态 HUD 永久挂在页面上（loading 态不会自动淡出）。
             let submitted = false;
             try {
-              submitted = fillAndSubmit(s.account, s.password, s.isp);
+              submitted = fillAndSubmit(latestSettings.account, latestSettings.password, latestSettings.isp);
             } catch (e) {
               submitted = false;
             }
@@ -645,36 +653,30 @@
             await new Promise(function (resolveFallback) {
               setTimeout(async function () {
                 try {
-                  if (done) return;
                   if (detectPageError()) {
-                    done = true;
                     showHud('登录失败：网关返回错误提示', 'error');
                     report({ ok: false, online: false, message: '登录失败：网关返回错误提示' });
                     return;
                   }
                   const ok = await checkStatus();
                   if (ok) {
-                    done = true;
                     showHud('校园网认证成功！已在线', 'success');
                     report({ ok: true, online: true, message: '登录成功，已确认在线' });
                     return;
                   }
                   if (detectPageError()) {
-                    done = true;
                     showHud('登录失败：网关返回错误提示', 'error');
                     report({ ok: false, online: false, message: '登录失败：网关返回错误提示' });
                     return;
                   }
                   // 兜底登录前复查「手动注销」标志：用户在等待期间点了注销时不得再把人登回。
                   const fresh = await getSettings();
-                  if (fresh.paused) {
-                    done = true;
+                  if (fresh.paused || !fresh.enabled || !fresh.account || !fresh.password) {
                     hideHud();
                     report({ ok: false, online: false, message: '已手动注销，取消兜底登录' });
                     return;
                   }
-                  const r = await directLogin(s.account, s.password, s.isp);
-                  done = true;
+                  const r = await directLogin(fresh.account, fresh.password, fresh.isp);
                   if (r.ok) {
                     showHud('校园网认证成功！已在线', 'success');
                   } else {

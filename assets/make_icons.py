@@ -11,11 +11,10 @@ OUT_DIR = os.path.join(PROJECT_ROOT, "chrome-extension", "icons")
 
 def main():
     try:
-        from PIL import Image, ImageDraw
+        from PIL import Image, ImageDraw, ImageOps
     except ImportError:
-        print("提示: 重新生成图标需安装 Pillow (pip install pillow)。")
-        print("当前 chrome-extension/icons/ 下的图标已预先生成完毕，日常使用插件无需安装任何依赖。")
-        return 0
+        print("错误: 生成图标需要安装 Pillow (pip install pillow)。")
+        return 1
 
     # 兼容旧版 Pillow（<9.1.0 无 Image.Resampling）。
     # 注意不能写成 getattr(Image.Resampling, 'LANCZOS', ...)：当 Image 本身没有
@@ -36,7 +35,11 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
 
     with Image.open(MASTER_PATH) as raw_img:
-        img = raw_img.convert("RGBA")
+        transposed = ImageOps.exif_transpose(raw_img)
+        img = transposed.convert("RGBA")
+    side = min(img.size)
+    if img.size != (side, side):
+        img = ImageOps.fit(img, (side, side), method=LANCZOS)
     w, h = img.size
 
     # 超采样生成抗锯齿圆角蒙版 (iOS Squircle 曲线)
@@ -45,7 +48,7 @@ def main():
     mask = Image.new("L", (mask_w, mask_h), 0)
     draw = ImageDraw.Draw(mask)
     radius = int(mask_w * 0.22)
-    draw.rounded_rectangle([0, 0, mask_w, mask_h], radius=radius, fill=255)
+    draw.rounded_rectangle([0, 0, mask_w - 1, mask_h - 1], radius=radius, fill=255)
     mask = mask.resize((w, h), LANCZOS)
 
     icon_master = img.copy()

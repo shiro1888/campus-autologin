@@ -640,8 +640,10 @@ function createConfirmModal(cfg = {}) {
     if (!overlay || !overlay.classList.contains('open')) return;
     overlay.classList.remove('open');
     overlay.setAttribute('aria-hidden', 'true');
-    if (lastFocused && typeof lastFocused.focus === 'function') {
-      lastFocused.focus();
+    const prevFocus = lastFocused;
+    lastFocused = null;
+    if (prevFocus && typeof prevFocus.focus === 'function') {
+      prevFocus.focus();
     }
     settleAll(overlay, !!result);
   }
@@ -703,11 +705,14 @@ function createConfirmModal(cfg = {}) {
       return Promise.resolve(window.confirm(opts.desc || opts.title || '确定执行此操作吗？'));
     }
 
-    // 已有模态框在等待时（快速双击触发第二次 open），先以「取消」结算上一次，
-    // 否则 activeResolve 被覆盖，第一个 Promise 会永久悬挂、其 .then 永不执行。
-    settle(false);
+    // 已有模态框在等待时（快速双击触发第二次 open），先以「取消」结算上一次并保留原始触发焦点，
+    // 避免把当前框内的确认/取消按钮误记为关闭后应恢复的目标元素。
+    const wasOpen = overlay.classList.contains('open');
+    settleAll(overlay, false);
 
-    lastFocused = document.activeElement;
+    if (!wasOpen) {
+      lastFocused = typeof document !== 'undefined' ? document.activeElement : null;
+    }
     const titleEl = getTitle();
     const descEl = getDesc();
     const confirmBtn = getConfirmBtn();
@@ -865,6 +870,26 @@ function createActivityTimeline(cfg = {}) {
     }
   };
 
+  const onDrawerFocusOut = () => {
+    if (!isOpen) return;
+    const isMobile = typeof window !== 'undefined' && typeof window.matchMedia === 'function' &&
+      window.matchMedia('(max-width: 900px)').matches;
+    if (isMobile) return;
+    setTimeout(() => {
+      if (!isOpen) return;
+      const drawer = getDrawer();
+      const btn = getToggleBtn();
+      const active = typeof document !== 'undefined' ? document.activeElement : null;
+      if (drawer && typeof drawer.contains === 'function' && drawer.contains(active)) return;
+      if (btn && typeof btn.contains === 'function' && btn.contains(active)) return;
+      toggle(false);
+    }, 0);
+  };
+
+  const drawerOnInit = getDrawer();
+  if (drawerOnInit && typeof drawerOnInit.addEventListener === 'function') {
+    drawerOnInit.addEventListener('focusout', onDrawerFocusOut);
+  }
   if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
     document.addEventListener('mousedown', onDocMouseDown);
     document.addEventListener('keydown', onDocKeyDown);
@@ -876,6 +901,10 @@ function createActivityTimeline(cfg = {}) {
     getLogs: () => cachedLogs.slice(),
     destroy() {
       if (toggleBtn) toggleBtn.removeEventListener('click', onToggleClick);
+      const d = getDrawer();
+      if (d && typeof d.removeEventListener === 'function') {
+        d.removeEventListener('focusout', onDrawerFocusOut);
+      }
       if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
         document.removeEventListener('mousedown', onDocMouseDown);
         document.removeEventListener('keydown', onDocKeyDown);
@@ -887,10 +916,15 @@ function createActivityTimeline(cfg = {}) {
 /**
  * 组件 8：主题强调色管理 (科技蓝、极光紫、翡翠绿、落日橙、玫瑰粉)
  */
-function applyAccent(accent) {
+function normalizeAccent(accent) {
   const valid = ['blue', 'purple', 'emerald', 'amber', 'rose'];
-  const target = valid.includes(accent) ? accent : 'blue';
+  return valid.includes(accent) ? accent : 'blue';
+}
+
+function applyAccent(accent) {
+  const target = normalizeAccent(accent);
   document.documentElement.setAttribute('data-accent', target);
+  return target;
 }
 
 /**
@@ -905,21 +939,27 @@ function applyAccent(accent) {
  */
 let accentListenerBound = false;
 let accentOnChange = null;
+let _accentSelfWriteValue = null;
+let _accentSelfWriteTimer = null;
 function initAccent(callback) {
   if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
   // 记录最新回调：监听器只注册一次，但每次调用都应让新回调接管后续变更
   if (typeof callback === 'function') accentOnChange = callback;
   chrome.storage.local.get({ accentColor: 'blue' }, (res) => {
-    const acc = res && res.accentColor ? res.accentColor : 'blue';
-    applyAccent(acc);
+    const acc = applyAccent(res && res.accentColor);
     if (typeof callback === 'function') callback(acc);
   });
   if (chrome.storage.onChanged && !accentListenerBound) {
     accentListenerBound = true;
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.accentColor) {
-        applyAccent(changes.accentColor.newValue);
-        if (typeof accentOnChange === 'function') accentOnChange(changes.accentColor.newValue);
+        const nextAcc = normalizeAccent(changes.accentColor.newValue);
+        if (_accentSelfWriteValue !== null && nextAcc === _accentSelfWriteValue) {
+          _accentSelfWriteValue = null;
+          return;
+        }
+        applyAccent(nextAcc);
+        if (typeof accentOnChange === 'function') accentOnChange(nextAcc);
       }
     });
   }
@@ -933,13 +973,18 @@ function initAccent(callback) {
 // onChanged 监听器只注册一次，通过 _themeApplyFn 指针把事件路由给最新实例的 apply。
 let _themeListenerBound = false;
 let _themeApplyFn = null;
+let _themeSelfWriteValue = null;
+let _themeSelfWriteTimer = null;
 function createThemeManager(options = {}) {
   const toggleBtn = $(options.toggleBtnId || options.btnId);
   const labelEl = $(options.labelId);
+  const VALID_THEMES = ['auto', 'dark', 'light'];
+  const normalizeTheme = (t) => VALID_THEMES.includes(t) ? t : 'auto';
   let currentPref = 'auto';
+  let cycling = false;
 
   function apply(theme) {
-    currentPref = theme || 'auto';
+    currentPref = normalizeTheme(theme);
     const sysDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const effective = currentPref === 'auto' ? (sysDark ? 'dark' : 'light') : currentPref;
 
@@ -961,37 +1006,59 @@ function createThemeManager(options = {}) {
   }
 
   function cycle() {
+    if (cycling) return;
     if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
-    chrome.storage.local.get({ theme: 'auto' }, (s) => {
-      const cur = (s && s.theme) || 'auto';
-      let next = 'dark';
-      if (options.supportAuto !== false) {
-        next = cur === 'auto' ? 'dark' : (cur === 'dark' ? 'light' : 'auto');
-      } else {
-        if (cur === 'dark') next = 'light';
-        else if (cur === 'light') next = 'dark';
-        else {
-          const sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-          next = sysDark ? 'light' : 'dark';
+    cycling = true;
+    try {
+      chrome.storage.local.get({ theme: 'auto' }, (s) => {
+        const finishCycle = () => { cycling = false; };
+        if (chrome.runtime && chrome.runtime.lastError) {
+          finishCycle();
+          return;
         }
-      }
-      chrome.storage.local.set({ theme: next }, () => {
-        const reducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (!reducedMotion && typeof document !== 'undefined' && typeof document.startViewTransition === 'function') {
-          try {
-            document.startViewTransition(() => apply(next));
-          } catch (e) {
-            apply(next);
-          }
+        const cur = normalizeTheme(s && s.theme);
+        let next = 'dark';
+        if (options.supportAuto !== false) {
+          next = cur === 'auto' ? 'dark' : (cur === 'dark' ? 'light' : 'auto');
         } else {
-          apply(next);
+          if (cur === 'dark') next = 'light';
+          else if (cur === 'light') next = 'dark';
+          else {
+            const sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            next = sysDark ? 'light' : 'dark';
+          }
         }
-        if (typeof options.onNotify === 'function') {
-          const map = { auto: '跟随系统', dark: '深色模式', light: '浅色模式' };
-          options.onNotify(`已切换至 ${map[next] || next}`);
-        }
+        _themeSelfWriteValue = next;
+        if (_themeSelfWriteTimer) clearTimeout(_themeSelfWriteTimer);
+        _themeSelfWriteTimer = setTimeout(() => { _themeSelfWriteValue = null; }, 300);
+
+        chrome.storage.local.set({ theme: next }, () => {
+          const reducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          if (!reducedMotion && typeof document !== 'undefined' && typeof document.startViewTransition === 'function') {
+            try {
+              const vt = document.startViewTransition(() => apply(next));
+              if (vt && vt.finished && typeof vt.finished.then === 'function') {
+                vt.finished.then(finishCycle, finishCycle);
+              } else {
+                finishCycle();
+              }
+            } catch (e) {
+              apply(next);
+              finishCycle();
+            }
+          } else {
+            apply(next);
+            finishCycle();
+          }
+          if (typeof options.onNotify === 'function') {
+            const map = { auto: '跟随系统', dark: '深色模式', light: '浅色模式' };
+            options.onNotify(`已切换至 ${map[next] || next}`);
+          }
+        });
       });
-    });
+    } catch (e) {
+      cycling = false;
+    }
   }
 
   function init() {
@@ -1006,7 +1073,12 @@ function createThemeManager(options = {}) {
         _themeListenerBound = true;
         chrome.storage.onChanged.addListener((changes, area) => {
           if (area === 'local' && changes.theme) {
-            if (typeof _themeApplyFn === 'function') _themeApplyFn(changes.theme.newValue);
+            const nextTheme = changes.theme.newValue;
+            if (_themeSelfWriteValue !== null && nextTheme === _themeSelfWriteValue) {
+              _themeSelfWriteValue = null;
+              return;
+            }
+            if (typeof _themeApplyFn === 'function') _themeApplyFn(nextTheme);
           }
         });
       }
@@ -1343,7 +1415,13 @@ function closeAllCustomSelects() {
   document.querySelectorAll('.select-wrap.open').forEach((w) => {
     w.classList.remove('open');
     const t = w.querySelector('.custom-select-trigger');
-    if (t) t.setAttribute('aria-expanded', 'false');
+    if (t) {
+      t.setAttribute('aria-expanded', 'false');
+      t.removeAttribute('aria-activedescendant');
+    }
+    w.querySelectorAll('.custom-select-option.focused').forEach((optEl) => {
+      optEl.classList.remove('focused');
+    });
     const card = w.closest('.card');
     if (card) card.style.zIndex = '';
     const field = w.closest('.field');
@@ -1373,6 +1451,7 @@ function initCustomSelects(root = document) {
     if (oldArrow) oldArrow.remove();
 
     const menuId = 'menu-' + (select.id || 'select-' + Math.floor(Math.random() * 10000));
+    const valueId = `${menuId}-value`;
 
     const trigger = document.createElement('button');
     trigger.type = 'button';
@@ -1381,21 +1460,28 @@ function initCustomSelects(root = document) {
     trigger.setAttribute('aria-haspopup', 'listbox');
     trigger.setAttribute('aria-expanded', 'false');
     trigger.setAttribute('aria-controls', menuId);
+    let selectAriaLabel = '';
+    let hasAssocLabel = false;
     if (select.id && typeof document !== 'undefined' && typeof document.querySelector === 'function') {
       const assocLabel = document.querySelector(`label[for="${select.id}"]`);
       if (assocLabel) {
         if (!assocLabel.id) assocLabel.id = `${select.id}-label`;
-        trigger.setAttribute('aria-labelledby', assocLabel.id);
-      } else if (typeof select.getAttribute === 'function' && select.getAttribute('aria-label')) {
-        trigger.setAttribute('aria-label', select.getAttribute('aria-label'));
+        trigger.setAttribute('aria-labelledby', `${assocLabel.id} ${valueId}`);
+        hasAssocLabel = true;
       }
+    }
+    if (!hasAssocLabel && typeof select.getAttribute === 'function' && select.getAttribute('aria-label')) {
+      selectAriaLabel = select.getAttribute('aria-label');
+      trigger.setAttribute('aria-label', selectAriaLabel);
     }
 
     const labelWrap = document.createElement('div');
+    labelWrap.id = valueId;
     labelWrap.className = 'custom-select-label';
 
     const arrowSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     arrowSvg.setAttribute('class', 'custom-select-arrow');
+    arrowSvg.setAttribute('aria-hidden', 'true');
     arrowSvg.setAttribute('viewBox', '0 0 24 24');
     arrowSvg.setAttribute('fill', 'none');
     arrowSvg.setAttribute('stroke', 'currentColor');
@@ -1410,6 +1496,13 @@ function initCustomSelects(root = document) {
     menu.id = menuId;
     menu.className = 'custom-select-menu';
     menu.setAttribute('role', 'listbox');
+    if (trigger.getAttribute('aria-labelledby')) {
+      menu.setAttribute('aria-labelledby', trigger.getAttribute('aria-labelledby').split(' ')[0]);
+    } else if (selectAriaLabel) {
+      menu.setAttribute('aria-label', selectAriaLabel);
+    }
+
+    let focusedIdx = Math.max(0, select.selectedIndex);
 
     Array.from(select.options).forEach((opt, idx) => {
       const optionEl = document.createElement('div');
@@ -1421,7 +1514,7 @@ function initCustomSelects(root = document) {
       optionEl.setAttribute('aria-selected', idx === select.selectedIndex ? 'true' : 'false');
 
       optionEl.innerHTML = formatOptionContent(opt.textContent) +
-        '<svg class="custom-select-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        '<svg class="custom-select-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
 
       optionEl.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1434,6 +1527,23 @@ function initCustomSelects(root = document) {
     });
 
     wrap.appendChild(menu);
+
+    function setFocusedOption(idx, shouldScroll) {
+      const allItems = menu.querySelectorAll('.custom-select-option');
+      if (!allItems || !allItems.length) return;
+      focusedIdx = Math.max(0, Math.min(allItems.length - 1, idx));
+      allItems.forEach((it, i) => {
+        it.classList.toggle('focused', i === focusedIdx);
+      });
+      if (wrap.classList.contains('open')) {
+        trigger.setAttribute('aria-activedescendant', `${menuId}-opt-${focusedIdx}`);
+        if (shouldScroll && allItems[focusedIdx] && typeof allItems[focusedIdx].scrollIntoView === 'function') {
+          allItems[focusedIdx].scrollIntoView({ block: 'nearest' });
+        }
+      } else {
+        trigger.removeAttribute('aria-activedescendant');
+      }
+    }
 
     function selectOption(index) {
       if (select.selectedIndex !== index) {
@@ -1449,20 +1559,28 @@ function initCustomSelects(root = document) {
       const curOpt = select.options[select.selectedIndex];
       if (curOpt) {
         labelWrap.innerHTML = formatOptionContent(curOpt.textContent);
+        if (!hasAssocLabel && selectAriaLabel) {
+          trigger.setAttribute('aria-label', `${selectAriaLabel}: ${String(curOpt.textContent || '').trim()}`);
+        }
       }
-      trigger.setAttribute('aria-activedescendant', `${menuId}-opt-${select.selectedIndex}`);
+      focusedIdx = Math.max(0, select.selectedIndex);
       const allItems = menu.querySelectorAll('.custom-select-option');
+      const isOpenMenu = wrap.classList.contains('open');
       allItems.forEach((it, idx) => {
         const isMatch = idx === select.selectedIndex;
         it.classList.toggle('active', isMatch);
+        it.classList.toggle('focused', isOpenMenu && idx === focusedIdx);
         it.setAttribute('aria-selected', isMatch ? 'true' : 'false');
       });
 
-      if (wrap.classList.contains('open')) {
+      if (isOpenMenu) {
+        trigger.setAttribute('aria-activedescendant', `${menuId}-opt-${focusedIdx}`);
         const activeItem = menu.querySelector('.custom-select-option.active');
-        if (activeItem) {
+        if (activeItem && typeof activeItem.scrollIntoView === 'function') {
           activeItem.scrollIntoView({ block: 'nearest' });
         }
+      } else {
+        trigger.removeAttribute('aria-activedescendant');
       }
     }
 
@@ -1492,15 +1610,17 @@ function initCustomSelects(root = document) {
       const parentField = wrap.closest('.field');
       if (parentField) parentField.style.zIndex = '60';
 
-      const activeItem = menu.querySelector('.custom-select-option.active');
-      if (activeItem) {
-        activeItem.scrollIntoView({ block: 'nearest' });
-      }
+      focusedIdx = Math.max(0, select.selectedIndex);
+      setFocusedOption(focusedIdx, true);
     }
 
     function closeMenu() {
       wrap.classList.remove('open');
       trigger.setAttribute('aria-expanded', 'false');
+      trigger.removeAttribute('aria-activedescendant');
+      menu.querySelectorAll('.custom-select-option.focused').forEach((it) => {
+        it.classList.remove('focused');
+      });
       const parentCard = wrap.closest('.card');
       if (parentCard) parentCard.style.zIndex = '';
       const parentField = wrap.closest('.field');
@@ -1517,23 +1637,30 @@ function initCustomSelects(root = document) {
     });
 
     trigger.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End' || e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
         if (!wrap.classList.contains('open')) {
-          openMenu();
-        } else {
-          let curIdx = select.selectedIndex;
-          if (e.key === 'ArrowDown') {
-            curIdx = Math.min(select.options.length - 1, curIdx + 1);
-          } else if (e.key === 'ArrowUp') {
-            curIdx = Math.max(0, curIdx - 1);
-          } else if (e.key === 'Enter' || e.key === ' ') {
-            closeMenu();
-            return;
+          if (e.key !== 'Home' && e.key !== 'End') {
+            openMenu();
           }
-          selectOption(curIdx);
+        } else {
+          if (e.key === 'ArrowDown') {
+            setFocusedOption(focusedIdx + 1, true);
+          } else if (e.key === 'ArrowUp') {
+            setFocusedOption(focusedIdx - 1, true);
+          } else if (e.key === 'Home') {
+            setFocusedOption(0, true);
+          } else if (e.key === 'End') {
+            setFocusedOption(select.options.length - 1, true);
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            selectOption(focusedIdx);
+            closeMenu();
+          }
         }
       } else if (e.key === 'Escape' || e.key === 'Tab') {
+        if (e.key === 'Escape' && wrap.classList.contains('open')) {
+          e.preventDefault();
+        }
         closeMenu();
       }
     });
@@ -1689,17 +1816,21 @@ function createAccentPicker(options = {}) {
 
   function set(accent) {
     if (!accent) return;
+    const normalized = normalizeAccent(accent);
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.set({ accentColor: accent }, () => {
-        applyAccent(accent);
-        sync(accent);
+      _accentSelfWriteValue = normalized;
+      if (_accentSelfWriteTimer) clearTimeout(_accentSelfWriteTimer);
+      _accentSelfWriteTimer = setTimeout(() => { _accentSelfWriteValue = null; }, 300);
+      chrome.storage.local.set({ accentColor: normalized }, () => {
+        applyAccent(normalized);
+        sync(normalized);
         if (typeof options.onNotify === 'function') {
-          options.onNotify(`已应用强调色：${names[accent] || accent}`);
+          options.onNotify(`已应用强调色：${names[normalized] || normalized}`);
         }
       });
     } else {
-      applyAccent(accent);
-      sync(accent);
+      applyAccent(normalized);
+      sync(normalized);
     }
   }
 

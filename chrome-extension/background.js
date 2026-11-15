@@ -109,6 +109,9 @@ const CONN_STATES = ['unknown', 'online', 'offline', 'unreachable', 'unparseable
 // 并发保护：防止定时器与手动点击同时发起登录，并互斥串行化
 let running = false;
 let activeAuthOp = null; // 'login' | 'logout' | 'content' | null
+let logoutClaiming = false;    // doLogout 异步抢锁前过渡期，防止 autoLogin TOCTOU 抢跑
+let authStateEpoch = 0;        // 注销/重置/状态重置纪元，防止陈旧 status 写回 onlineSince
+let stateGen = 0;              // eventLogs / 状态落盘代数，防止 settingsChanged 用旧快照覆盖新日志
 let contentLockTimer = null;
 let contentLockToken = null;   // 内容脚本认证锁的持有令牌，释放时须校验
 
@@ -195,11 +198,13 @@ function maskAccount(acc) {
   return t.slice(0, 3) + '****' + t.slice(-4);
 }
 
-/** 从 JSONP 文本中提取 JSON 对象并解析；失败返回 null */
+/** 从 JSONP 文本中提取 JSON 对象并解析；仅接受完整 JSONP 包装格式，拒绝内嵌 HTML 脚本片段 */
 function parseJsonp(text) {
   if (!text) return null;
   if (typeof text !== 'string') text = String(text);
-  const m = text.match(/\(\s*(\{[\s\S]*\})\s*\)/);
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.charAt(0) === '<') return null;
+  const m = trimmed.match(/^(?:[a-zA-Z_$][\w$.]*\s*)?\(\s*(\{[\s\S]*\})\s*\)\s*;?\s*$/);
   if (!m) return null;
   try {
     return JSON.parse(m[1]);
@@ -371,6 +376,8 @@ async function getSettings() {
     instantTrigger: stored.instantTrigger === undefined ? DEFAULT_SETTINGS.instantTrigger : !!stored.instantTrigger,
     // 用户手动注销后为 true：暂停一切自动登录，直到用户重新点「立即登录」
     manualLogout: stored.manualLogout === undefined ? DEFAULT_SETTINGS.manualLogout : !!stored.manualLogout,
+    // 注销发出后若门户仍返回在线，标记为「注销后残留会话」，防止下一轮巡检误判为用户自行重登而解除暂停
+    logoutResidualOnline: !!stored.logoutResidualOnline,
     // 上次登录因凭据类错误（密码错/账号不存在等）失败 -> 降频重试，不再每秒打门户
     authError: stored.authError === undefined ? DEFAULT_SETTINGS.authError : !!stored.authError,
     // 连续探测失败次数，用于指数退避（区分「不在校园网内」与「确认掉线」）
@@ -443,20 +450,30 @@ function formatInterval(min) {
   return min + ' 分钟';
 }
 
+function safeBadgeCall(p) {
+  if (p && typeof p.catch === 'function') {
+    p.catch(() => {});
+  }
+}
+
 /** 更新浏览器工具栏图标角标 (Action Badge) */
 function updateActionBadge(online, text) {
   try {
     if (!chrome.action || !chrome.action.setBadgeText) return;
     if (text !== undefined) {
-      chrome.action.setBadgeText({ text: text });
-      chrome.action.setBadgeBackgroundColor({ color: '#3b82f6' });
+      safeBadgeCall(chrome.action.setBadgeText({ text: text }));
+      if (chrome.action.setBadgeBackgroundColor) {
+        safeBadgeCall(chrome.action.setBadgeBackgroundColor({ color: '#3b82f6' }));
+      }
       return;
     }
     if (online) {
-      chrome.action.setBadgeText({ text: '' });
+      safeBadgeCall(chrome.action.setBadgeText({ text: '' }));
     } else {
-      chrome.action.setBadgeText({ text: '!' });
-      chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
+      safeBadgeCall(chrome.action.setBadgeText({ text: '!' }));
+      if (chrome.action.setBadgeBackgroundColor) {
+        safeBadgeCall(chrome.action.setBadgeBackgroundColor({ color: '#ef4444' }));
+      }
     }
   } catch (e) {
     // 忽略异常
@@ -473,14 +490,18 @@ async function saveResult(result, trigger) {
   // eventLogs 仍是空数组，直接 set 会把磁盘上的历史日志整段覆盖成 1 条。
   await hydrateState();
   try {
-    if (result && result.message) {
+    stateGen += 1;
+    const safeResult = result && typeof result === 'object'
+      ? Object.assign({}, result, result.message !== undefined ? { message: redactCredentials(result.message) } : {})
+      : result;
+    if (safeResult && safeResult.message) {
       const entry = {
-        time: result.time || nowText(),
-        message: redactCredentials(result.message),
-        ok: !!result.ok,
-        online: !!result.online,
-        pending: !!(result.pending || result.state === 'submitted'),
-        from: String(trigger || result.from || '后台巡检'),
+        time: safeResult.time || nowText(),
+        message: safeResult.message,
+        ok: !!safeResult.ok,
+        online: !!safeResult.online,
+        pending: !!(safeResult.pending || safeResult.state === 'submitted'),
+        from: String(trigger || safeResult.from || '后台巡检'),
         count: 1
       };
       const head = eventLogs[0];
@@ -498,11 +519,11 @@ async function saveResult(result, trigger) {
     // 心跳历史与结果同批落盘：掉线时 1 秒巡检节奏下，若 recordPingHistory 每次
     // 单独 setState，会多出约每秒 1 次写盘；合并后不增加额外 I/O。
     await chrome.storage.local.set({
-      lastResult: result,
+      lastResult: safeResult,
       eventLogs: eventLogs,
       pingHistory: getPingHistory()
     });
-    updateActionBadge(result && result.online);
+    updateActionBadge(safeResult && safeResult.online);
   } catch (e) {
     // 忽略
   }
@@ -735,18 +756,21 @@ async function doLogin(settings) {
 // 可能同时触发注销。若各发一条完整序列，会重复请求门户。
 // 统一由此执行器去重：在途复用同一 Promise；刚完成的结果在 3 秒窗口内复用。
 let logoutInFlight = null;
+let doLogoutInFlight = null;
 let lastLogoutResult = null;
 let lastLogoutAt = 0;
 const LOGOUT_DEDUP_MS = 3000;
 
-function runLogoutOnce() {
+function runLogoutOnce(opts) {
   if (logoutInFlight) return logoutInFlight;
   if (lastLogoutResult && Date.now() - lastLogoutAt < LOGOUT_DEDUP_MS) {
     return Promise.resolve(lastLogoutResult);
   }
-  logoutInFlight = _doLogoutInternal().then((res) => {
-    lastLogoutResult = res;
-    lastLogoutAt = Date.now();
+  logoutInFlight = _doLogoutInternal(opts).then((res) => {
+    if (!res || !res._earlyAbort) {
+      lastLogoutResult = res;
+      lastLogoutAt = Date.now();
+    }
     return res;
   }).finally(() => {
     logoutInFlight = null;
@@ -760,54 +784,83 @@ async function doLogout() {
   if (logoutInFlight) {
     return logoutInFlight;
   }
+  if (doLogoutInFlight) {
+    return doLogoutInFlight;
+  }
 
-  // 用户明确注销：第一时间落盘 manualLogout=true，令在途的 autoLogin 主动让出
-  await setState({ manualLogout: true, unreachableStreak: 0 });
-  unreachableStreak = 0;
+  logoutClaiming = true;
+  doLogoutInFlight = (async () => {
+    await hydrateState();
+    const prevSettings = await getSettings();
+    const prevManualLogout = !!prevSettings.manualLogout;
 
-  // 若当前有登录认证在进行中，等待登录检测到 manualLogout 后主动让出退出（最多等待 3 秒）
-  if (activeAuthOp) {
-    const t0 = Date.now();
-    while (activeAuthOp && activeAuthOp !== 'logout' && Date.now() - t0 < 3000) {
-      await new Promise((r) => setTimeout(r, 50));
+    // 用户明确注销：第一时间落盘 manualLogout=true，令在途的 autoLogin 主动让出
+    authStateEpoch += 1;
+    await setState({ manualLogout: true, unreachableStreak: 0 });
+    unreachableStreak = 0;
+
+    // 若当前有登录认证在进行中，等待登录检测到 manualLogout 后主动让出退出（最多等待 3 秒）
+    if (activeAuthOp) {
+      const t0 = Date.now();
+      while (activeAuthOp && activeAuthOp !== 'logout' && Date.now() - t0 < 3000) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
     }
-  }
 
-  if (activeAuthOp && activeAuthOp !== 'logout') {
-    // 竞态下 autoLogin 可能已补发注销（还没等到锁释放）：此时绝不能回滚暂停标志，
-    // 否则 UI 说「注销已跳过」、门户实际已注销，下一轮巡检又会把人静默登回。
-    if (logoutInFlight) return logoutInFlight;
-    if (lastLogoutResult && Date.now() - lastLogoutAt < LOGOUT_DEDUP_MS) {
-      return lastLogoutResult;
+    if (activeAuthOp && activeAuthOp !== 'logout') {
+      // 竞态下 autoLogin 可能已补发注销（还没等到锁释放）：此时绝不能回滚暂停标志，
+      // 否则 UI 说「注销已跳过」、门户实际已注销，下一轮巡检又会把人静默登回。
+      if (logoutInFlight) return logoutInFlight;
+      if (lastLogoutResult && Date.now() - lastLogoutAt < LOGOUT_DEDUP_MS) {
+        return lastLogoutResult;
+      }
+      return fail(`当前正在进行${activeAuthOp === 'content' ? '页面认证' : '网络操作'}，已暂停自动登录；该操作结束后不会自动重连`, false);
     }
-    // 抢锁超时（例如内容脚本仍在认证）：必须保留 manualLogout=true。
-    // 在途操作会读取该标志并主动让出（autoLogin 的补发注销、content.js 的 5 秒复查），
-    // 一旦回滚，反而会让它们继续把用户登回去 —— 注销被静默撤销。
-    // 代价只是守护进入暂停态，用户可随时点「立即登录」恢复，远优于注销失效。
-    return fail(`当前正在进行${activeAuthOp === 'content' ? '页面认证' : '网络操作'}，已暂停自动登录；该操作结束后不会自动重连`, false);
-  }
 
-  activeAuthOp = 'logout';
-  running = true;
-  try {
-    return await runLogoutOnce();
-  } finally {
-    activeAuthOp = null;
-    running = false;
-  }
+    activeAuthOp = 'logout';
+    running = true;
+    try {
+      return await runLogoutOnce({ canRevertPause: !prevManualLogout });
+    } finally {
+      activeAuthOp = null;
+      running = false;
+    }
+  })().finally(() => {
+    logoutClaiming = false;
+    doLogoutInFlight = null;
+  });
+
+  return doLogoutInFlight;
 }
 
-async function _doLogoutInternal() {
+async function _doLogoutInternal(opts) {
+  const canRevertPause = !!(opts && opts.canRevertPause);
   const st = await checkStatus();
   if (!st.reachable) {
-    return fail('网络连接失败，请检查 Wi-Fi 或网线', false);
+    if (canRevertPause) {
+      authStateEpoch += 1;
+      await setState({ manualLogout: false, logoutResidualOnline: false });
+    }
+    await updateConnState(st);
+    const res = fail('网络连接失败，请检查 Wi-Fi 或网线', false);
+    Object.defineProperty(res, '_earlyAbort', { value: true, enumerable: false });
+    await saveResult(res, '手动注销');
+    await applyCadence();
+    return res;
   }
   if (st.unparseable) {
-    // 门户返回的是 HTML 而非认证数据（如酒店/机场强制门户）：既拿不到会话参数，
-    // 也得不到真实在线状态，不能把它当成「已下线」。
+    // 门户返回的是 HTML 而非认证数据（如酒店/机场强制门户）：尚未发送注销请求，
+    // 回滚此次抢先写入的暂停标记并同步连接状态与退避定时。
+    if (canRevertPause) {
+      authStateEpoch += 1;
+      await setState({ manualLogout: false, logoutResidualOnline: false });
+    }
+    await updateConnState(st);
     const res = fail('门户返回的不是认证数据，无法执行注销（可能处于强制登录网络）', false);
     res.state = 'unknown';
+    Object.defineProperty(res, '_earlyAbort', { value: true, enumerable: false });
     await saveResult(res, '手动注销');
+    await applyCadence();
     return res;
   }
   const raw = st.raw || {};
@@ -835,6 +888,7 @@ async function _doLogoutInternal() {
 
   // 用户明确发起注销：必须在向网关发请求前立即落盘 manualLogout=true，
   // 避免注销过程中（网络请求 + 600ms 延迟）后台定时器触发 autoLogin 看到掉线后把人静默登回。
+  authStateEpoch += 1;
   await setState({ manualLogout: true, unreachableStreak: 0 });
   unreachableStreak = 0;
 
@@ -852,7 +906,8 @@ async function _doLogoutInternal() {
   if (!stAfter.reachable) {
     // 网关不可达，无法确认是否下线（C11：区分确认离线与无法确认）
     onlineSince = null;
-    await setState({ manualLogout: true, unreachableStreak: 0, onlineSince: null });
+    authStateEpoch += 1;
+    await setState({ manualLogout: true, logoutResidualOnline: false, unreachableStreak: 0, onlineSince: null });
     connState = 'unreachable';
     const res = fail('注销请求已提交，但当前网关不可达，无法确认是否成功下线', false);
     res.state = 'unknown';
@@ -865,7 +920,8 @@ async function _doLogoutInternal() {
   if (stAfter.unparseable) {
     // 门户返回非认证数据：online 恒为 false，但这不是「已下线」，不能据此报成功。
     onlineSince = null;
-    await setState({ manualLogout: true, unreachableStreak: 0, onlineSince: null });
+    authStateEpoch += 1;
+    await setState({ manualLogout: true, logoutResidualOnline: false, unreachableStreak: 0, onlineSince: null });
     connState = 'unparseable';
     const res = fail('注销请求已提交，但无法确认是否成功下线（门户返回非认证数据）', false);
     res.state = 'unknown';
@@ -878,7 +934,8 @@ async function _doLogoutInternal() {
   if (!stAfter.online) {
     // 注销成功 -> 置上抑制标志，暂停自动登录，并清空本地在线会话计时
     onlineSince = null;
-    await setState({ manualLogout: true, unreachableStreak: 0, onlineSince: null });
+    authStateEpoch += 1;
+    await setState({ manualLogout: true, logoutResidualOnline: false, unreachableStreak: 0, onlineSince: null });
     unreachableStreak = 0;
     connState = 'offline';
     const res = ok('已注销下线（自动登录已暂停，点「立即登录」可恢复）', false);
@@ -891,12 +948,9 @@ async function _doLogoutInternal() {
 
   const res = fail('注销请求已提交，但会话仍在（可能需到门户页面手动注销）', true);
   // 会话仍在有两种可能：(a) 门户不支持自助注销；(b) 并发登录正在途中，稍后会完成。
-  // 无论哪种，用户点过注销就该保持暂停，否则下一轮巡检会立刻把人登回去，
-  // 「注销」形同虚设。登录完成时若发现该标志，会补发一次注销（见 autoLogin 第 4.5 步）。
-  if (!(await getSettings()).manualLogout) {
-    await setState({ manualLogout: true, unreachableStreak: 0 });
-    console.log('[logout] 会话未清除，但仍保持注销暂停以避免被立刻登回');
-  }
+  // 置 logoutResidualOnline=true 防止下一轮巡检看到该残留会话在线就误判为用户手动重连并解除暂停。
+  await setState({ manualLogout: true, logoutResidualOnline: true, unreachableStreak: 0 });
+  console.log('[logout] 会话未清除，保持注销暂停并标记残留会话以避免自动撤销暂停');
   await updateConnState(stAfter);
   await saveResult(res, '手动注销');
   await applyCadence();
@@ -984,7 +1038,7 @@ async function updateConnState(st) {
  */
 async function autoLogin(trigger, manual) {
   const tag = trigger ? '[' + trigger + '] ' : '';
-  if (running || activeAuthOp) {
+  if (running || activeAuthOp || logoutClaiming) {
     return { ok: false, online: false, skipped: true, message: '正在处理认证中，已跳过本次请求', time: nowText() };
   }
   activeAuthOp = 'login';
@@ -996,7 +1050,8 @@ async function autoLogin(trigger, manual) {
     // 0) 用户主动点「立即登录」/ 按快捷键 -> 解除注销暂停
     let paused = settings.manualLogout;
     if (manual && paused) {
-      await setState({ manualLogout: false, unreachableStreak: 0 });
+      authStateEpoch += 1;
+      await setState({ manualLogout: false, logoutResidualOnline: false, unreachableStreak: 0 });
       unreachableStreak = 0;
       paused = false;
       console.log(tag + '用户手动登录，已解除注销暂停');
@@ -1028,18 +1083,30 @@ async function autoLogin(trigger, manual) {
     // 2) 状态检查（每次巡检只查一次，暂停态的判定也复用这次结果）
     const st = await checkStatus();
 
-    // 3) 注销暂停判定。若暂停中却探测到「已在线」，说明用户自己打开门户网页登了回来，
-    //    此时应自动恢复守护 —— 否则暂停态一直留着，界面显示「已在线」让用户看不出
-    //    异常，等之后真掉线了插件却不重连，表现为「时好时坏」。
+    // 3) 注销暂停判定。若暂停中却探测到「已在线」，且并非注销后原会话残留，
+    //    说明用户自己打开门户网页登了回来，此时才自动恢复守护。
+    //    若已知门户仍挂着上次注销未清掉的残留会话（logoutResidualOnline），则必须保持暂停，
+    //    等门户真正下线一次（清掉残留标记）后，再恢复「自行重登自愈」逻辑。
     if (paused && !(st.reachable && st.online)) {
+      if (settings.logoutResidualOnline && st.reachable && !st.unparseable && !st.online) {
+        await setState({ logoutResidualOnline: false });
+      }
       await updateConnState(st);
       console.log(tag + '处于手动注销暂停中，跳过');
       await ensureAlarm();   // 暂停态由 ensureAlarm 内部识别，会降为常规间隔
       return { ok: true, online: false, skipped: true, paused: true,
                message: '已手动注销，自动登录已暂停', time: nowText() };
     }
+    if (paused && settings.logoutResidualOnline) {
+      await updateConnState(st);
+      console.log(tag + '注销暂停中（检测到注销前残留会话仍在线，保持暂停）');
+      await ensureAlarm();
+      return { ok: true, online: true, skipped: true, paused: true,
+               message: '已手动注销（当前会话仍在，自动登录已暂停）', time: nowText() };
+    }
     if (paused) {
-      await setState({ manualLogout: false, unreachableStreak: 0 });
+      authStateEpoch += 1;
+      await setState({ manualLogout: false, logoutResidualOnline: false, unreachableStreak: 0 });
       console.log(tag + '检测到已在线（用户可能自行登录），自动恢复守护');
     }
 
@@ -1168,6 +1235,10 @@ async function ensureAlarm() {
     // 按 connState==='offline' 设成「掉线间隔 1 秒」，浏览器又回到每秒空唤醒。
     if (settings.manualLogout) {
       period = clampInterval(settings.intervalMin);   // 空闲巡检
+    } else if (!hasCredentials) {
+      period = clampInterval(settings.intervalMin);   // 未填写凭据：不按掉线/退避空转
+    } else if (!settings.adaptive) {
+      period = clampInterval(settings.intervalMin);   // 关闭自适应：统一常规间隔
     } else if (connState === 'unreachable' || connState === 'unparseable') {
       // 离开校园网后即使此前触发过凭据错误，也应进入指数退避，避免按 intervalMin 持续空唤醒
       period = backoffPeriod(settings);
@@ -1175,10 +1246,8 @@ async function ensureAlarm() {
       // 密码错 / 账号不存在等：按 1 秒重试一万次也不会成功，
       // 反而每天打出上万次无效认证。降到常规间隔，等用户改好凭据再说。
       period = clampInterval(settings.intervalMin);
-    } else if (!settings.adaptive) {
-      period = clampInterval(settings.intervalMin);   // 关闭自适应：统一常规间隔
     } else if (connState === 'offline') {
-      period = clampInterval(hasCredentials ? settings.offlineIntervalMin : settings.intervalMin);
+      period = clampInterval(settings.offlineIntervalMin);
     } else {
       period = clampInterval(settings.intervalMin);
     }
@@ -1246,7 +1315,7 @@ function setupInstantTriggers() {
   function trigger(label, pre) {
     try {
       chrome.storage.local.get({ instantTrigger: true }, (s) => {
-        if (!s || s.instantTrigger === false) return;
+        if (chrome.runtime.lastError || !s || s.instantTrigger === false) return;
         if (pre && !pre()) return;
         if (isThrottled() || instantInFlight) return;
         instantInFlight = true;
@@ -1350,11 +1419,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'status') {
     // 附带 manualLogout, running 与 onlineSince 状态，让 popup 与内容脚本一次拿全，避免并发竞态
+    const reqEpoch = authStateEpoch;
     hydrateState()
       .then(() => Promise.all([checkStatus(), getSettings()]))
       .then(async ([st, s]) => {
         let curOnlineSince = onlineSince || s.onlineSince || null;
-        if (st.online && !curOnlineSince) {
+        if (reqEpoch !== authStateEpoch || s.manualLogout) {
+          if (!st.online || s.manualLogout) curOnlineSince = null;
+        } else if (st.online && !curOnlineSince) {
           curOnlineSince = deriveOnlineSince(st.raw);
           onlineSince = curOnlineSince;
           await setState({ onlineSince: curOnlineSince });
@@ -1380,14 +1452,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 重新从 storage 同步运行态（connState / unreachableStreak / onlineSince）。
     // 「恢复默认设置」会把 connState/unreachableStreak 清回 unknown/0，但后台 SW 的
     // 内存副本仍是旧值；只重建闹钟不会让退避计数归零，导致恢复默认后仍在退避。
+    let genBefore = stateGen;
     hydrateState()
-      .then(getSettings)
+      .then(() => {
+        genBefore = stateGen;
+        return getSettings();
+      })
       .then((s) => {
+        authStateEpoch += 1;
         connState = s.connState;
         unreachableStreak = s.unreachableStreak;
         lastPersistedStreak = s.unreachableStreak;
         onlineSince = s.onlineSince || null;
-        if (Array.isArray(s.eventLogs)) {
+        if (genBefore === stateGen && Array.isArray(s.eventLogs)) {
           eventLogs = s.eventLogs.slice(0, MAX_EVENT_LOGS);
         }
         return ensureAlarm();
@@ -1404,6 +1481,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 下一次 saveResult 写回 —— 清空操作被静默撤销。
     hydrateState()
       .then(() => {
+        stateGen += 1;
         eventLogs = [];
         return setState({ eventLogs: [] });
       })

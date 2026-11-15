@@ -86,11 +86,12 @@ campus-autologin/
 │   ├── options.html/js/css    控制中心设置页
 │   ├── icons/                 各尺寸图标
 │   └── README.md              详细功能与设置说明
-├── assets/                    ← 图标生成工具（make_icons.py，基于 master.jpg）
-├── tests/                     ← 自动化测试套件
+├── assets/                    ← 图标生成工具与原图（make_icons.py / master.jpg）
+├── tests/                     ← 自动化与端到端测试套件（test_extension.py / test_clean_history_e2e.ps1）
 ├── clean_history.ps1          ← Git 历史敏感凭据脱敏工具（见下方安全公告）
 ├── reload_extension.bat       ← 改完扩展代码后一键打开扩展页刷新
 ├── .gitattributes
+├── .gitignore
 └── README.md
 ```
 
@@ -98,9 +99,11 @@ campus-autologin/
 
 ## 开发
 
+> 运行单元测试需要 **Python 3** 与 **Node.js**（测试通过 Node VM 执行扩展 JS 行为校验）；端到端历史清洗测试另需 `git-filter-repo`。
+
 ```powershell
-# 扩展结构与 DOM 契约测试（manifest / 弹窗与设置页的 DOM ID 对应关系 / 外链 noopener）
-python -m unittest discover tests -v
+# 扩展结构、DOM 契约与核心逻辑测试（建议加 -B 避免生成 __pycache__）
+python -B -m unittest discover tests -v
 
 # 端到端回归：在隔离临时克隆中验证「错误密码被拦截」与「凭据清洗全流程」；
 # 历史已清洗时会植入临时虚构凭据构造测试历史，仅在缺少 git-filter-repo 时标记 SKIP

@@ -215,6 +215,10 @@ function load() {
   }
 
   chrome.storage.local.get(DEFAULTS, (s) => {
+    if (chrome.runtime.lastError || !s) {
+      showToast('读取本地配置失败，请重试', 'err');
+      return;
+    }
     clearAllFieldErrors();
     // 只接受字符串：storage 里的值可能被手改或来自旧版本。
     // 注意不能只用 String() —— String({}) 会得到字面量 "[object Object]"，照样显示难看。
@@ -374,10 +378,23 @@ function syncOfflineRow() {
   }
 }
 
+let statusReqSeq = 0;
+let statusSpinTimer = null;
+
+function setTelemetryAria(id, label) {
+  const el = $(id);
+  if (el) el.setAttribute('aria-label', label);
+}
+
 /** 刷新顶部诊断卡片状态 */
 function refreshStatus(cb) {
+  const reqId = ++statusReqSeq;
   const checkBtn = $('btnCheckStatus');
   const spinStart = Date.now();
+  if (statusSpinTimer) {
+    clearTimeout(statusSpinTimer);
+    statusSpinTimer = null;
+  }
   if (checkBtn) checkBtn.classList.add('spinning');
 
   const stopSpin = () => {
@@ -385,12 +402,16 @@ function refreshStatus(cb) {
     const elapsed = Date.now() - spinStart;
     const minSpinMs = 600;
     const remaining = Math.max(0, minSpinMs - elapsed);
-    setTimeout(() => {
+    if (statusSpinTimer) clearTimeout(statusSpinTimer);
+    statusSpinTimer = setTimeout(() => {
+      statusSpinTimer = null;
       checkBtn.classList.remove('spinning');
     }, remaining);
   };
 
   chrome.storage.local.get(['lastResult', 'eventLogs'], (s) => {
+    if (reqId !== statusReqSeq) return;
+    if (chrome.runtime.lastError || !s) return;
     const r = s && s.lastResult;
     // 逐字段兜底：lastResult 可能来自旧版本或手改，缺字段时直接相加会显示成
     // 「12345 · undefined」；而对象经 String() 会变成 "[object Object]"，同样难看。
@@ -403,6 +424,7 @@ function refreshStatus(cb) {
   });
 
   chrome.runtime.sendMessage({ type: 'status' }, (res) => {
+    if (reqId !== statusReqSeq) return;
     stopSpin();
 
     const pill = $('stPill');
@@ -424,8 +446,10 @@ function refreshStatus(cb) {
       if (portalDot) portalDot.className = 'portal-dot off';
       textEl.textContent = '后台未响应';
       $('stIp').textContent = '—';
-      $('stTime').textContent = '—';
       $('stMac').textContent = '物理 MAC: —';
+      setTelemetryAria('stIp', '本机局域网 IP 暂不可用');
+      setTelemetryAria('stMac', '物理 MAC 地址暂不可用');
+      $('stTime').textContent = '—';
       $('stPing').textContent = '—';
       renderOptPingSparkline(-1);
       $('stFlow').textContent = '—';
@@ -442,8 +466,11 @@ function refreshStatus(cb) {
 
     const raw = res.raw || {};
     const ip = [raw.v4ip, raw.ss5].find((v) => v && v !== '0.0.0.0') || '';
+    const formattedMac = raw.ss1 ? fmtMac(raw.ss1) : '';
     $('stIp').textContent = ip || '未获取到';
-    $('stMac').textContent = raw.ss1 ? ('物理 MAC: ' + fmtMac(raw.ss1)) : '物理 MAC: —';
+    $('stMac').textContent = formattedMac ? ('物理 MAC: ' + formattedMac) : '物理 MAC: —';
+    setTelemetryAria('stIp', ip ? `本机 IP ${ip}，点击复制` : '本机局域网 IP 未获取到');
+    setTelemetryAria('stMac', formattedMac ? `物理 MAC 地址 ${formattedMac}，点击复制` : '物理 MAC 地址暂未获取到');
 
     if (res.online) {
       const { durationInput, optionsSubtitle } = resolveSessionDuration(res, raw);
@@ -777,6 +804,7 @@ $('form').addEventListener('submit', (e) => {
     const s = readForm();
     // 自动切回凭据视图，避免用户停留在其他分页时校验红框与焦点不可见
     switchOptionsSection('credentials');
+    let firstInvalid = null;
     if (!s.account) {
       const acc = $('account');
       acc.classList.add('field-invalid');
@@ -784,16 +812,18 @@ $('form').addEventListener('submit', (e) => {
       acc.setAttribute('aria-describedby', 'accountError');
       const errEl = $('accountError');
       if (errEl) errEl.textContent = '上网账号不能为空，请填写手机号或学号';
-      acc.focus();
-    } else if (!s.password) {
+      firstInvalid = firstInvalid || acc;
+    }
+    if (!s.password) {
       const pwd = $('password');
       pwd.classList.add('field-invalid');
       pwd.setAttribute('aria-invalid', 'true');
       pwd.setAttribute('aria-describedby', 'passwordError');
       const errEl = $('passwordError');
       if (errEl) errEl.textContent = '认证密码不能为空，请填写校园网密码';
-      pwd.focus();
+      firstInvalid = firstInvalid || pwd;
     }
+    if (firstInvalid) firstInvalid.focus();
     return;
   }
 
@@ -948,6 +978,7 @@ bindInteractiveNode($('topoNodeInternet'), () => {
 // --- 巡检事件流抽屉操作：复制脱敏诊断报告 & 清空日志 ---
 $('btnCopyDiagnostic')?.addEventListener('click', () => {
   chrome.storage.local.get(['eventLogs', 'lastResult'], (s) => {
+    const safeLogs = (!chrome.runtime.lastError && s && Array.isArray(s.eventLogs)) ? s.eventLogs : [];
     const reportText = generateDiagnosticSnapshot({
       account: $('account')?.value?.trim() || '',
       isp: $('isp')?.value || '1',
@@ -958,7 +989,7 @@ $('btnCopyDiagnostic')?.addEventListener('click', () => {
       pingText: $('stPing')?.textContent || '',
       flowText: `${$('stFlow')?.textContent || '—'} (${$('stFlowDetail')?.textContent || '—'})`,
       policyText: $('stPolicyPill')?.textContent || '',
-      eventLogs: s.eventLogs
+      eventLogs: safeLogs
     });
 
     if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
@@ -1038,6 +1069,10 @@ if ($('clearAccount')) {
 if ($('btnExportConfig')) {
   $('btnExportConfig').addEventListener('click', () => {
     chrome.storage.local.get(null, (all) => {
+      if (chrome.runtime.lastError || !all) {
+        showToast('导出失败：读取本地配置时出错', 'err');
+        return;
+      }
       const cfg = {
         _app: 'Campus AutoLogin',
         _version: chrome.runtime?.getManifest?.()?.version || '1.0.0',
@@ -1093,18 +1128,18 @@ if ($('btnImportConfig') && $('importFileInput')) {
       try {
         const text = evt.target.result;
         const data = JSON.parse(text);
-        if (!data || typeof data !== 'object') {
-          throw new Error('无效的 JSON 配置文件');
+        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+          throw new Error('无效的 JSON 配置文件（根节点必须为对象）');
         }
 
         const toSave = {};
         // 账号：手机号在 JSON 里很容易写成裸数字（13800000000 没加引号）。
         // 若只接受 string，用户会"导入成功"但账号没进去 —— 静默丢数据。
-        // 这里接受 string 或 number 并归一为字符串；其他类型（对象/数组）才算非法。
-        if (typeof data.account === 'string' || typeof data.account === 'number') {
+        // 这里接受 string 或 finite number 并归一为字符串；其他类型（对象/数组）才算非法。
+        if (typeof data.account === 'string' || (typeof data.account === 'number' && Number.isFinite(data.account))) {
           toSave.account = String(data.account).trim();
         }
-        if (typeof data.password === 'string' || typeof data.password === 'number') {
+        if (typeof data.password === 'string' || (typeof data.password === 'number' && Number.isFinite(data.password))) {
           toSave.password = String(data.password);
         }
         // 账号/密码存在但类型非法时明确报错，不要静默忽略
@@ -1123,18 +1158,28 @@ if ($('btnImportConfig') && $('importFileInput')) {
           }
           toSave.isp = ispVal;
         }
+        const parseImportedNum = (val, fieldName) => {
+          if (typeof val === 'number' && Number.isFinite(val)) return val;
+          if (typeof val === 'string' && val.trim() !== '') {
+            const n = Number(val);
+            if (Number.isFinite(n)) return n;
+          }
+          throw new Error(`${fieldName} 字段格式不对（应为有限数字）`);
+        };
         if (data.intervalMin !== undefined) {
-          const v = parseFloat(data.intervalMin);
-          if (Number.isFinite(v)) toSave.intervalMin = snapToPresetValue('intervalMin', v);
+          toSave.intervalMin = snapToPresetValue('intervalMin', parseImportedNum(data.intervalMin, 'intervalMin'));
         }
         if (data.offlineIntervalMin !== undefined) {
-          const v = parseFloat(data.offlineIntervalMin);
-          if (Number.isFinite(v)) toSave.offlineIntervalMin = snapToPresetValue('offlineIntervalMin', v);
+          toSave.offlineIntervalMin = snapToPresetValue('offlineIntervalMin', parseImportedNum(data.offlineIntervalMin, 'offlineIntervalMin'));
         }
         if (data.adaptive !== undefined) toSave.adaptive = !!data.adaptive;
         if (data.autoOnStartup !== undefined) toSave.autoOnStartup = !!data.autoOnStartup;
         if (data.contentAutoFill !== undefined) toSave.contentAutoFill = !!data.contentAutoFill;
         if (data.instantTrigger !== undefined) toSave.instantTrigger = !!data.instantTrigger;
+
+        if (Object.keys(toSave).length === 0) {
+          throw new Error('未找到可导入的有效配置字段（如 account/password/isp/intervalMin 等）');
+        }
 
         // 导入的是一份「新的」配置：清掉凭据错误标记，让新凭据立刻按正常节奏生效。
         // 否则若之前因密码错而降频，导入正确配置后仍会被低频重试挡着。

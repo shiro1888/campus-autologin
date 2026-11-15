@@ -51,7 +51,21 @@ const popupToast = createToastManager({
   textId: 'msg',
   iconId: 'msgIcon'
 });
-const setMsg = (text, kind, autoDismissMs = 3200) => popupToast.show(text, kind, autoDismissMs);
+let refreshSeq = 0;
+let spinTimer = null;
+let userToastExpiresAt = 0;
+let lastStoredMsgKey = '';
+let dismissedStoredMsgKey = '';
+
+const setMsg = (text, kind, autoDismissMs = 3200, isStoredReplay = false) => {
+  if (!isStoredReplay) {
+    dismissedStoredMsgKey = '';
+    userToastExpiresAt = text
+      ? Date.now() + (kind === 'err' ? 12000 : (autoDismissMs || 3200))
+      : 0;
+  }
+  popupToast.show(text, kind, autoDismissMs);
+};
 
 let currentIp = '';
 let currentAccount = '';
@@ -75,6 +89,7 @@ function updateAccountDisplay() {
     accEl.classList.remove('masked');
     accEl.classList.add('unset');
     accEl.title = '尚未设置认证账号，点击前往「控制中心」填写';
+    accEl.setAttribute('aria-label', '尚未设置认证账号，点击前往控制中心填写');
     if (maskBtn) {
       maskBtn.classList.remove('active');
       maskBtn.disabled = true;
@@ -105,13 +120,16 @@ function updateAccountDisplay() {
 
   const masked = privacyMask.isMasked();
   if (masked) {
-    accEl.textContent = maskAccount(currentAccount);
+    const maskedText = maskAccount(currentAccount);
+    accEl.textContent = maskedText;
     accEl.classList.add('masked');
     accEl.title = '自习室防窥模式（点击切换明文显示）';
+    accEl.setAttribute('aria-label', `认证账号 ${maskedText}，已开启防窥遮罩，点击显示明文`);
   } else {
     accEl.textContent = currentAccount;
     accEl.classList.remove('masked');
     accEl.title = `点击开启自习室防窥: ${currentAccount}`;
+    accEl.setAttribute('aria-label', `认证账号 ${currentAccount}，点击开启防窥遮罩`);
   }
 }
 
@@ -139,16 +157,24 @@ function syncIspDisplay(ispCode) {
 }
 
 /** 刷新面板状态 */
-function refresh(onComplete) {
+function refresh(onComplete, opts = {}) {
+  const showStoredToast = opts.showStoredToast !== false;
+  const reqId = ++refreshSeq;
   const refreshBtn = $('btnRefresh');
   const spinStart = Date.now();
+  if (spinTimer) {
+    clearTimeout(spinTimer);
+    spinTimer = null;
+  }
   if (refreshBtn) refreshBtn.classList.add('spinning');
 
   const stopSpin = () => {
     if (!refreshBtn) return;
     const elapsed = Date.now() - spinStart;
     const remaining = Math.max(0, 600 - elapsed);
-    setTimeout(() => {
+    if (spinTimer) clearTimeout(spinTimer);
+    spinTimer = setTimeout(() => {
+      spinTimer = null;
       refreshBtn.classList.remove('spinning');
     }, remaining);
   };
@@ -168,6 +194,8 @@ function refresh(onComplete) {
   chrome.storage.local.get(
     ['account', 'isp', 'lastResult', 'privacyMask'],
     (s) => {
+      if (reqId !== refreshSeq) return;
+      if (chrome.runtime.lastError || !s) return;
       currentAccount = (s && typeof s.account === 'string') ? s.account : '';
       if (s && s.privacyMask !== undefined) {
         privacyMask.setMasked(s.privacyMask);
@@ -177,14 +205,23 @@ function refresh(onComplete) {
 
       const r = s && s.lastResult;
       const rMsg = r && typeof r.message === 'string' ? r.message : '';
-      if (rMsg && (!r.ok || rMsg.indexOf('无需登录') === -1)) {
+      const storedKey = (r && r.time ? String(r.time) : '') + '|' + rMsg;
+      if (
+        showStoredToast &&
+        rMsg &&
+        (!r.ok || rMsg.indexOf('无需登录') === -1) &&
+        storedKey !== dismissedStoredMsgKey &&
+        Date.now() >= userToastExpiresAt
+      ) {
         const msgType = (r.state === 'submitted' || r.pending) ? 'info' : (r.ok === false ? 'err' : 'ok');
-        setMsg(rMsg, msgType);
+        lastStoredMsgKey = storedKey;
+        setMsg(rMsg, msgType, 3200, true);
       }
     }
   );
 
   chrome.runtime.sendMessage({ type: 'status' }, (res) => {
+    if (reqId !== refreshSeq) return;
     stopSpin();
 
     if (chrome.runtime.lastError || !res) {
@@ -301,7 +338,7 @@ $('btnLogin')?.addEventListener('click', () => {
       return;
     }
     setMsg(res.message || '完成', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));
-    setTimeout(refresh, 500);
+    setTimeout(() => refresh(undefined, { showStoredToast: false }), 500);
   });
 });
 
@@ -325,7 +362,7 @@ const logoutConfirmCtrl = createConfirmButton('btnLogout', {
         return;
       }
       setMsg(res.message || '注销完成', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));
-      setTimeout(refresh, 600);
+      setTimeout(() => refresh(undefined, { showStoredToast: false }), 600);
     });
   }
 });
@@ -363,7 +400,7 @@ if (popGwTag) {
         const p = classifyPing(res.pingMs, true);
         setMsg(`网关连通正常 · 响应延迟 ${p.text} (${p.label})`, 'ok', 2200);
       }
-    });
+    }, { showStoredToast: false });
   };
   popGwTag.addEventListener('click', probeGateway);
   popGwTag.addEventListener('keydown', (e) => {
@@ -396,6 +433,10 @@ $('account')?.addEventListener('keydown', (e) => {
 });
 
 $('msgBox')?.addEventListener('click', () => {
+  if (lastStoredMsgKey) {
+    dismissedStoredMsgKey = lastStoredMsgKey;
+  }
+  userToastExpiresAt = 0;
   popupToast.dismiss($('msgBox'));
 });
 
@@ -435,14 +476,12 @@ const ispQuickSheet = $('ispQuickSheet');
 
 function toggleIspSheet(forceOpen, restoreFocus = false) {
   if (!ispQuickSheet) return;
-  const wasFocusedInside = typeof document !== 'undefined' && document.activeElement &&
-    ispQuickSheet.contains(document.activeElement);
   const open = typeof forceOpen === 'boolean' ? forceOpen : !ispQuickSheet.classList.contains('open');
   ispQuickSheet.classList.toggle('open', open);
   ispQuickSheet.setAttribute('aria-hidden', open ? 'false' : 'true');
   if (accountIspEl) {
     accountIspEl.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (!open && (restoreFocus || wasFocusedInside)) {
+    if (!open && restoreFocus) {
       accountIspEl.focus();
     }
   }
@@ -488,6 +527,11 @@ if (accountIspEl && ispQuickSheet) {
   });
 
   ispQuickSheet.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      // 关闭直选弹层，避免焦点的背景控件被半遮挡却仍在后台交互
+      toggleIspSheet(false, false);
+      return;
+    }
     const btns = Array.from(ispQuickSheet.querySelectorAll('.isp-sheet-btn'));
     const curIdx = btns.indexOf(document.activeElement);
     if (curIdx === -1) return;
@@ -507,9 +551,20 @@ if (accountIspEl && ispQuickSheet) {
     }
   });
 
+  ispQuickSheet.addEventListener('focusout', () => {
+    if (!ispQuickSheet.classList.contains('open')) return;
+    setTimeout(() => {
+      if (!ispQuickSheet.classList.contains('open')) return;
+      const active = document.activeElement;
+      if (!ispQuickSheet.contains(active) && active !== accountIspEl) {
+        toggleIspSheet(false, false);
+      }
+    }, 0);
+  });
+
   document.addEventListener('click', (e) => {
     if (ispQuickSheet.classList.contains('open') && !e.target.closest('#ispQuickSheet')) {
-      toggleIspSheet(false);
+      toggleIspSheet(false, false);
     }
   });
 
