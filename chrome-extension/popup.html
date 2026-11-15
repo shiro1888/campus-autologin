@@ -114,7 +114,7 @@
       </div>
 
       <!-- 3: 已用流量 -->
-      <div class="dock-item">
+      <div class="dock-item flow-dock-item" id="flowDockItem" tabindex="0" aria-describedby="popFlowTip">
         <div class="dock-head">
           <svg class="dock-icon purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M7 10l5-5 5 5"/>
@@ -125,10 +125,11 @@
           <span class="flow-sub-tag" id="popFlowSub"></span>
         </div>
         <div class="dock-value" id="popFlow">—</div>
-        <div class="flow-bar-wrap" id="flowBarWrap" style="display: none;" title="上传与下载比例">
+        <div class="flow-bar-wrap" id="flowBarWrap" style="display: none;">
           <div class="flow-bar-dl" id="flowBarDl" style="width: 50%;"></div>
           <div class="flow-bar-ul" id="flowBarUl" style="width: 50%;"></div>
         </div>
+        <div class="flow-hover-tip" id="popFlowTip" role="tooltip"></div>
       </div>
 
       <!-- 4: 当前账号 (安全认证身份徽章 + 内嵌直选面板组件) -->

@@ -153,6 +153,7 @@ body {
 }
 
 .popup-wrapper {
+  position: relative;
   width: 356px;
   max-width: 356px;
   box-sizing: border-box;
@@ -985,6 +986,82 @@ body {
   overflow: hidden;
 }
 
+.flow-dock-item {
+  overflow: visible;
+}
+
+.flow-dock-item.has-flow-tip {
+  cursor: help;
+}
+
+.flow-dock-item.has-flow-tip:hover,
+.flow-dock-item.has-flow-tip:focus-within {
+  z-index: 25;
+}
+
+.flow-hover-tip {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 7px);
+  width: max-content;
+  max-width: 320px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 10px 24px -6px rgba(15, 23, 42, 0.42);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px) scale(0.97);
+  transform-origin: bottom left;
+  transition: opacity 0.16s ease, transform 0.2s var(--ease-spring), visibility 0.16s;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.flow-hover-tip::after {
+  content: "";
+  position: absolute;
+  left: 24px;
+  top: 100%;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #0f172a;
+}
+
+[data-theme="dark"] .flow-hover-tip {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.65);
+}
+
+[data-theme="dark"] .flow-hover-tip::after {
+  border-top-color: #1e293b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .flow-hover-tip {
+    background: #1e293b;
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.65);
+  }
+  :root:not([data-theme="light"]) .flow-hover-tip::after {
+    border-top-color: #1e293b;
+  }
+}
+
+.flow-dock-item.has-flow-tip:hover .flow-hover-tip,
+.flow-dock-item.has-flow-tip:focus-within .flow-hover-tip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
 .dock-value-row {
   display: flex;
   align-items: center;
@@ -1663,28 +1740,30 @@ body {
 /* ==========================================================================
    Floating Glass Capsule Toast (Sonner / 灵动岛毛玻璃通知)
    ========================================================================== */
-/* 提示条以「流内插入」方式显示：DOM 中它位于各 section 之后、footer 之前，
-   显示时由 .popup-wrapper（flex column）在底部撑开一行。
-   早期用 position:fixed; top:10px 浮在页面上，在真实 356px 视口下左右只留 33px，
-   会盖住 header 的 logo 与标题；且 pointer-events:auto 会吞掉版本胶囊与主题按钮的
-   点击。改为流内后不遮挡任何控件，也不再拦截点击，长文本仍可换行滚动。 */
+/* 提示条固定悬浮于底部页脚区域（bottom: 7px; left/right: 13px）：
+   1. 绝不撑开弹窗整体高度或把按钮/页脚向下推移；
+   2. 远离顶部 header、状态卡片与主操作按钮，避免遮挡任何高频控件与「确认注销？」。 */
 .msg-box {
-  position: relative;
-  display: none;            /* 隐藏时不占位，也不给 wrapper 的 gap 留空 */
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  bottom: 7px;
+  width: auto;
+  z-index: 60;
+  display: none;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  padding: 7px 16px;
+  padding: 6px 14px;
   border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 600;
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 22px -6px rgba(15, 23, 42, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18);
   white-space: normal;
   word-break: break-word;
   box-sizing: border-box;
-  max-height: 80px;
+  max-height: 76px;
   overflow-y: auto;
   cursor: pointer;
   user-select: none;
@@ -2187,10 +2266,15 @@ body {
 .gw-route-pill:focus-visible,
 .isp-badge:focus-visible,
 .isp-sheet-btn:focus-visible,
+.flow-dock-item:focus-visible,
 #account:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+.flow-dock-item:focus-visible {
+  border-radius: var(--radius-lg);
 }
 
 /* ==========================================================================

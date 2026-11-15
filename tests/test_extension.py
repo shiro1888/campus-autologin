@@ -3657,6 +3657,8 @@ console.log(triggered === 0 ? 'LABEL_GUARD_OK' : 'LABEL_GUARD_FAIL:' + triggered
         # 1. Popup P1 356px 精炼单列与防遮挡 Toast / 呼吸流光 / 账号卡排布校验
         with open(os.path.join(EXT_DIR, "popup.html"), "r", encoding="utf-8") as f:
             popup_html = f.read()
+        with open(os.path.join(EXT_DIR, "popup.js"), "r", encoding="utf-8") as f:
+            popup_js = f.read()
         self.assertIn("width: 356px;", popup_css)
         self.assertNotIn("width: 460px;", popup_css)
         self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", popup_css)
@@ -3665,17 +3667,23 @@ console.log(triggered === 0 ? 'LABEL_GUARD_OK' : 'LABEL_GUARD_FAIL:' + triggered
         self.assertIn(".dock-value-row", popup_css)
         self.assertIn('id="accountDockItem">', popup_html, "外层 #accountDockItem 不应带全局原生 title 遮挡内部操作按钮")
         self.assertIn("grid-template-columns: repeat(2, 1fr);", popup_css)
-        # 提示条必须留在流内：fixed + top:10px 在真实 356px 视口下左右只留 33px，
-        # 会盖住 header 的 logo 与标题，且 pointer-events:auto 会吞掉版本胶囊/主题按钮
-        # 的点击。这里断言「不遮挡」的本质，而不是某个像素值。
+        # 提示条固定悬浮于底部页脚位置，绝不撑开弹窗整体高度，且绝不覆盖顶部 header/状态区或主操作按钮
         msg_rule = re.search(r"\.msg-box\s*\{([^}]*)\}", popup_css)
         self.assertIsNotNone(msg_rule, "未找到 .msg-box 规则")
-        self.assertNotIn("position: fixed", msg_rule.group(1),
-                         "Popup 提示条不应 fixed 浮层覆盖 header/状态区")
+        self.assertIn("position: absolute", msg_rule.group(1),
+                      "Popup 提示条应相对 .popup-wrapper 悬浮于底部，避免弹出时撑开页面高度")
+        self.assertRegex(msg_rule.group(1), r"\bbottom:\s*7px;",
+                         "Popup 提示条应贴底悬浮，避免覆盖 header/状态区或主操作区")
+        self.assertNotRegex(msg_rule.group(1), r"\btop:\s*",
+                            "Popup 提示条不得使用 top 定位遮挡顶部 header/状态区")
         self.assertIn("display: none", msg_rule.group(1),
                       "提示条隐藏时应不占位，否则 .popup-wrapper 的 gap 会在底部留白")
         self.assertRegex(popup_css, r"\.msg-box\.show\s*\{[^}]*display:\s*flex",
-                         "提示条显示时应回到流内 flex，而非绝对定位浮层")
+                         "提示条显示时应展示为 flex 胶囊")
+        self.assertIn('id="popFlowTip"', popup_html)
+        self.assertIn(".flow-hover-tip", popup_css)
+        self.assertIn('id="flowDockItem"', popup_html)
+        self.assertIn("if (btn.classList.contains('online-mode'))", popup_js)
         self.assertIn(".btn-primary.online-mode .btn-shimmer", popup_css)
         online_btn_rule = re.search(r"\.btn-primary\.online-mode\s*\{([^}]*)\}", popup_css)
         self.assertIsNotNone(online_btn_rule, "未找到 .btn-primary.online-mode 规则")

@@ -13,8 +13,10 @@ const renderPingSparkline = createSparkline('popPingSparkline', 7);
 
 /** 组件实例：上下行双向流量计量条 */
 const popupFlowMeter = createFlowMeter({
+  cardEl: 'flowDockItem',
   totalEl: 'popFlow',
   subTagEl: 'popFlowSub',
+  tipEl: 'popFlowTip',
   wrapEl: 'flowBarWrap',
   dlBarEl: 'flowBarDl',
   ulBarEl: 'flowBarUl'
@@ -320,9 +322,24 @@ function refresh(onComplete, opts = {}) {
 /** 遥测数据刷新时的平滑微动效 (Component: triggerPulseAnimation, 60fps 无 Layout Thrashing) */
 const triggerTelemetryFade = () => triggerPulseAnimation('.dock-value');
 
-// --- 登录 / 重新验证 ---
+// --- 登录 / 重新验证 / 刷新状态 ---
 $('btnLogin')?.addEventListener('click', () => {
   const btn = $('btnLogin');
+  if (btn.classList.contains('online-mode')) {
+    btn.disabled = true;
+    btn.classList.add('loading');
+    $('btnLoginText').textContent = '刷新中…';
+    refresh((res) => {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      if (!res) {
+        $('btnLoginText').textContent = '立即登录';
+        setMsg('后台未响应，请刷新插件', 'err');
+      }
+    }, { showStoredToast: false });
+    return;
+  }
+
   btn.disabled = true;
   btn.classList.add('loading');
   $('btnLoginText').textContent = '通信中…';

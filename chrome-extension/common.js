@@ -354,18 +354,22 @@ function createSparkline(containerId, maxBars = 8) {
  */
 function createFlowMeter(cfg = {}) {
   const getEl = (k1, k2) => $(cfg[k1] || cfg[k2]);
+  const card = () => getEl('cardEl', 'cardId');
   const total = () => getEl('totalEl', 'totalId');
   const detail = () => getEl('detailEl', 'detailId');
   const subTag = () => getEl('subTagEl', 'subTagId');
+  const tip = () => getEl('tipEl', 'tipId');
   const wrap = () => getEl('wrapEl', 'wrapId');
   const dlBar = () => getEl('dlBarEl', 'dlId') || getEl('dlBarEl', 'dlBarId');
   const ulBar = () => getEl('ulBarEl', 'ulId') || getEl('ulBarEl', 'ulBarId');
 
   function render(rawData, online) {
     const raw = rawData || {};
+    const cardEl = card();
     const totalEl = total();
     const detailEl = detail();
     const subTagEl = subTag();
+    const tipEl = tip();
     const wrapEl = wrap();
     const dlBarEl = dlBar();
     const ulBarEl = ulBar();
@@ -378,28 +382,45 @@ function createFlowMeter(cfg = {}) {
       const ul = parseFloat(raw.actuf) || 0;
       const sum = dl + ul;
 
-      if (subTagEl) {
-        if (sum > 0) {
-          const dlPct = Math.round((dl / sum) * 100);
-          subTagEl.textContent = `↓${dlPct}%`;
-          subTagEl.classList.add('visible');
-        } else {
-          subTagEl.classList.remove('visible');
-        }
-      }
+      if (sum > 0) {
+        const exactDlPct = Math.round((dl / sum) * 100);
+        const exactUlPct = 100 - exactDlPct;
+        const breakdown = `↓ 下载 ${exactDlPct}% (${fmtFlow(dl)}) · ↑ 上传 ${exactUlPct}% (${fmtFlow(ul)})`;
 
-      if (sum > 0 && dlBarEl && ulBarEl && wrapEl) {
-        const dlPct = Math.max(6, Math.min(94, Math.round((dl / sum) * 100)));
-        const ulPct = 100 - dlPct;
-        dlBarEl.style.width = dlPct + '%';
-        ulBarEl.style.width = ulPct + '%';
-        wrapEl.style.display = 'flex';
-        wrapEl.title = `下载 ${dlPct}% (${fmtFlow(dl)}) · 上传 ${ulPct}% (${fmtFlow(ul)})`;
-        if (totalEl) {
-          totalEl.title = `已用: ${totalFormatted} (下载: ${fmtFlow(dl)} / 上传: ${fmtFlow(ul)})`;
+        if (subTagEl) {
+          subTagEl.textContent = `下载 ${exactDlPct}%`;
+          subTagEl.classList.add('visible');
         }
-      } else if (wrapEl) {
-        wrapEl.style.display = 'none';
+
+        if (tipEl) {
+          tipEl.textContent = breakdown;
+          if (cardEl) cardEl.classList.add('has-flow-tip');
+          if (totalEl) {
+            totalEl.removeAttribute('title');
+            totalEl.setAttribute('aria-label', `已用 ${totalFormatted}，${breakdown}`);
+          }
+          if (wrapEl) {
+            wrapEl.removeAttribute('title');
+            wrapEl.setAttribute('aria-label', breakdown);
+          }
+        } else {
+          if (cardEl) cardEl.classList.remove('has-flow-tip');
+          if (wrapEl) wrapEl.title = `下载 ${exactDlPct}% (${fmtFlow(dl)}) · 上传 ${exactUlPct}% (${fmtFlow(ul)})`;
+          if (totalEl) totalEl.title = `已用: ${totalFormatted} (下载: ${fmtFlow(dl)} / 上传: ${fmtFlow(ul)})`;
+        }
+
+        if (dlBarEl && ulBarEl && wrapEl) {
+          const barDlPct = Math.max(6, Math.min(94, exactDlPct));
+          const barUlPct = 100 - barDlPct;
+          dlBarEl.style.width = barDlPct + '%';
+          ulBarEl.style.width = barUlPct + '%';
+          wrapEl.style.display = 'flex';
+        }
+      } else {
+        if (subTagEl) subTagEl.classList.remove('visible');
+        if (tipEl) tipEl.textContent = '';
+        if (cardEl) cardEl.classList.remove('has-flow-tip');
+        if (wrapEl) wrapEl.style.display = 'none';
       }
 
       if (detailEl) {
@@ -410,22 +431,34 @@ function createFlowMeter(cfg = {}) {
         }
       }
     } else {
-      if (totalEl) totalEl.textContent = online ? '计量中' : '—';
+      if (totalEl) {
+        totalEl.textContent = online ? '计量中' : '—';
+        totalEl.removeAttribute('title');
+      }
       if (detailEl) detailEl.textContent = '流量明细: —';
       if (wrapEl) wrapEl.style.display = 'none';
       if (subTagEl) subTagEl.classList.remove('visible');
+      if (tipEl) tipEl.textContent = '';
+      if (cardEl) cardEl.classList.remove('has-flow-tip');
     }
   }
 
   function reset() {
+    const cardEl = card();
     const totalEl = total();
     const detailEl = detail();
     const subTagEl = subTag();
+    const tipEl = tip();
     const wrapEl = wrap();
-    if (totalEl) totalEl.textContent = '—';
+    if (totalEl) {
+      totalEl.textContent = '—';
+      totalEl.removeAttribute('title');
+    }
     if (detailEl) detailEl.textContent = '流量明细: —';
     if (wrapEl) wrapEl.style.display = 'none';
     if (subTagEl) subTagEl.classList.remove('visible');
+    if (tipEl) tipEl.textContent = '';
+    if (cardEl) cardEl.classList.remove('has-flow-tip');
   }
 
   return {
