@@ -389,26 +389,40 @@ function setTelemetryAria(id, label) {
   if (el) el.setAttribute('aria-label', label);
 }
 
+let lastOnlineState = null;
+
+/** 触发 Hero 状态卡网络认证成功的形态扩散波纹 */
+function triggerHeroRipple() {
+  const wave = $('heroRippleWave');
+  if (!wave) return;
+  wave.classList.remove('burst');
+  void wave.offsetWidth;
+  wave.classList.add('burst');
+}
+
 /** 刷新顶部诊断卡片状态 */
 function refreshStatus(cb) {
   const reqId = ++statusReqSeq;
   const checkBtn = $('btnCheckStatus');
+  const topoStrip = $('networkTopology');
   const spinStart = Date.now();
   if (statusSpinTimer) {
     clearTimeout(statusSpinTimer);
     statusSpinTimer = null;
   }
   if (checkBtn) checkBtn.classList.add('spinning');
+  if (topoStrip) topoStrip.classList.add('probing');
 
   const stopSpin = () => {
-    if (!checkBtn) return;
     const elapsed = Date.now() - spinStart;
     const minSpinMs = 600;
     const remaining = Math.max(0, minSpinMs - elapsed);
     if (statusSpinTimer) clearTimeout(statusSpinTimer);
     statusSpinTimer = setTimeout(() => {
       statusSpinTimer = null;
-      checkBtn.classList.remove('spinning');
+      if (checkBtn) checkBtn.classList.remove('spinning');
+      const topo = $('networkTopology');
+      if (topo) topo.classList.remove('probing');
     }, remaining);
   };
 
@@ -437,6 +451,7 @@ function refreshStatus(cb) {
     const portalDot = $('portalDot');
 
     if (chrome.runtime.lastError || !res) {
+      lastOnlineState = false;
       // 与 !reachable 分支保持一致：停掉计时器，否则上一轮在线状态启动的
       // 秒表会继续每秒跳动，把这里的占位符覆盖掉，显示一个无人校验的时长
       durationTicker.stop();
@@ -507,6 +522,7 @@ function refreshStatus(cb) {
     optFlowMeter.render(raw, res.online);
 
     if (!res.reachable) {
+      lastOnlineState = false;
       durationTicker.stop();
       pill.className = 'status-pill off';
       if (heroEl) {
@@ -517,6 +533,10 @@ function refreshStatus(cb) {
       if (portalDot) portalDot.className = 'portal-dot off';
       textEl.textContent = res.manualLogout ? '网络连接失败 · 已暂停' : '网络连接失败';
     } else if (res.online) {
+      if (lastOnlineState !== true) {
+        triggerHeroRipple();
+      }
+      lastOnlineState = true;
       pill.className = 'status-pill on';
       if (heroEl) {
         heroEl.classList.remove('hero-off', 'hero-wait');
@@ -526,6 +546,7 @@ function refreshStatus(cb) {
       if (portalDot) portalDot.className = 'portal-dot on';
       textEl.textContent = '已在线 ✓';
     } else {
+      lastOnlineState = false;
       durationTicker.stop();
       pill.className = 'status-pill wait';
       if (heroEl) {
@@ -866,12 +887,20 @@ $('btnLoginNow').addEventListener('click', () => {
   const btn = $('btnLoginNow');
   btn.disabled = true;
   showToast('正在请求登录…', 'info');
+  const topoStrip = $('networkTopology');
+  if (topoStrip) topoStrip.classList.add('authenticating');
 
   chrome.runtime.sendMessage({ type: 'login' }, (res) => {
     btn.disabled = false;
+    const topo = $('networkTopology');
+    if (topo) topo.classList.remove('authenticating');
     if (chrome.runtime.lastError || !res) {
       showToast('后台未响应', 'err');
       return;
+    }
+    if (res.online) {
+      triggerHeroRipple();
+      lastOnlineState = true;
     }
     showToast(res.message || '登录请求完成', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));
     refreshStatus();

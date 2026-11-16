@@ -516,6 +516,44 @@ body {
   background: radial-gradient(circle at 35% 35%, rgba(148, 163, 184, 0.12) 0%, transparent 70%);
 }
 
+/* State Morphing Ripple Wave (网络认证成功瞬间的柔和物理扩散波纹) */
+.status-ripple-wave {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  width: 32px;
+  height: 32px;
+  margin-top: -16px;
+  margin-left: -16px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.48) 0%, rgba(16, 185, 129, 0.16) 42%, transparent 72%);
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.55);
+  opacity: 0;
+  transform: scale(0.4);
+  z-index: 1;
+}
+
+.status-ripple-wave.burst {
+  animation: popup-ripple-wave-burst 1.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes popup-ripple-wave-burst {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.95;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.7);
+  }
+  45% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(14);
+    opacity: 0;
+    box-shadow: 0 0 0px transparent;
+  }
+}
+
 /* ==========================================================================
    Border Beam (Magic UI / Raycast 边缘巡回流光微交互)
    ========================================================================== */
@@ -1953,9 +1991,9 @@ body {
 }
 
 .btn-primary:active {
-  transform: scale(0.97);
+  transform: scale(0.962) translateY(1px);
   box-shadow: 0 2px 8px -1px color-mix(in srgb, var(--primary) 35%, transparent);
-  transition: transform 0.12s var(--ease-spring), box-shadow 0.12s ease;
+  transition: transform 0.08s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.08s ease;
 }
 
 .btn-primary.online-mode {
@@ -1979,9 +2017,9 @@ body {
 }
 
 .btn-primary.online-mode:active {
-  transform: scale(0.965);
+  transform: scale(0.962) translateY(1px);
   box-shadow: 0 2px 8px -1px color-mix(in srgb, var(--primary) 35%, transparent);
-  transition: transform 0.12s var(--ease-spring), box-shadow 0.12s ease;
+  transition: transform 0.08s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.08s ease;
 }
 
 .btn-primary:disabled {
@@ -2049,8 +2087,8 @@ body {
 }
 
 .btn-secondary:active {
-  transform: scale(0.95);
-  transition: transform 0.12s var(--ease-spring);
+  transform: scale(0.952) translateY(1px);
+  transition: transform 0.08s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.08s ease;
 }
 
 .btn-secondary.confirming {
@@ -2135,6 +2173,7 @@ body {
   }
   .card-border-beam,
   .btn-shimmer,
+  .status-ripple-wave,
   .status-beacon::before,
   .status-beacon::after {
     animation: none !important;

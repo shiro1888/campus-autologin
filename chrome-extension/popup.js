@@ -21,6 +21,17 @@ const popupFlowMeter = createFlowMeter({
   ulBarEl: 'flowBarUl'
 });
 
+let lastPopupOnlineState = null;
+
+/** 触发 Popup Hero 状态卡网络认证成功的形态扩散波纹 */
+function triggerStatusRipple() {
+  const wave = $('statusRippleWave');
+  if (!wave) return;
+  wave.classList.remove('burst');
+  void wave.offsetWidth;
+  wave.classList.add('burst');
+}
+
 /** 设置状态卡片 UI */
 function setStatus(title, desc, cls) {
   const card = $('statusCard');
@@ -226,6 +237,7 @@ function refresh(onComplete, opts = {}) {
     stopSpin();
 
     if (chrome.runtime.lastError || !res) {
+      lastPopupOnlineState = false;
       durationTicker.stop();
       setStatus('后台无响应', '扩展 Service Worker 可能休眠，请重试', 'off');
       setLocalIp('');
@@ -268,6 +280,7 @@ function refresh(onComplete, opts = {}) {
     popupFlowMeter.render(rawData, res.online);
 
     if (!res.reachable) {
+      lastPopupOnlineState = false;
       durationTicker.stop();
       setStatus('网络连接失败', paused
         ? '未连上校园网；自动登录当前处于暂停状态'
@@ -280,6 +293,10 @@ function refresh(onComplete, opts = {}) {
       $('btnLogout').disabled = true;
       logoutConfirmCtrl.reset();
     } else if (res.online) {
+      if (lastPopupOnlineState !== true) {
+        triggerStatusRipple();
+      }
+      lastPopupOnlineState = true;
       setStatus('已在线 · 认证通过', '', 'on');
       $('btnLogin').classList.add('online-mode');
       $('btnLoginText').textContent = '刷新状态';
@@ -298,6 +315,7 @@ function refresh(onComplete, opts = {}) {
         setTooltip($('onlineDuration'), '已在线');
       }
     } else {
+      lastPopupOnlineState = false;
       durationTicker.stop();
       if (paused) {
         setStatus('已手动注销 · 自动登录暂停', '点「恢复登录」可恢复自动重连', 'wait');
@@ -354,8 +372,13 @@ $('btnLogin')?.addEventListener('click', () => {
     $('btnLoginText').textContent = (res && res.online) ? '刷新状态' : '立即登录';
 
     if (chrome.runtime.lastError || !res) {
+      lastPopupOnlineState = false;
       setMsg('后台未响应，请刷新插件', 'err');
       return;
+    }
+    if (res.online) {
+      triggerStatusRipple();
+      lastPopupOnlineState = true;
     }
     setMsg(res.message || '完成', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));
     setTimeout(() => refresh(undefined, { showStoredToast: false }), 500);

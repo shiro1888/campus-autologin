@@ -4307,6 +4307,50 @@ assert.strictEqual(tipEl.getAttribute('aria-hidden'), 'true');
         res = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=False)
         self.assertEqual(res.returncode, 0, f"统一 tooltip 运行时测试失败:\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}")
 
+    def test_motion_microinteractions_and_spring_physics(self):
+        """校验动效与微交互升级：
+        1. 链路拓扑图的数据光流流光层 (.topo-line-packets & @keyframes topo-packets-stream)
+        2. 状态切换时的形态扩散波纹 (#heroRippleWave / #statusRippleWave & burst 关键帧)
+        3. 主按钮点击的弹性物理反馈 (:active scale(0.962) translateY(1px))
+        """
+        with open(os.path.join(EXT_DIR, "options.html"), "r", encoding="utf-8") as f:
+            options_html = f.read()
+        with open(os.path.join(EXT_DIR, "options.css"), "r", encoding="utf-8") as f:
+            options_css = f.read()
+        with open(os.path.join(EXT_DIR, "options.js"), "r", encoding="utf-8") as f:
+            options_js = f.read()
+        with open(os.path.join(EXT_DIR, "popup.html"), "r", encoding="utf-8") as f:
+            popup_html = f.read()
+        with open(os.path.join(EXT_DIR, "popup.css"), "r", encoding="utf-8") as f:
+            popup_css = f.read()
+        with open(os.path.join(EXT_DIR, "popup.js"), "r", encoding="utf-8") as f:
+            popup_js = f.read()
+
+        # 1. 链路拓扑图流光与数据光流
+        self.assertIn('id="heroRippleWave"', options_html)
+        self.assertIn('class="topo-line-packets"', options_html)
+        self.assertIn(".topo-line-packets", options_css)
+        self.assertIn("@keyframes topo-packets-stream", options_css)
+        self.assertIn(".network-topology-strip.probing", options_css)
+        self.assertIn(".network-topology-strip.authenticating", options_css)
+        self.assertIn(".topo-link.on .topo-line-packets", options_css)
+
+        # 2. 状态切换时的形态扩散波纹
+        self.assertIn('id="statusRippleWave"', popup_html)
+        self.assertIn(".status-ripple-wave", popup_css)
+        self.assertIn(".hero-ripple-wave", options_css)
+        self.assertIn("@keyframes popup-ripple-wave-burst", popup_css)
+        self.assertIn("@keyframes hero-ripple-wave-burst", options_css)
+        self.assertIn("triggerHeroRipple", options_js)
+        self.assertIn("triggerStatusRipple", popup_js)
+
+        # 3. 按钮点击弹性物理反馈 (Spring Physics)
+        self.assertIn("scale(0.962) translateY(1px)", popup_css)
+        self.assertIn("scale(0.962) translateY(1px)", options_css)
+        self.assertIn(".btn-main:active", options_css)
+        self.assertIn(".btn-primary:active", popup_css)
+        self.assertIn(".btn-secondary:active", popup_css)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -112,7 +112,10 @@
 
         <!-- Live Telemetry & Diagnostic Dashboard (Hero Cockpit) -->
         <section class="card status-hero" id="statusWidget">
-    <div class="hero-ambient-backdrop" aria-hidden="true"><div class="hero-ambient-glow"></div></div>
+    <div class="hero-ambient-backdrop" aria-hidden="true">
+      <div class="hero-ambient-glow"></div>
+      <div class="hero-ripple-wave" id="heroRippleWave"></div>
+    </div>
 
     <div class="hero-top-bar">
       <div class="hero-status-pill-wrap">
@@ -160,7 +163,10 @@
       </div>
 
       <div class="topo-link" id="topoLinkPing">
-        <div class="topo-line-track"><div class="topo-line-glow"></div></div>
+        <div class="topo-line-track">
+          <div class="topo-line-glow"></div>
+          <div class="topo-line-packets"></div>
+        </div>
         <div class="topo-chip-badge" id="topoPingChip" title="网关响应延迟">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
           <span id="topoPingVal">探测中</span>
@@ -179,7 +185,10 @@
       </div>
 
       <div class="topo-link" id="topoLinkAuth">
-        <div class="topo-line-track"><div class="topo-line-glow"></div></div>
+        <div class="topo-line-track">
+          <div class="topo-line-glow"></div>
+          <div class="topo-line-packets"></div>
+        </div>
         <div class="topo-chip-badge" id="topoAuthChip" title="认证状态">
           <span class="topo-chip-dot"></span>
           <span id="topoAuthVal">认证状态</span>
