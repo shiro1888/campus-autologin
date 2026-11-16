@@ -3696,6 +3696,8 @@ console.log(triggered === 0 ? 'LABEL_GUARD_OK' : 'LABEL_GUARD_FAIL:' + triggered
         self.assertNotIn(".flow-hover-tip", popup_css, "popup.css 不应保留独立的私有 .flow-hover-tip 样式")
         self.assertIn("initHoverTooltips();", popup_js)
         self.assertIn("initHoverTooltips();", options_js)
+        self.assertIn("if (privacyMask && privacyMask.destroy) privacyMask.destroy();", popup_js)
+        self.assertIn("if (statusPoller && statusPoller.destroy) statusPoller.destroy();", options_js)
         self.assertNotIn(".title =", popup_js, "popup.js 应统一使用 setTooltip 写入自定义提示，避免弹出异构原生白框")
         self.assertNotIn(".title =", options_js, "options.js 应统一使用 setTooltip 写入自定义提示，避免弹出异构原生白框")
         self.assertIn("cardEl: 'cardStatFlow'", options_js)

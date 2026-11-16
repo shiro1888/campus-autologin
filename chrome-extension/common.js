@@ -2073,6 +2073,11 @@ function initHoverTooltips() {
       return;
     }
 
+    // 性能优化：同元素内子节点移动且文案未变时避免重复触发布局重排与样式更新
+    if (activeTarget === target && tipEl.classList.contains('show') && textEl.textContent === text) {
+      return;
+    }
+
     if (activeTarget !== target && ariaAttached && activeTarget && typeof activeTarget.removeAttribute === 'function') {
       activeTarget.removeAttribute('aria-describedby');
       ariaAttached = false;

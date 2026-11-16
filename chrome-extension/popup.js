@@ -617,7 +617,8 @@ initAccent();
 initHoverTooltips();
 refresh();
 
-// 页面隐藏/关闭时清理计时器
+// 页面隐藏/关闭时清理计时器与事件监听
 window.addEventListener('pagehide', () => {
   durationTicker.stop();
+  if (privacyMask && privacyMask.destroy) privacyMask.destroy();
 });

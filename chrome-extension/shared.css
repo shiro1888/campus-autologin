@@ -27,6 +27,9 @@
   transform: translateY(4px) scale(0.97);
   transform-origin: bottom center;
   transition: opacity 0.14s ease, transform 0.18s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)), visibility 0.14s;
+  will-change: transform, opacity;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .ui-hover-tip.place-bottom {

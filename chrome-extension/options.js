@@ -1295,8 +1295,9 @@ const accentPicker = createAccentPicker({
 window.addEventListener('pagehide', () => {
   durationTicker.stop();
   passwordToggle.rehide();
-  if (activityTimeline.destroy) activityTimeline.destroy();
-  if (privacyMask.destroy) privacyMask.destroy();
+  if (activityTimeline && activityTimeline.destroy) activityTimeline.destroy();
+  if (privacyMask && privacyMask.destroy) privacyMask.destroy();
+  if (statusPoller && statusPoller.destroy) statusPoller.destroy();
 });
 
 

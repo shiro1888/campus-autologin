@@ -173,6 +173,7 @@ chrome-extension/
 ├── content.js        登录页自动填写与 HUD 状态胶囊提示脚本
 ├── popup.html/js/css 工具栏弹出面板（Bento 网格、毛玻璃动态流光）
 ├── options.html/js/css 控制中心设置页（左侧四分区导航：实时总览 / 账号与网络 / 保活与触发 / 备份与重置，含实时遥测与连接诊断）
+├── shared.css        共享样式库：全局统一悬浮提示浮层组件样式
 ├── icons/            已生成的各尺寸图标 (icon16/32/48/128.png)
 └── README.md         本说明文件
 ```

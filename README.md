@@ -84,6 +84,7 @@ campus-autologin/
 │   ├── common.js              共享组件库：格式化工具 + 计时器/波形图/时间轴/Toast/主题/健康度等 UI 组件
 │   ├── popup.html/js/css      工具栏弹出面板
 │   ├── options.html/js/css    控制中心设置页
+│   ├── shared.css             共享样式库：全局统一悬浮提示浮层等
 │   ├── icons/                 各尺寸图标
 │   └── README.md              详细功能与设置说明
 ├── assets/                    ← 图标生成工具与原图（make_icons.py / master.jpg）
