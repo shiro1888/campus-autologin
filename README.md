@@ -1,21 +1,31 @@
-# Campus AutoLogin · 校园网自动登录（Chrome 扩展）
+# Campus AutoLogin · 校园网自动登录（Chrome / Edge 扩展）
 
-针对 **http://172.30.100.2/**（Dr.COM / 哆点 ePortal 认证系统）的 Chrome 扩展：
-**掉线自动重连**，无需手动打开门户登录页。
+针对 **http://172.30.100.2/**（Dr.COM / 哆点 ePortal 认证系统）的高性能浏览器扩展：
+**掉线秒级自动重连**，无需手动打开门户登录页。
 
-> 本仓库现在只包含 **Chrome 扩展**。命令行脚本 / 桌面控制中心 / 开机自启计划任务已全部移除。
+基于 Chromium Manifest V3 架构开发，**原生兼容 Google Chrome、Microsoft Edge** 以及所有 Chromium 内核浏览器（如 Brave、Vivaldi、360 极速浏览器等）。
 
 ---
 
-## 安装（30 秒）
+## 安装（30 秒搞定）
 
-1. 打开 Chrome，地址栏输入 `chrome://extensions/` 回车
-2. 打开右上角 **开发者模式** 开关
-3. 点击左上角 **加载已解压的扩展程序**
-4. 选择本仓库下的 **`chrome-extension`** 文件夹
-5. 点工具栏的插件图标 → **控制中心**，填入校园网账号密码 → **保存并连接**
+本项目支持 **Google Chrome** 与 **Microsoft Edge**，请选择您的主力浏览器操作：
 
-> 工具栏看不到图标？点地址栏右侧的「拼图」图标，把 **Campus AutoLogin** 固定住。
+### 方案 A：Google Chrome 用户
+1. 打开 Chrome，地址栏输入 `chrome://extensions/` 回车；
+2. 打开右上角 **「开发者模式」** 开关；
+3. 点击左上角 **「加载已解压的扩展程序」**；
+4. 选择本仓库下的 **`chrome-extension`** 文件夹；
+5. 点击工具栏的插件图标 → **控制中心**，填入校园网账号密码 → **保存并连接**。
+
+### 方案 B：Microsoft Edge 用户
+1. 打开 Edge，地址栏输入 `edge://extensions/` 回车；
+2. 开启左下角（或左侧导航）的 **「开发人员模式」** 开关；
+3. 点击顶部的 **「加载解压缩的扩展」** 按钮；
+4. 选择本仓库下的 **`chrome-extension`** 文件夹；
+5. 点击工具栏的插件图标 → **控制中心**，填入校园网账号密码 → **保存并连接**。
+
+> 💡 **固定到工具栏**：如果工具栏看不到图标，点击地址栏右侧的「拼图」图标，把 **Campus AutoLogin** 固定住即可。
 >
 > 详细说明（含功能清单、设置项、工作原理）见 **[chrome-extension/README.md](chrome-extension/README.md)**。
 
@@ -162,6 +172,24 @@ powershell -File clean_history.ps1 -ForcePush
 
 ---
 
-## 许可
+## 适配其他高校网关
 
-供个人学习与自用。
+本扩展默认针对 `http://172.30.100.2/`（常见于许多高校的 Dr.COM / ePortal 认证系统）。如果您的学校也是同类型系统但网关 IP 不同（例如 `10.x.x.x` 或其他内网地址），仅需两步即可完成适配：
+
+1. **修改通信清单 [manifest.json](chrome-extension/manifest.json)**：
+   将 `host_permissions` 与 `content_scripts.matches` 中的 `http://172.30.100.2/*` 改为你学校的网关地址（如 `http://10.10.10.1/*`）。
+2. **修改网关常量 [background.js](chrome-extension/background.js)**：
+   将第 16 行的 `const PORTAL_HOST = '172.30.100.2';` 替换为您学校的网关 IP。
+
+---
+
+## 免责声明
+
+1. 本项目仅供网络技术学习交流与校园网合规个人自用，作者不对因使用本程序产生的任何网络中断、资费变动或账号异常承担连带责任。
+2. 请使用者自觉遵守所在高校的《校园网络安全管理规定》与信息化服务条款，切勿将本工具用于恶意并发攻击、违规代理或商业用途。
+
+---
+
+## 开源协议
+
+本项目基于 [MIT License](LICENSE) 协议开源。
