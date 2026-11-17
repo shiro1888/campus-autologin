@@ -3,7 +3,7 @@
 针对 **http://172.30.100.2/**（Dr.COM / 哆点 ePortal 认证系统）的高性能浏览器扩展：
 **掉线秒级自动重连**，无需手动打开门户登录页。
 
-基于 Chromium Manifest V3 架构开发，**原生兼容 Google Chrome、Microsoft Edge** 以及所有 Chromium 内核浏览器（如 Brave、Vivaldi、360 极速浏览器等）。
+基于 Chromium Manifest V3 架构开发，**原生兼容 Google Chrome、Microsoft Edge** 以及 Chromium 内核版本 ≥ 111 的浏览器（如 Brave、Vivaldi 等）。扩展声明了 `minimum_chrome_version: 111`，部分内核较旧的国产双核浏览器（如某些版本的 360 极速浏览器）可能无法加载，请先确认其内核版本。
 
 ---
 
@@ -179,7 +179,9 @@ powershell -File clean_history.ps1 -ForcePush
 1. **修改通信清单 [manifest.json](chrome-extension/manifest.json)**：
    将 `host_permissions` 与 `content_scripts.matches` 中的 `http://172.30.100.2/*` 改为你学校的网关地址（如 `http://10.10.10.1/*`）。
 2. **修改网关常量 [background.js](chrome-extension/background.js)**：
-   将第 16 行的 `const PORTAL_HOST = '172.30.100.2';` 替换为您学校的网关 IP。
+   搜索 `const PORTAL_HOST = '172.30.100.2';`（位于文件开头的常量区，约第 16 行），替换为您学校的网关 IP。
+
+> 用搜索常量名而不是记行号：该常量可能因后续改动而位移，行号仅作参考。
 
 ---
 
