@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  unit-and-syntax:
+    name: Syntax Check & Unit Tests (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check extension JS syntax
+        run: |
+          for f in chrome-extension/*.js; do
+            echo "Checking $f"
+            node --check "$f"
+          done
+
+      - name: Run unit test suite
+        run: python -B -W default -m unittest discover -s tests -v
+
+  history-clean-e2e:
+    name: Clean History E2E (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install git-filter-repo
+        run: python -m pip install --no-cache-dir git-filter-repo
+
+      - name: Run history cleanup E2E tests
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_clean_history_e2e.ps1

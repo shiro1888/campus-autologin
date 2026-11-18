@@ -4331,6 +4331,8 @@ assert.strictEqual(tipEl.getAttribute('aria-hidden'), 'true');
         self.assertIn('class="topo-line-packets"', options_html)
         self.assertIn(".topo-line-packets", options_css)
         self.assertIn("@keyframes topo-packets-stream", options_css)
+        self.assertIn("@keyframes topo-packets-stream-32", options_css)
+        self.assertIn("@keyframes topo-packets-stream-24", options_css)
         self.assertIn(".network-topology-strip.probing", options_css)
         self.assertIn(".network-topology-strip.authenticating", options_css)
         self.assertIn(".topo-link.on .topo-line-packets", options_css)

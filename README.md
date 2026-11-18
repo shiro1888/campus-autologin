@@ -38,7 +38,7 @@
 | **断网秒级重连** | 网页打不开 / 被跳到门户登录页的**瞬间**就重连，不等定时器 |
 | **自适应加速** | 在线时低频检查（默认 10 秒）；确认掉线自动切到 **1 秒**高频重连，连上再切回 |
 | **离线自动退避** | 不在校园网内（在家 / 热点）时指数退避到 1 分钟一次，不会每秒空转 |
-| **浏览器启动自动登录** | 打开 Chrome 就检查一次 |
+| **浏览器启动自动登录** | 打开浏览器就检查一次 |
 | **登录页自动填写** | 被断网跳转到门户登录页时，自动填账号密码并点登录 |
 | **手动登录 / 注销** | 点插件图标 → 「立即登录」/「注销」；注销后会暂停自动登录 |
 | **图标角标状态** | 离线高亮红色 `!`，重连中显示 `...`，在线自动隐藏 |
@@ -60,7 +60,7 @@
 > （若恰逢后台忙被跳过，会缩短为 1 秒后重试），
 > 单轮流程还包含 Service Worker 冷启动、运行态恢复与最多 3 次 8 秒超时的门户请求；
 > 且低于 30 秒的 `chrome.alarms` 周期依赖「未打包扩展不受夹紧」这一非契约行为
-> （打包发布后会被 Chrome 夹到 30 秒）。实际重连时间取决于当时浏览器与门户状态。
+> （打包发布到应用商店后会被浏览器夹到 30 秒）。实际重连时间取决于当时浏览器与门户状态。
 
 ---
 
@@ -87,7 +87,8 @@
 
 ```
 campus-autologin/
-├── chrome-extension/          ← Chrome 扩展本体（唯一的功能载体）
+├── .github/workflows/ci.yml   ← GitHub Actions 自动校验（语法检查 / 单元测试 / 历史脱敏 E2E）
+├── chrome-extension/          ← Chrome / Edge 扩展本体（唯一的功能载体）
 │   ├── manifest.json          MV3 清单
 │   ├── background.js          Service Worker：定时检查 + 自动重连 + webNavigation 监听
 │   ├── content.js             登录页自动填写与 HUD 提示
@@ -100,7 +101,8 @@ campus-autologin/
 ├── assets/                    ← 图标生成工具与原图（make_icons.py / master.jpg）
 ├── tests/                     ← 自动化与端到端测试套件（test_extension.py / test_clean_history_e2e.ps1）
 ├── clean_history.ps1          ← Git 历史敏感凭据脱敏工具（见下方安全公告）
-├── reload_extension.bat       ← 改完扩展代码后一键打开扩展页刷新
+├── reload_extension.bat       ← 改完扩展代码后一键打开 Chrome / Edge 扩展页刷新（支持传参 edge）
+├── LICENSE                    ← MIT 开源协议
 ├── .gitattributes
 ├── .gitignore
 └── README.md
@@ -123,11 +125,11 @@ powershell -File tests/test_clean_history_e2e.ps1
 # 重新生成扩展图标（需要 Pillow：pip install pillow）
 python assets/make_icons.py
 
-# 改完扩展代码后：双击 reload_extension.bat → 在扩展页点 🔄 刷新 → 关掉旧设置页重开
+# 改完扩展代码后：双击 reload_extension.bat（Edge 用户可用 reload_extension.bat edge）→ 点 🔄 刷新 → 重开设置页
 ```
 
-> Chrome 只在**加载扩展的那一刻**读取代码，之后一直用内存里的副本。
-> 改了磁盘文件不点刷新不会生效 —— 这是 Chrome 的正常行为，不是插件的问题。
+> 浏览器只在**加载扩展的那一刻**读取代码，之后一直用内存里的副本。
+> 改了磁盘文件不点刷新不会生效 —— 这是浏览器的正常行为，不是插件的问题。
 
 ---
 
@@ -135,17 +137,13 @@ python assets/make_icons.py
 
 插件把校园网账号密码保存在浏览器扩展存储（`chrome.storage.local`）中，**明文**。
 
-- 本仓库**从创建起就是私有仓库**（已通过三项独立核对：GitHub 公开仓库列表中无此仓库、
-  匿名访问返回 404、Software Heritage 公网存档中无此 origin），
-  校园网凭据**从未出现在公网**；该账号其余公开仓库经抽查（尤其是同为 Batchfile 的
-  `Harness`）均不含该凭据。
-- 早期历史提交中确曾包含真实账号与初始密码，现已用 `git filter-repo` 完整重写，
-  相关对象已在本地与远端**物理回收**（`git log --all -S<账号>` 与 `-S<密码>` 均为 0 命中）。
-  **即使将来把仓库转为公开，也不会带出凭据。**
-- 因此凭据的实际风险面**只有你的本机**：Chrome 扩展存储（`chrome.storage.local`）为本地明文。
+- 本仓库现已以开源方式公开发布；开源前已使用 `git filter-repo` 对早期历史提交完成脱敏重写，
+  相关旧对象已在本地与远端**物理回收**（全历史 `git log --all -S<账号>` 与 `-S<密码>` 均为 0 命中）。
+- 本仓库当前 HEAD 与全量提交历史中均**不含任何真实凭据**；`.gitignore` 也已排除插件「导出配置」生成的明文备份
+  （`campus-autologin-config-*.json`），防止误提交。
+- 凭据的实际风险面**仅在你的本机**：浏览器扩展存储（`chrome.storage.local`）为本地明文保存（不会同步云端或上传第三方）。
   这是自动登录功能的固有前提，无法规避；公用电脑使用完毕后请清空插件设置页里的账号密码。
-- 本仓库当前 HEAD **不含任何真实凭据**；`.gitignore` 也已排除插件「导出配置」生成的明文备份。
-- 门户通信是**明文 HTTP**，同网段可被嗅探 —— 这是校园网本身的限制，插件无法规避。
+- 门户通信是**明文 HTTP**，同网段可被嗅探 —— 这是校园网协议本身的限制，插件无法规避，请勿在不可信的公共网络环境使用或泄露配置备份。
 
 ### 历史自检（随时可跑）
 
@@ -181,7 +179,7 @@ powershell -File clean_history.ps1 -ForcePush
 2. **修改网关常量 [background.js](chrome-extension/background.js)**：
    搜索 `const PORTAL_HOST = '172.30.100.2';`（位于文件开头的常量区，约第 16 行），替换为您学校的网关 IP。
 
-> 用搜索常量名而不是记行号：该常量可能因后续改动而位移，行号仅作参考。
+> 用搜索常量名而不是记行号：该常量可能因后续改动而位移，行号仅作参考。界面上展示的网关文字与直达链接（如 `popup.html` / `popup.js` / `options.html` / `common.js` 中的 `172.30.100.2`）仅作展示之用，如需一并替换可按关键词全局搜索。
 
 ---
 

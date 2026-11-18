@@ -1504,6 +1504,16 @@ body {
   100% { background-position-x: 28px; }
 }
 
+@keyframes topo-packets-stream-32 {
+  0% { background-position-x: 0px; }
+  100% { background-position-x: 32px; }
+}
+
+@keyframes topo-packets-stream-24 {
+  0% { background-position-x: 0px; }
+  100% { background-position-x: 24px; }
+}
+
 .topo-link.on .topo-line-packets {
   background: repeating-linear-gradient(
     90deg,
@@ -1517,7 +1527,7 @@ body {
   );
   background-size: 32px 100%;
   filter: drop-shadow(0 0 3px #10b981);
-  animation: topo-packets-stream 1.25s linear infinite;
+  animation: topo-packets-stream-32 1.25s linear infinite;
   opacity: 0.9;
 }
 
@@ -1534,7 +1544,7 @@ body {
   );
   background-size: 32px 100%;
   filter: drop-shadow(0 0 3px #f59e0b);
-  animation: topo-packets-stream 0.95s linear infinite;
+  animation: topo-packets-stream-32 0.95s linear infinite;
   opacity: 0.85;
 }
 
@@ -1556,7 +1566,7 @@ body {
   );
   background-size: 24px 100%;
   filter: drop-shadow(0 0 4px var(--primary));
-  animation: topo-packets-stream 0.55s linear infinite;
+  animation: topo-packets-stream-24 0.55s linear infinite;
   opacity: 1;
   display: block !important;
 }
