@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Verify, Package & Deploy Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify JS syntax & run unit tests
+        run: |
+          for f in chrome-extension/*.js; do
+            node --check "$f"
+          done
+          python -B -W default -m unittest discover -s tests -v
+
+      - name: Verify tag matches manifest version & package zip
+        id: pkg
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          MANIFEST_VER="$(python -c 'import json; print(json.load(open("chrome-extension/manifest.json", encoding="utf-8"))["version"])')"
+          if [ "$TAG" != "v${MANIFEST_VER}" ]; then
+            echo "Tag $TAG does not match manifest version v${MANIFEST_VER}"
+            exit 1
+          fi
+          ARCHIVE_NAME="campus-autologin-${TAG}.zip"
+          STAGE_DIR="$(mktemp -d)"
+          cp -r chrome-extension/. "$STAGE_DIR/"
+          cp LICENSE "$STAGE_DIR/"
+          (cd "$STAGE_DIR" && zip -r "${RUNNER_TEMP}/${ARCHIVE_NAME}" .)
+          rm -rf "$STAGE_DIR"
+          echo "archive_path=${RUNNER_TEMP}/${ARCHIVE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "archive_name=${ARCHIVE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "${{ steps.pkg.outputs.archive_path }}" --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" "${{ steps.pkg.outputs.archive_path }}" \
+              --title "Campus AutoLogin ${GITHUB_REF_NAME}" \
+              --notes "Chrome / Edge 双浏览器校园网自动登录扩展发布包：下载并解压 \`${{ steps.pkg.outputs.archive_name }}\` 后，在 \`chrome://extensions/\` 或 \`edge://extensions/\` 开启开发者模式加载解压目录即可使用（如使用仓库源码，请加载 \`chrome-extension\` 目录）。" \
+              --generate-notes
+          fi

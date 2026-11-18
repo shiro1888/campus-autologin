@@ -9,20 +9,24 @@
 
 ## 安装（30 秒搞定）
 
+> **获取方式**（二选一）：
+> - **普通用户**：前往 [GitHub Releases](https://github.com/shiro1888/campus-autologin/releases) 下载最新 `campus-autologin-v*.zip` 并解压到固定目录；
+> - **开发者**：克隆本仓库，加载仓库下的 **`chrome-extension`** 目录。
+
 本项目支持 **Google Chrome** 与 **Microsoft Edge**，请选择您的主力浏览器操作：
 
 ### 方案 A：Google Chrome 用户
 1. 打开 Chrome，地址栏输入 `chrome://extensions/` 回车；
 2. 打开右上角 **「开发者模式」** 开关；
 3. 点击左上角 **「加载已解压的扩展程序」**；
-4. 选择本仓库下的 **`chrome-extension`** 文件夹；
+4. 选择解压后的扩展文件夹（或源码仓库下的 **`chrome-extension`** 文件夹）；
 5. 点击工具栏的插件图标 → **控制中心**，填入校园网账号密码 → **保存并连接**。
 
 ### 方案 B：Microsoft Edge 用户
 1. 打开 Edge，地址栏输入 `edge://extensions/` 回车；
 2. 开启左下角（或左侧导航）的 **「开发人员模式」** 开关；
 3. 点击顶部的 **「加载解压缩的扩展」** 按钮；
-4. 选择本仓库下的 **`chrome-extension`** 文件夹；
+4. 选择解压后的扩展文件夹（或源码仓库下的 **`chrome-extension`** 文件夹）；
 5. 点击工具栏的插件图标 → **控制中心**，填入校园网账号密码 → **保存并连接**。
 
 > 💡 **固定到工具栏**：如果工具栏看不到图标，点击地址栏右侧的「拼图」图标，把 **Campus AutoLogin** 固定住即可。
@@ -87,7 +91,9 @@
 
 ```
 campus-autologin/
-├── .github/workflows/ci.yml   ← GitHub Actions 自动校验（语法检查 / 单元测试 / 历史脱敏 E2E）
+├── .github/workflows/
+│   ├── ci.yml                 ← GitHub Actions 自动校验（语法检查 / 单元测试 / 历史脱敏 E2E）
+│   └── release.yml            ← Tag 发版工作流：自动验证并打包部署 GitHub Release 扩展包
 ├── chrome-extension/          ← Chrome / Edge 扩展本体（唯一的功能载体）
 │   ├── manifest.json          MV3 清单
 │   ├── background.js          Service Worker：定时检查 + 自动重连 + webNavigation 监听
