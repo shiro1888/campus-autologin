@@ -299,7 +299,7 @@ body {
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: all 0.2s var(--ease-spring);
+  transition: color 0.2s var(--ease-spring), background-color 0.2s var(--ease-spring), border-color 0.2s var(--ease-spring), transform 0.2s var(--ease-spring);
   user-select: none;
 }
 
@@ -338,7 +338,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.25s var(--ease-spring);
+  transition: transform 0.25s var(--ease-spring), color 0.25s var(--ease-spring), background-color 0.25s var(--ease-spring), border-color 0.25s var(--ease-spring);
 }
 
 .icon-btn::before {
@@ -506,6 +506,7 @@ body {
   inset: 0;
   border-radius: inherit;
   overflow: hidden;
+  contain: strict;
   pointer-events: none;
   z-index: 0;
 }
@@ -545,6 +546,7 @@ body {
 }
 
 .status-ripple-wave.burst {
+  will-change: transform, opacity;
   animation: popup-ripple-wave-burst 1.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -552,7 +554,6 @@ body {
   0% {
     transform: scale(0.4);
     opacity: 0.95;
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.7);
   }
   45% {
     opacity: 0.5;
@@ -560,7 +561,6 @@ body {
   100% {
     transform: scale(14);
     opacity: 0;
-    box-shadow: 0 0 0px transparent;
   }
 }
 
@@ -705,7 +705,7 @@ body {
   height: 11px;
   border-radius: 50%;
   background: var(--text-light);
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
   z-index: 2;
 }
 
@@ -808,7 +808,7 @@ body {
   color: var(--text-muted);
   white-space: nowrap;
   flex-shrink: 0;
-  transition: all 0.25s ease;
+  transition: color 0.25s ease, background-color 0.25s ease, border-color 0.25s ease;
 }
 
 .status-card.on .status-state-pill {
@@ -885,7 +885,7 @@ body {
   white-space: nowrap;
   flex-shrink: 0;
   cursor: pointer;
-  transition: all 0.22s var(--ease-spring);
+  transition: transform 0.22s var(--ease-spring), color 0.22s var(--ease-spring), background-color 0.22s var(--ease-spring), border-color 0.22s var(--ease-spring);
 }
 
 .gw-route-pill:hover {
@@ -933,7 +933,7 @@ body {
   padding: 4px 11px;
   border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: all 0.25s var(--ease-spring);
+  transition: transform 0.25s var(--ease-spring), color 0.25s var(--ease-spring), background-color 0.25s var(--ease-spring), border-color 0.25s var(--ease-spring), box-shadow 0.25s var(--ease-spring);
   min-width: 0;
   position: relative;
   z-index: 2;
@@ -1028,7 +1028,6 @@ body {
   min-height: 68px;
   gap: 5px;
   box-shadow: var(--shadow-dock), var(--glass-highlight);
-  backdrop-filter: blur(14px);
   transition: transform 0.25s var(--ease-spring), border-color 0.2s ease, box-shadow 0.25s ease;
   position: relative;
   overflow: hidden;
@@ -1168,7 +1167,7 @@ body {
   line-height: 1;
   cursor: pointer;
   user-select: none;
-  transition: all 0.2s var(--ease-spring);
+  transition: transform 0.2s var(--ease-spring), background-color 0.2s var(--ease-spring), color 0.2s var(--ease-spring), border-color 0.2s var(--ease-spring);
 }
 
 .isp-badge::after {
@@ -1582,8 +1581,6 @@ body {
   border: 1px solid var(--border-hairline);
   padding: 2px;
   border-radius: var(--radius-pill);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 .dock-value.masked {
@@ -1602,7 +1599,7 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-pill);
-  transition: all 0.2s var(--ease-spring);
+  transition: transform 0.2s var(--ease-spring), color 0.2s var(--ease-spring), background-color 0.2s var(--ease-spring);
   flex-shrink: 0;
   line-height: 1;
 }
@@ -1692,7 +1689,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.18s var(--ease-spring);
+  transition: transform 0.18s var(--ease-spring), color 0.18s var(--ease-spring), background-color 0.18s var(--ease-spring), border-color 0.18s var(--ease-spring);
   padding: 0 4px;
 }
 
@@ -1965,7 +1962,7 @@ body {
   gap: 7px;
   cursor: pointer;
   box-shadow: var(--primary-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.32);
-  transition: all 0.25s var(--ease-spring);
+  transition: transform 0.25s var(--ease-spring), box-shadow 0.25s var(--ease-spring), filter 0.25s ease, opacity 0.2s ease;
 }
 
 .btn-shimmer {
@@ -2077,10 +2074,8 @@ body {
   justify-content: center;
   gap: 5px;
   cursor: pointer;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   box-shadow: var(--shadow-dock), var(--glass-highlight);
-  transition: all 0.25s var(--ease-spring);
+  transition: transform 0.25s var(--ease-spring), color 0.25s var(--ease-spring), background-color 0.25s var(--ease-spring), border-color 0.25s var(--ease-spring), box-shadow 0.25s var(--ease-spring);
 }
 
 .btn-secondary svg {
@@ -2140,7 +2135,7 @@ body {
   font-size: 12px;
   color: var(--text-muted);
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
   padding: 4px 8px;
   border-radius: var(--radius-pill);
   white-space: nowrap;

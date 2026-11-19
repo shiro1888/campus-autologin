@@ -4353,6 +4353,119 @@ assert.strictEqual(tipEl.getAttribute('aria-hidden'), 'true');
         self.assertIn(".btn-primary:active", popup_css)
         self.assertIn(".btn-secondary:active", popup_css)
 
+    def test_ui_rendering_performance_and_lifecycle_invariants(self):
+        """UI 渲染性能与生命周期回归校验：
+        1. 禁止在 popup.css / options.css 中使用宽泛的 transition: all；
+        2. 高频/无限动画（topo-packets-stream* / topo-sonar-pulse / ripple-wave-burst）
+           仅允许使用 GPU 合成层属性（transform / opacity），不得动画化 background-position-x 或 box-shadow；
+        3. popup.js / options.js 不得使用 void wave.offsetWidth 触发同步强制回流；
+        4. options.css 必须在 [data-page-hidden="true"] 时暂停常驻动画，且 createVisibilityPoller 运行时正确切换该属性；
+        5. setTooltip 在文案未变时跳过冗余 setAttribute，减少 MutationObserver 唤醒；
+        6. content.js 的 showHud / hideHud 必须清理前次淡出定时器，避免连续提示被提前销毁。
+        """
+        import subprocess
+        with open(os.path.join(EXT_DIR, "options.css"), "r", encoding="utf-8") as f:
+            options_css = f.read()
+        with open(os.path.join(EXT_DIR, "popup.css"), "r", encoding="utf-8") as f:
+            popup_css = f.read()
+        with open(os.path.join(EXT_DIR, "options.js"), "r", encoding="utf-8") as f:
+            options_js = f.read()
+        with open(os.path.join(EXT_DIR, "popup.js"), "r", encoding="utf-8") as f:
+            popup_js = f.read()
+        with open(os.path.join(EXT_DIR, "content.js"), "r", encoding="utf-8") as f:
+            content_js = f.read()
+
+        # 1. 杜绝 transition: all
+        self.assertIsNone(re.search(r"transition\s*:[^;]*\ball\b", popup_css),
+                          "popup.css 不应包含宽泛的 transition: all")
+        self.assertIsNone(re.search(r"transition\s*:[^;]*\ball\b", options_css),
+                          "options.css 不应包含宽泛的 transition: all")
+
+        # 2. 关键动画仅使用 GPU 合成层属性
+        for css_name, css_src, kf_names in (
+            ("options.css", options_css, (
+                "topo-packets-stream", "topo-packets-stream-32", "topo-packets-stream-24",
+                "topo-sonar-pulse", "hero-ripple-wave-burst",
+            )),
+            ("popup.css", popup_css, ("popup-ripple-wave-burst",)),
+        ):
+            for kf in kf_names:
+                m = re.search(rf"@keyframes\s+{re.escape(kf)}\s*\{{((?:[^{{}}]|\{{[^{{}}]*\}})*)\}}", css_src)
+                self.assertIsNotNone(m, f"{css_name} 缺少 @keyframes {kf}")
+                body = m.group(1)
+                self.assertNotIn("background-position", body, f"{css_name} @keyframes {kf} 不应动画化 background-position")
+                self.assertNotIn("box-shadow", body, f"{css_name} @keyframes {kf} 不应动画化 box-shadow")
+
+        # 3. 零同步强制回流触发波纹
+        self.assertNotIn("wave.offsetWidth", popup_js, "popup.js 不应使用 wave.offsetWidth 触发同步强制回流")
+        self.assertNotIn("wave.offsetWidth", options_js, "options.js 不应使用 wave.offsetWidth 触发同步强制回流")
+
+        # 4. 后台不可见标签页暂停常驻动画
+        self.assertIn('[data-page-hidden="true"]', options_css)
+        self.assertIn("animation-play-state: paused !important;", options_css)
+
+        # 5. content.js HUD 定时器清理守卫
+        self.assertIn("clearHudTimers", content_js)
+        self.assertIn("hudFadeTimer", content_js)
+        self.assertIn("hudRemoveTimer", content_js)
+
+        # 6. 运行时验证 createVisibilityPoller 的 data-page-hidden 切换与 setTooltip 幂等去重
+        common_path = os.path.join(EXT_DIR, "common.js")
+        js = f"""
+const fs = require('fs'), vm = require('vm'), assert = require('assert');
+const attrs = new Map();
+let setAttrCalls = 0;
+let visState = 'visible';
+const docListeners = {{}};
+const ctx = {{
+  console, setInterval: () => 1, clearInterval: () => {{}},
+  document: {{
+    get visibilityState() {{ return visState; }},
+    documentElement: {{
+      setAttribute(k, v) {{ attrs.set(k, String(v)); }},
+      removeAttribute(k) {{ attrs.delete(k); }},
+      getAttribute(k) {{ return attrs.has(k) ? attrs.get(k) : null; }}
+    }},
+    addEventListener(t, fn) {{ (docListeners[t] = docListeners[t] || []).push(fn); }},
+    removeEventListener(t, fn) {{ docListeners[t] = (docListeners[t] || []).filter(f => f !== fn); }}
+  }},
+  window: {{ addEventListener() {{}}, removeEventListener() {{}} }}
+}};
+vm.runInNewContext(fs.readFileSync({common_path!r}, 'utf8'), ctx);
+
+// 6a. createVisibilityPoller 切换后台时应打标 data-page-hidden="true"，切回前台与 destroy 必须清除
+const poller = ctx.createVisibilityPoller(() => {{}}, 15000);
+assert.strictEqual(attrs.get('data-page-hidden'), undefined, '前台初始化不应标记隐藏');
+visState = 'hidden';
+(docListeners.visibilitychange || []).forEach(fn => fn());
+assert.strictEqual(attrs.get('data-page-hidden'), 'true', '切至后台必须设置 data-page-hidden=true');
+visState = 'visible';
+(docListeners.visibilitychange || []).forEach(fn => fn());
+assert.strictEqual(attrs.get('data-page-hidden'), undefined, '回到前台必须移除 data-page-hidden');
+visState = 'hidden';
+(docListeners.visibilitychange || []).forEach(fn => fn());
+poller.destroy();
+assert.strictEqual(attrs.get('data-page-hidden'), undefined, 'destroy 必须清理 data-page-hidden');
+
+// 6b. setTooltip 相同文案重复调用不应反复触发 setAttribute
+const tipAttrs = new Map();
+const mockEl = {{
+  getAttribute: k => (tipAttrs.has(k) ? tipAttrs.get(k) : null),
+  hasAttribute: k => tipAttrs.has(k),
+  setAttribute(k, v) {{ setAttrCalls++; tipAttrs.set(k, String(v)); }},
+  removeAttribute(k) {{ tipAttrs.delete(k); }}
+}};
+ctx.setTooltip(mockEl, '稳定提示');
+assert.strictEqual(setAttrCalls, 1);
+ctx.setTooltip(mockEl, '稳定提示');
+ctx.setTooltip(mockEl, '稳定提示');
+assert.strictEqual(setAttrCalls, 1, '相同文案重复 setTooltip 不应触发冗余 setAttribute');
+ctx.setTooltip(mockEl, '变更提示');
+assert.strictEqual(setAttrCalls, 2);
+"""
+        res = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=False)
+        self.assertEqual(res.returncode, 0, f"性能/生命周期运行时校验失败:\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}")
+
 
 if __name__ == "__main__":
     unittest.main()

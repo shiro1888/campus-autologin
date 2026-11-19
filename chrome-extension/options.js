@@ -390,14 +390,31 @@ function setTelemetryAria(id, label) {
 }
 
 let lastOnlineState = null;
+let heroRippleRaf = 0;
 
-/** 触发 Hero 状态卡网络认证成功的形态扩散波纹 */
+/** 触发 Hero 状态卡网络认证成功的形态扩散波纹（双 rAF 零同步回流重播） */
 function triggerHeroRipple() {
   const wave = $('heroRippleWave');
   if (!wave) return;
+  if (!wave.dataset.rippleCleanupBound && typeof wave.addEventListener === 'function') {
+    wave.dataset.rippleCleanupBound = '1';
+    wave.addEventListener('animationend', () => wave.classList.remove('burst'));
+  }
+  if (heroRippleRaf && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(heroRippleRaf);
+    heroRippleRaf = 0;
+  }
   wave.classList.remove('burst');
-  void wave.offsetWidth;
-  wave.classList.add('burst');
+  if (typeof requestAnimationFrame === 'function') {
+    heroRippleRaf = requestAnimationFrame(() => {
+      heroRippleRaf = requestAnimationFrame(() => {
+        heroRippleRaf = 0;
+        wave.classList.add('burst');
+      });
+    });
+  } else {
+    wave.classList.add('burst');
+  }
 }
 
 /** 刷新顶部诊断卡片状态 */
@@ -844,18 +861,26 @@ $('form').addEventListener('submit', (e) => {
   btn.classList.add('loading');
   $('btnSaveText').textContent = '正在保存并连接…';
   showToast('正在向校园网登录网站发起验证…', 'info');
+  const topoStrip = $('networkTopology');
+  if (topoStrip) topoStrip.classList.add('authenticating');
 
   save(() => {
     chrome.runtime.sendMessage({ type: 'login' }, (res) => {
       btn.disabled = false;
       btn.classList.remove('loading');
       $('btnSaveText').textContent = '保存并连接';
+      const topo = $('networkTopology');
+      if (topo) topo.classList.remove('authenticating');
 
       if (chrome.runtime.lastError || !res) {
         showToast('保存成功，但后台未响应测试请求', 'err');
         return;
       }
 
+      if (res.online) {
+        triggerHeroRipple();
+        lastOnlineState = true;
+      }
       showToast(res.message || '配置已生效', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));
       refreshStatus();
     });
@@ -1322,6 +1347,14 @@ const accentPicker = createAccentPicker({
 });
 
 window.addEventListener('pagehide', () => {
+  if (statusSpinTimer) {
+    clearTimeout(statusSpinTimer);
+    statusSpinTimer = null;
+  }
+  if (heroRippleRaf && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(heroRippleRaf);
+    heroRippleRaf = 0;
+  }
   durationTicker.stop();
   passwordToggle.rehide();
   if (activityTimeline && activityTimeline.destroy) activityTimeline.destroy();

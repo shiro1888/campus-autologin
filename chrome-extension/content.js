@@ -394,8 +394,23 @@
     })();
   }
 
+  let hudFadeTimer = null;
+  let hudRemoveTimer = null;
+
+  function clearHudTimers() {
+    if (hudFadeTimer) {
+      clearTimeout(hudFadeTimer);
+      hudFadeTimer = null;
+    }
+    if (hudRemoveTimer) {
+      clearTimeout(hudRemoveTimer);
+      hudRemoveTimer = null;
+    }
+  }
+
   /** 移除 HUD（加载态卡住时兜底用） */
   function hideHud() {
+    clearHudTimers();
     try {
       const hud = document.getElementById('campus-login-hud');
       if (hud && hud.parentNode) hud.parentNode.removeChild(hud);
@@ -406,6 +421,7 @@
 
   /** 在门户页面顶部显示现代浮动指示条（灵动岛毛玻璃风格） */
   function showHud(text, state) {
+    clearHudTimers();
     try {
       let styleEl = document.getElementById('campus-login-hud-style');
       if (!styleEl) {
@@ -438,10 +454,13 @@
           'align-items:center',
           'gap:10px',
           'animation:campusHudIn 0.32s cubic-bezier(0.16, 1, 0.3, 1)',
-          'transition:all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+          'transition:opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1),transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
           'pointer-events:none'
         ].join(';');
         document.body.appendChild(hud);
+      } else {
+        hud.style.opacity = '1';
+        hud.style.transform = 'translateX(-50%)';
       }
       const isOk = state === 'success';
       const isErr = state === 'error';
@@ -466,11 +485,15 @@
       const textEl = hud.lastElementChild;
       if (textEl) textEl.textContent = String(text == null ? '' : text);
       if (isOk || isErr) {
-        setTimeout(function () {
+        hudFadeTimer = setTimeout(function () {
+          hudFadeTimer = null;
           if (!hud) return;
           hud.style.opacity = '0';
           hud.style.transform = 'translateX(-50%) translateY(-10px) scale(0.95)';
-          setTimeout(function () { if (hud && hud.parentNode) hud.parentNode.removeChild(hud); }, 400);
+          hudRemoveTimer = setTimeout(function () {
+            hudRemoveTimer = null;
+            if (hud && hud.parentNode) hud.parentNode.removeChild(hud);
+          }, 400);
         }, 3200);
       }
     } catch (e) {

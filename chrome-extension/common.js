@@ -15,11 +15,19 @@ function setTooltip(el, text) {
   if (!el) return;
   const clean = text === null || text === undefined ? '' : String(text).trim();
   if (typeof el.setAttribute === 'function' && typeof el.removeAttribute === 'function') {
-    if (clean) el.setAttribute('data-tip', clean);
-    else el.removeAttribute('data-tip');
-    el.removeAttribute('title');
+    const hasGet = typeof el.getAttribute === 'function';
+    if (clean) {
+      if (!hasGet || el.getAttribute('data-tip') !== clean) {
+        el.setAttribute('data-tip', clean);
+      }
+    } else if (!hasGet || el.getAttribute('data-tip') !== null) {
+      el.removeAttribute('data-tip');
+    }
+    if (typeof el.hasAttribute !== 'function' || el.hasAttribute('title')) {
+      el.removeAttribute('title');
+    }
   }
-  if ('title' in el && !clean) {
+  if ('title' in el && !clean && el.title) {
     el.title = '';
   }
 }
@@ -340,19 +348,22 @@ function createSparkline(containerId, maxBars = 8) {
         const isLatest = historyIdx === history.length - 1;
 
         if (val === -1) {
-          bar.style.height = '42%';
-          bar.className = 'spark-bar timeout' + (isLatest ? ' latest' : '');
+          const nextCls = 'spark-bar timeout' + (isLatest ? ' latest' : '');
+          if (bar.style.height !== '42%') bar.style.height = '42%';
+          if (bar.className !== nextCls) bar.className = nextCls;
           setTooltip(bar, `心跳 #${historyIdx + 1}: 超时 / 丢包`);
         } else {
           const pct = Math.max(22, Math.min(100, Math.round((val / maxPing) * 100)));
-          bar.style.height = `${pct}%`;
+          const nextHeight = `${pct}%`;
           const info = classifyPing(val, true);
-          bar.className = `spark-bar ${info.grade}` + (isLatest ? ' latest' : '');
+          const nextCls = `spark-bar ${info.grade}` + (isLatest ? ' latest' : '');
+          if (bar.style.height !== nextHeight) bar.style.height = nextHeight;
+          if (bar.className !== nextCls) bar.className = nextCls;
           setTooltip(bar, `心跳 #${historyIdx + 1}: ${val} ms (${info.label})`);
         }
       } else {
-        bar.style.height = '18%';
-        bar.className = 'spark-bar empty';
+        if (bar.style.height !== '18%') bar.style.height = '18%';
+        if (bar.className !== 'spark-bar empty') bar.className = 'spark-bar empty';
         setTooltip(bar, '等待心跳…');
       }
     });
@@ -1905,6 +1916,18 @@ function createAccentPicker(options = {}) {
 function createVisibilityPoller(callback, intervalMs = 15000) {
   let timer = null;
 
+  function syncHiddenAttr() {
+    if (typeof document === 'undefined' || !document.documentElement) return;
+    const isHidden = document.visibilityState === 'hidden';
+    if (isHidden) {
+      if (typeof document.documentElement.setAttribute === 'function') {
+        document.documentElement.setAttribute('data-page-hidden', 'true');
+      }
+    } else if (typeof document.documentElement.removeAttribute === 'function') {
+      document.documentElement.removeAttribute('data-page-hidden');
+    }
+  }
+
   function poll() {
     if (typeof callback === 'function' && typeof document !== 'undefined' && document.visibilityState === 'visible') {
       callback();
@@ -1924,6 +1947,7 @@ function createVisibilityPoller(callback, intervalMs = 15000) {
   }
 
   const onVisChange = () => {
+    syncHiddenAttr();
     if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
       poll();
       start();
@@ -1940,7 +1964,10 @@ function createVisibilityPoller(callback, intervalMs = 15000) {
     window.addEventListener('pagehide', stop);
   }
 
-  start();
+  syncHiddenAttr();
+  if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+    start();
+  }
 
   return {
     start,
@@ -1948,6 +1975,9 @@ function createVisibilityPoller(callback, intervalMs = 15000) {
     trigger: poll,
     destroy() {
       stop();
+      if (typeof document !== 'undefined' && document.documentElement && typeof document.documentElement.removeAttribute === 'function') {
+        document.documentElement.removeAttribute('data-page-hidden');
+      }
       if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
         document.removeEventListener('visibilitychange', onVisChange);
       }

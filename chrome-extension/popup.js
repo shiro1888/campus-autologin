@@ -22,14 +22,31 @@ const popupFlowMeter = createFlowMeter({
 });
 
 let lastPopupOnlineState = null;
+let statusRippleRaf = 0;
 
-/** 触发 Popup Hero 状态卡网络认证成功的形态扩散波纹 */
+/** 触发 Popup Hero 状态卡网络认证成功的形态扩散波纹（双 rAF 零同步回流重播） */
 function triggerStatusRipple() {
   const wave = $('statusRippleWave');
   if (!wave) return;
+  if (!wave.dataset.rippleCleanupBound && typeof wave.addEventListener === 'function') {
+    wave.dataset.rippleCleanupBound = '1';
+    wave.addEventListener('animationend', () => wave.classList.remove('burst'));
+  }
+  if (statusRippleRaf && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(statusRippleRaf);
+    statusRippleRaf = 0;
+  }
   wave.classList.remove('burst');
-  void wave.offsetWidth;
-  wave.classList.add('burst');
+  if (typeof requestAnimationFrame === 'function') {
+    statusRippleRaf = requestAnimationFrame(() => {
+      statusRippleRaf = requestAnimationFrame(() => {
+        statusRippleRaf = 0;
+        wave.classList.add('burst');
+      });
+    });
+  } else {
+    wave.classList.add('burst');
+  }
 }
 
 /** 设置状态卡片 UI */
@@ -642,6 +659,14 @@ refresh();
 
 // 页面隐藏/关闭时清理计时器与事件监听
 window.addEventListener('pagehide', () => {
+  if (spinTimer) {
+    clearTimeout(spinTimer);
+    spinTimer = null;
+  }
+  if (statusRippleRaf && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(statusRippleRaf);
+    statusRippleRaf = 0;
+  }
   durationTicker.stop();
   if (privacyMask && privacyMask.destroy) privacyMask.destroy();
 });
