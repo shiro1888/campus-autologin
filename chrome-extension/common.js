@@ -102,7 +102,9 @@ function toastIconKind(kind) {
 function fmt(min) {
   const n = parseFloat(min);
   if (!Number.isFinite(n)) return '—';
-  return n < 1 ? Math.round(n * 60) + ' 秒' : n + ' 分钟';
+  if (n < 1) return Math.round(n * 60) + ' 秒';
+  const cleanMin = Number.isInteger(n) ? n : Number(n.toFixed(2));
+  return cleanMin + ' 分钟';
 }
 
 /**
@@ -389,13 +391,15 @@ function createFlowMeter(cfg = {}) {
   const detail = () => getEl('detailEl', 'detailId');
   const subTag = () => getEl('subTagEl', 'subTagId');
   const wrap = () => getEl('wrapEl', 'wrapId');
-  const dlBar = () => getEl('dlBarEl', 'dlId') || getEl('dlBarEl', 'dlBarId');
-  const ulBar = () => getEl('ulBarEl', 'ulId') || getEl('ulBarEl', 'ulBarId');
+  const dlBar = () => $(cfg.dlBarEl || cfg.dlBarId || cfg.dlId);
+  const ulBar = () => $(cfg.ulBarEl || cfg.ulBarId || cfg.ulId);
 
   function clearFlowTips(cardEl, totalEl, wrapEl) {
     setTooltip(cardEl, '');
     setTooltip(totalEl, '');
     setTooltip(wrapEl, '');
+    if (totalEl && typeof totalEl.removeAttribute === 'function') totalEl.removeAttribute('aria-label');
+    if (wrapEl && typeof wrapEl.removeAttribute === 'function') wrapEl.removeAttribute('aria-label');
     if (cardEl) cardEl.classList.remove('has-flow-tip');
   }
 
@@ -1041,14 +1045,7 @@ function createThemeManager(options = {}) {
     currentPref = normalizeTheme(theme);
     const sysDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const effective = currentPref === 'auto' ? (sysDark ? 'dark' : 'light') : currentPref;
-
-    if (effective === 'dark') {
-      document.documentElement.setAttribute('data-theme', 'dark');
-    } else if (effective === 'light') {
-      document.documentElement.setAttribute('data-theme', 'light');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-    }
+    document.documentElement.setAttribute('data-theme', effective);
 
     if (labelEl) {
       labelEl.textContent = currentPref === 'dark' ? '深色' : (currentPref === 'light' ? '浅色' : '自动');
@@ -1138,12 +1135,15 @@ function createThemeManager(options = {}) {
       }
     }
 
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-        if (currentPref === 'auto') {
-          apply('auto');
-        }
-      });
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      const mql = window.matchMedia('(prefers-color-scheme: dark)');
+      if (mql && typeof mql.addEventListener === 'function') {
+        mql.addEventListener('change', () => {
+          if (currentPref === 'auto') {
+            apply('auto');
+          }
+        });
+      }
     }
 
     if (toggleBtn) {

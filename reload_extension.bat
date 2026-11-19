@@ -31,6 +31,12 @@ if not defined EDGE_BIN if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application
 if not defined EDGE_BIN if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" set "EDGE_BIN=%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
 if not defined EDGE_BIN if exist "%LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe" set "EDGE_BIN=%LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe"
 
+if defined TARGET if /i not "%TARGET%"=="chrome" if /i not "%TARGET%"=="edge" (
+    echo [ERROR] Unsupported browser target: "%TARGET%"
+    echo         Usage: reload_extension.bat [chrome^|edge]
+    exit /b 1
+)
+
 if /i "%TARGET%"=="edge" (
     if defined EDGE_BIN (
         start "" "%EDGE_BIN%" "edge://extensions/"

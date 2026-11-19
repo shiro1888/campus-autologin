@@ -4466,6 +4466,235 @@ assert.strictEqual(setAttrCalls, 2);
         res = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=False)
         self.assertEqual(res.returncode, 0, f"性能/生命周期运行时校验失败:\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}")
 
+    def test_css_brace_balance_and_focus_geometry(self):
+        """CSS 语法完整性与焦点环几何回归校验：
+        1. 全部扩展样式表的花括号必须严格配平（防止遗留多余 } 破坏解析）；
+        2. popup.css 公共 :focus-visible 规则不得覆写胶囊/圆角按钮的 border-radius；
+        3. popup.css 的 prefers-reduced-motion 不应包含不存在的死伪元素选择器。
+        """
+        for css_name in ("popup.css", "options.css", "shared.css"):
+            with open(os.path.join(EXT_DIR, css_name), "r", encoding="utf-8") as f:
+                src = f.read()
+            clean = re.sub(r"/\*[\s\S]*?\*/", lambda m: "\n" * m.group(0).count("\n"), src)
+            depth = 0
+            for lineno, line in enumerate(clean.splitlines(), 1):
+                for ch in line:
+                    if ch == "{":
+                        depth += 1
+                    elif ch == "}":
+                        depth -= 1
+                        self.assertGreaterEqual(
+                            depth, 0,
+                            f"{css_name} 第 {lineno} 行存在多余的闭合花括号 `}}`"
+                        )
+            self.assertEqual(depth, 0, f"{css_name} 文件末尾存在未闭合花括号 (depth={depth})")
+
+        with open(os.path.join(EXT_DIR, "popup.css"), "r", encoding="utf-8") as f:
+            popup_css = f.read()
+        shared_focus = re.search(
+            r"\.btn-primary:focus-visible[\s\S]*?\{([^}]*)\}", popup_css
+        )
+        self.assertIsNotNone(shared_focus, "popup.css 缺少公共 :focus-visible 规则")
+        self.assertNotIn(
+            "border-radius", shared_focus.group(1),
+            "popup.css 公共 :focus-visible 不应覆写胶囊/圆形按钮的 border-radius"
+        )
+        self.assertNotIn(".status-beacon::before", popup_css)
+        self.assertNotIn(".status-beacon::after", popup_css)
+
+    def test_background_logout_concurrency_and_state_sync(self):
+        """后台并发与状态同步回归校验：
+        1. doLogout 异步抢锁阶段 (logoutClaiming) 必须拒绝 acquireAuthLock，堵住 TOCTOU 竞态；
+        2. autoLogin 途中触发注销补发时，不得重复 saveResult 导致时间轴 repeat 计数虚增为 ×2；
+        3. doLogout 确认下线后必须同步落盘 connState='offline'；
+        4. status 消息检测到离线时不得返回并残留陈旧 onlineSince。
+        """
+        import subprocess
+        bg_path = os.path.join(EXT_DIR, "background.js")
+        js = f"""
+const fs = require('fs'), vm = require('vm'), assert = require('assert');
+const src = fs.readFileSync({bg_path!r}, 'utf8');
+
+function createBgEnv(initStore, fetchImpl) {{
+  const listeners = {{}};
+  const storage = Object.assign({{ initialized: true, account: 'u1', password: 'p1', isp: '1' }}, initStore);
+  const writes = [];
+  const chrome = {{
+    storage: {{ local: {{
+      get: (arg, cb) => {{
+        const r = arg === null ? {{ ...storage }} : (typeof arg === 'object' && !Array.isArray(arg)
+          ? Object.assign({{}}, arg, Object.fromEntries(Object.keys(arg).filter(k => k in storage).map(k => [k, storage[k]])))
+          : {{ ...storage }});
+        if (typeof cb === 'function') {{ cb(r); return; }}
+        return Promise.resolve(r);
+      }},
+      set: (patch, cb) => {{
+        writes.push({{ ...patch }});
+        Object.assign(storage, patch);
+        if (typeof cb === 'function') cb();
+        return Promise.resolve();
+      }}
+    }} }},
+    runtime: {{
+      onInstalled: {{ addListener: (f) => listeners.installed = f }},
+      onStartup: {{ addListener: (f) => listeners.startup = f }},
+      onMessage: {{ addListener: (f) => listeners.message = f }},
+      getManifest: () => ({{ version: '1.0.0' }}),
+      lastError: null
+    }},
+    alarms: {{ onAlarm: {{ addListener: () => {{}} }}, get: async () => null, create: async () => {{}} }},
+    action: {{ setBadgeText: () => {{}}, setBadgeBackgroundColor: () => {{}} }},
+    commands: null,
+    webNavigation: {{ onCommitted: {{ addListener: () => {{}} }}, onErrorOccurred: {{ addListener: () => {{}} }} }}
+  }};
+  const ctx = {{
+    console: {{ log: () => {{}}, warn: () => {{}}, error: () => {{}} }},
+    chrome,
+    setTimeout: (fn) => setTimeout(fn, 0),
+    clearTimeout,
+    setInterval: () => 0,
+    clearInterval: () => {{}},
+    Date, Math, JSON, Promise, Number, String, Array, Object, RegExp,
+    parseInt, parseFloat, isNaN, Boolean, Set, Map, Error,
+    TextDecoder, TextEncoder, AbortController, Uint8Array, ArrayBuffer, URLSearchParams,
+    fetch: fetchImpl
+  }};
+  vm.createContext(ctx);
+  vm.runInContext(src, ctx);
+  const send = (msg) => new Promise((resolve) => listeners.message(msg, {{}}, resolve));
+  return {{ ctx, storage, writes, send }};
+}}
+
+function mkResp(body) {{
+  const buf = new TextEncoder().encode(body).buffer;
+  return Promise.resolve({{
+    headers: {{ get: () => 'application/javascript; charset=utf-8' }},
+    arrayBuffer: () => Promise.resolve(buf)
+  }});
+}}
+
+(async () => {{
+  // 1. acquireAuthLock 必须尊重 logoutClaiming 过渡锁
+  {{
+    let releaseGet;
+    const env = createBgEnv({{ connState: 'online' }}, () => mkResp('dr1001({{"result":0}})'));
+    const origGet = env.ctx.chrome.storage.local.get;
+    let pausedOnce = false;
+    env.ctx.chrome.storage.local.get = (arg, cb) => {{
+      if (!pausedOnce) {{
+        pausedOnce = true;
+        return new Promise((r) => {{ releaseGet = () => r(origGet(arg, cb)); }});
+      }}
+      return origGet(arg, cb);
+    }};
+    const logoutP = env.send({{ type: 'logout' }});
+    const lockRes = await env.send({{ type: 'acquireAuthLock' }});
+    assert.strictEqual(lockRes.ok, false, 'doLogout 抢锁过渡期必须拒绝 content script 抢锁');
+    assert.strictEqual(lockRes.busy, true);
+    assert.strictEqual(lockRes.reason, 'logout');
+    releaseGet();
+    await logoutP;
+    assert.strictEqual(env.storage.connState, 'offline', 'doLogout 下线后必须落盘 connState=offline');
+  }}
+
+  // 2. autoLogin 登录途中用户点注销 -> 补发注销只记 1 次日志（count=1，不重复 saveResult）
+  {{
+    let chkCalls = 0;
+    const env = createBgEnv({{ connState: 'offline' }}, (url) => {{
+      if (url.includes('/drcom/chkstatus')) {{
+        chkCalls++;
+        return mkResp('dr1001({{"result":0}})');
+      }}
+      if (url.includes('/drcom/login')) {{
+        // 模拟登录请求在途期间用户点了注销（落盘 manualLogout=true）
+        env.storage.manualLogout = true;
+        return mkResp('dr1002({{"result":1}})');
+      }}
+      return mkResp('dr1003({{"result":1}})');
+    }});
+    const r = await env.ctx.autoLogin('定时', false);
+    assert.strictEqual(r.ok, true);
+    assert.strictEqual(r.online, false);
+    assert.strictEqual(env.storage.eventLogs.length, 1, '补发注销只应记录 1 条日志');
+    assert.strictEqual(env.storage.eventLogs[0].count, 1, '不得因重复 saveResult 产生 ×2 虚增计数');
+  }}
+
+  // 3. status 检测到离线时必须清理陈旧 onlineSince
+  {{
+    const staleSince = Date.now() - 3600 * 1000;
+    const env = createBgEnv({{ onlineSince: staleSince, connState: 'online' }}, () => mkResp('dr1001({{"result":0}})'));
+    const st = await env.send({{ type: 'status' }});
+    assert.strictEqual(st.online, false);
+    assert.strictEqual(st.onlineSince, null, '离线状态下 status 不得返回陈旧 onlineSince');
+    assert.strictEqual(env.storage.onlineSince, null, '离线状态下 status 应清理存储中的陈旧 onlineSince');
+  }}
+}})().catch((e) => {{ console.error(e); process.exit(1); }});
+"""
+        res = subprocess.run(["node", "-e", js], capture_output=True, text=True, encoding="utf-8", timeout=30)
+        self.assertEqual(res.returncode, 0, f"后台并发与状态同步回归失败:\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}")
+
+    def test_ui_accessibility_and_error_state_polish(self):
+        """UI 无障碍清理、错误态同步与大文件导入防护回归校验：
+        1. createFlowMeter 在 reset() / 无流量时必须清除陈旧 aria-label；
+        2. content.js 兜底登录失败 report() 复用去重后的 displayMsg，不出现双前缀；
+        3. options.js 恢复默认必须清理 logoutResidualOnline 并带 initialized=true，
+           后台无响应时重置 pingBadge，大文件导入 (>1MB) 直接拦截。
+        """
+        import subprocess
+        common_path = os.path.join(EXT_DIR, "common.js")
+        content_path = os.path.join(EXT_DIR, "content.js")
+        options_path = os.path.join(EXT_DIR, "options.js")
+        js = f"""
+const fs = require('fs'), vm = require('vm'), assert = require('assert');
+
+// 1. createFlowMeter clears stale aria-label on reset() and empty flow
+{{
+  const mkNode = () => {{
+    const attrs = new Map();
+    const cls = new Set();
+    return {{
+      style: {{}},
+      textContent: '',
+      classList: {{ add: (c) => cls.add(c), remove: (c) => cls.delete(c), contains: (c) => cls.has(c) }},
+      setAttribute: (k, v) => attrs.set(k, String(v)),
+      getAttribute: (k) => attrs.has(k) ? attrs.get(k) : null,
+      hasAttribute: (k) => attrs.has(k),
+      removeAttribute: (k) => attrs.delete(k)
+    }};
+  }};
+  const nodes = {{
+    card: mkNode(), total: mkNode(), wrap: mkNode(), dl: mkNode(), ul: mkNode()
+  }};
+  const ctx = {{ document: {{ getElementById: (id) => nodes[id] || null }}, console }};
+  vm.runInNewContext(fs.readFileSync({common_path!r}, 'utf8'), ctx);
+  const fm = ctx.createFlowMeter({{ cardEl: 'card', totalEl: 'total', wrapEl: 'wrap', dlBarEl: 'dl', ulBarEl: 'ul' }});
+  fm.render({{ flow: 2048, actdf: 1500, actuf: 548 }}, true);
+  assert.ok(nodes.total.getAttribute('aria-label'), '有流量时应设置 aria-label');
+  assert.ok(nodes.wrap.getAttribute('aria-label'), '有流量时进度条应设置 aria-label');
+  fm.reset();
+  assert.strictEqual(nodes.total.getAttribute('aria-label'), null, 'reset 后必须清除陈旧 aria-label');
+  assert.strictEqual(nodes.wrap.getAttribute('aria-label'), null, 'reset 后进度条必须清除陈旧 aria-label');
+}}
+
+// 2. content.js 兜底登录失败文案不得双重拼接「登录失败：」
+{{
+  const src = fs.readFileSync({content_path!r}, 'utf8');
+  assert.ok(src.includes('message: displayMsg'), 'content.js report() 应复用去重后的 displayMsg');
+  assert.ok(!src.includes("message: r.ok ? '登录成功（兜底请求）' : ('登录失败：' + (r.msg || '认证被拒绝'))"));
+}}
+
+// 3. options.js 恢复默认清理 logoutResidualOnline + 错误态重置 pingBadge + 导入 1MB 上限守卫
+{{
+  const src = fs.readFileSync({options_path!r}, 'utf8');
+  assert.ok(src.includes('logoutResidualOnline: false'), '恢复默认设置必须同步清理 logoutResidualOnline');
+  assert.ok(src.includes('MAX_IMPORT_BYTES'), '配置导入必须具备文件大小上限保护');
+  assert.ok(src.includes("errPingBadge.className = 'latency-badge slow'"), '后台无响应时必须重置 pingBadge 避免残留');
+  assert.ok(src.includes('normalizeStatusMessage(text(r && r.message))'), 'stLast 展示应与时间轴统一经过 normalizeStatusMessage');
+}}
+"""
+        res = subprocess.run(["node", "-e", js], capture_output=True, text=True, encoding="utf-8", timeout=30)
+        self.assertEqual(res.returncode, 0, f"UI 无障碍与错误态回归失败:\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}")
+
 
 if __name__ == "__main__":
     unittest.main()

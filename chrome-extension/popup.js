@@ -82,6 +82,7 @@ const popupToast = createToastManager({
 });
 let refreshSeq = 0;
 let spinTimer = null;
+let deferredRefreshTimer = null;
 let userToastExpiresAt = 0;
 let lastStoredMsgKey = '';
 let dismissedStoredMsgKey = '';
@@ -386,7 +387,9 @@ $('btnLogin')?.addEventListener('click', () => {
   chrome.runtime.sendMessage({ type: 'login' }, (res) => {
     btn.disabled = false;
     btn.classList.remove('loading');
-    $('btnLoginText').textContent = (res && res.online) ? '刷新状态' : '立即登录';
+    const isNowOnline = !!(res && res.online);
+    btn.classList.toggle('online-mode', isNowOnline);
+    $('btnLoginText').textContent = isNowOnline ? '刷新状态' : '立即登录';
 
     if (chrome.runtime.lastError || !res) {
       lastPopupOnlineState = false;
@@ -398,7 +401,11 @@ $('btnLogin')?.addEventListener('click', () => {
       lastPopupOnlineState = true;
     }
     setMsg(res.message || '完成', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));
-    setTimeout(() => refresh(undefined, { showStoredToast: false }), 500);
+    if (deferredRefreshTimer) clearTimeout(deferredRefreshTimer);
+    deferredRefreshTimer = setTimeout(() => {
+      deferredRefreshTimer = null;
+      refresh(undefined, { showStoredToast: false });
+    }, 500);
   });
 });
 
@@ -422,7 +429,11 @@ const logoutConfirmCtrl = createConfirmButton('btnLogout', {
         return;
       }
       setMsg(res.message || '注销完成', res.skipped ? 'info' : (res.ok ? 'ok' : 'err'));
-      setTimeout(() => refresh(undefined, { showStoredToast: false }), 600);
+      if (deferredRefreshTimer) clearTimeout(deferredRefreshTimer);
+      deferredRefreshTimer = setTimeout(() => {
+        deferredRefreshTimer = null;
+        refresh(undefined, { showStoredToast: false });
+      }, 600);
     });
   }
 });
@@ -623,7 +634,7 @@ if (accountIspEl && ispQuickSheet) {
   });
 
   document.addEventListener('click', (e) => {
-    if (ispQuickSheet.classList.contains('open') && !e.target.closest('#ispQuickSheet')) {
+    if (ispQuickSheet.classList.contains('open') && (!e.target || typeof e.target.closest !== 'function' || !e.target.closest('#ispQuickSheet'))) {
       toggleIspSheet(false, false);
     }
   });
@@ -663,10 +674,15 @@ window.addEventListener('pagehide', () => {
     clearTimeout(spinTimer);
     spinTimer = null;
   }
+  if (deferredRefreshTimer) {
+    clearTimeout(deferredRefreshTimer);
+    deferredRefreshTimer = null;
+  }
   if (statusRippleRaf && typeof cancelAnimationFrame === 'function') {
     cancelAnimationFrame(statusRippleRaf);
     statusRippleRaf = 0;
   }
   durationTicker.stop();
+  logoutConfirmCtrl.reset();
   if (privacyMask && privacyMask.destroy) privacyMask.destroy();
 });

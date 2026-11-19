@@ -415,7 +415,6 @@ body {
     color: #fbbf24;
   }
 }
-}
 
 #btnRefresh:hover .icon-refresh {
   transform: rotate(45deg);
@@ -2179,8 +2178,14 @@ body {
   .status-card::after,
   .btn-shimmer,
   .status-ripple-wave,
-  .status-beacon::before,
-  .status-beacon::after {
+  .status-glow,
+  .status-beacon .dot,
+  .status-beacon .pulse-ring,
+  .avatar-beacon.on,
+  .avatar-beacon.on::after,
+  .avatar-beacon.wait,
+  .avatar-beacon.wait::after,
+  .flow-bar-wrap::after {
     animation: none !important;
   }
 }
@@ -2242,11 +2247,10 @@ body {
 #account:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
-.flow-dock-item:focus-visible {
-  border-radius: var(--radius-lg);
+#account:focus-visible {
+  border-radius: 4px;
 }
 
 /* ==========================================================================

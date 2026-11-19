@@ -447,7 +447,8 @@ function clampInterval(v) {
 /** 把分钟数显示成人话：1/60 -> "1 秒"，0.5 -> "30 秒"，1 -> "1 分钟" */
 function formatInterval(min) {
   if (min < 1) return Math.round(min * 60) + ' 秒';
-  return min + ' 分钟';
+  const cleanMin = Number.isInteger(min) ? min : Number(min.toFixed(2));
+  return cleanMin + ' 分钟';
 }
 
 function safeBadgeCall(p) {
@@ -573,7 +574,7 @@ const MAX_PING_HISTORY = 12;
 const pingHistory = [];
 
 function recordPingHistory(ms) {
-  if (typeof ms === 'number') {
+  if (typeof ms === 'number' && Number.isFinite(ms)) {
     pingHistory.push(ms);
     if (pingHistory.length > MAX_PING_HISTORY) {
       pingHistory.shift();
@@ -798,6 +799,7 @@ async function doLogout() {
     authStateEpoch += 1;
     await setState({ manualLogout: true, unreachableStreak: 0 });
     unreachableStreak = 0;
+    lastPersistedStreak = 0;
 
     // 若当前有登录认证在进行中，等待登录检测到 manualLogout 后主动让出退出（最多等待 3 秒）
     if (activeAuthOp) {
@@ -891,6 +893,7 @@ async function _doLogoutInternal(opts) {
   authStateEpoch += 1;
   await setState({ manualLogout: true, unreachableStreak: 0 });
   unreachableStreak = 0;
+  lastPersistedStreak = 0;
 
   try {
     await fetchText(PORTAL_ORIGIN + '/drcom/logout?' + p1.toString());
@@ -907,8 +910,10 @@ async function _doLogoutInternal(opts) {
     // 网关不可达，无法确认是否下线（C11：区分确认离线与无法确认）
     onlineSince = null;
     authStateEpoch += 1;
-    await setState({ manualLogout: true, logoutResidualOnline: false, unreachableStreak: 0, onlineSince: null });
     connState = 'unreachable';
+    unreachableStreak = 0;
+    lastPersistedStreak = 0;
+    await setState({ manualLogout: true, logoutResidualOnline: false, connState: 'unreachable', unreachableStreak: 0, onlineSince: null });
     const res = fail('注销请求已提交，但当前网关不可达，无法确认是否成功下线', false);
     res.state = 'unknown';
     await saveResult(res, '手动注销');
@@ -921,8 +926,10 @@ async function _doLogoutInternal(opts) {
     // 门户返回非认证数据：online 恒为 false，但这不是「已下线」，不能据此报成功。
     onlineSince = null;
     authStateEpoch += 1;
-    await setState({ manualLogout: true, logoutResidualOnline: false, unreachableStreak: 0, onlineSince: null });
     connState = 'unparseable';
+    unreachableStreak = 0;
+    lastPersistedStreak = 0;
+    await setState({ manualLogout: true, logoutResidualOnline: false, connState: 'unparseable', unreachableStreak: 0, onlineSince: null });
     const res = fail('注销请求已提交，但无法确认是否成功下线（门户返回非认证数据）', false);
     res.state = 'unknown';
     await saveResult(res, '手动注销');
@@ -935,9 +942,10 @@ async function _doLogoutInternal(opts) {
     // 注销成功 -> 置上抑制标志，暂停自动登录，并清空本地在线会话计时
     onlineSince = null;
     authStateEpoch += 1;
-    await setState({ manualLogout: true, logoutResidualOnline: false, unreachableStreak: 0, onlineSince: null });
     unreachableStreak = 0;
+    lastPersistedStreak = 0;
     connState = 'offline';
+    await setState({ manualLogout: true, logoutResidualOnline: false, connState: 'offline', unreachableStreak: 0, onlineSince: null });
     const res = ok('已注销下线（自动登录已暂停，点「立即登录」可恢复）', false);
     await saveResult(res, '手动注销');
     // 需先落盘 manualLogout=true，ensureAlarm 才会按暂停态选空闲间隔
@@ -949,6 +957,8 @@ async function _doLogoutInternal(opts) {
   const res = fail('注销请求已提交，但会话仍在（可能需到门户页面手动注销）', true);
   // 会话仍在有两种可能：(a) 门户不支持自助注销；(b) 并发登录正在途中，稍后会完成。
   // 置 logoutResidualOnline=true 防止下一轮巡检看到该残留会话在线就误判为用户手动重连并解除暂停。
+  unreachableStreak = 0;
+  lastPersistedStreak = 0;
   await setState({ manualLogout: true, logoutResidualOnline: true, unreachableStreak: 0 });
   console.log('[logout] 会话未清除，保持注销暂停并标记残留会话以避免自动撤销暂停');
   await updateConnState(stAfter);
@@ -1053,6 +1063,7 @@ async function autoLogin(trigger, manual) {
       authStateEpoch += 1;
       await setState({ manualLogout: false, logoutResidualOnline: false, unreachableStreak: 0 });
       unreachableStreak = 0;
+      lastPersistedStreak = 0;
       paused = false;
       console.log(tag + '用户手动登录，已解除注销暂停');
     }
@@ -1060,6 +1071,7 @@ async function autoLogin(trigger, manual) {
     // 否则用户从长时间不可达状态手动点登录，仍会卡在 60 秒退避，体验极差。
     if (manual && !paused && unreachableStreak > 0) {
       unreachableStreak = 0;
+      lastPersistedStreak = 0;
       await setState({ unreachableStreak: 0 });
       console.log(tag + '用户手动登录，已重置退避计数');
     }
@@ -1106,6 +1118,8 @@ async function autoLogin(trigger, manual) {
     }
     if (paused) {
       authStateEpoch += 1;
+      unreachableStreak = 0;
+      lastPersistedStreak = 0;
       await setState({ manualLogout: false, logoutResidualOnline: false, unreachableStreak: 0 });
       console.log(tag + '检测到已在线（用户可能自行登录），自动恢复守护');
     }
@@ -1153,17 +1167,20 @@ async function autoLogin(trigger, manual) {
     //   其实还在计费上网，且插件自认为暂停、不会再纠正。
     if ((await getSettings()).manualLogout) {
       console.log(tag + '登录期间用户已注销，补发注销以尊重用户意图');
-      const lr = await runLogoutOnce();
-      await saveResult(lr, '手动注销');
-      return lr;
+      // runLogoutOnce() 内部每条返回路径均已调用 saveResult(res, '手动注销')，
+      // 此处不重复写盘，避免同一注销事件产生双写与时间轴 ×2 虚增计数。
+      return await runLogoutOnce();
     }
 
-    // 5) 登录后二次验证（三态：确认在线 / 确认未在线 / 什么都没确认到）
+    // 5) 登录后二次验证（四态：确认在线 / 返回非认证数据 / 确认未在线 / 不可达待确认）
     if (r.ok) {
       const st2 = await checkStatus();
       await updateConnState(st2);
       if (st2.reachable && st2.online) {
         r = ok('登录成功，已确认在线', true);
+      } else if (st2.reachable && st2.unparseable) {
+        r = ok('登录请求已提交，复查返回非认证数据，待下一轮巡检确认', false);
+        r.pending = true;
       } else if (st2.reachable) {
         // 注意：这里**不能**判为凭据类错误。门户已接受认证（result:1），
         // 只是内核生效有延迟 —— 这属于「真掉线」场景，必须保持 1 秒快速重试。
@@ -1426,7 +1443,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         let curOnlineSince = onlineSince || s.onlineSince || null;
         if (reqEpoch !== authStateEpoch || s.manualLogout) {
           if (!st.online || s.manualLogout) curOnlineSince = null;
-        } else if (st.online && !curOnlineSince) {
+        } else if (!st.online) {
+          curOnlineSince = null;
+          if (onlineSince !== null || s.onlineSince) {
+            onlineSince = null;
+            await setState({ onlineSince: null });
+          }
+        } else if (!curOnlineSince) {
           curOnlineSince = deriveOnlineSince(st.raw);
           onlineSince = curOnlineSince;
           await setState({ onlineSince: curOnlineSince });
@@ -1491,8 +1514,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'acquireAuthLock') {
-    if (activeAuthOp || running) {
-      sendResponse({ ok: false, busy: true, reason: activeAuthOp || 'running' });
+    if (activeAuthOp || running || logoutClaiming) {
+      sendResponse({ ok: false, busy: true, reason: activeAuthOp || (logoutClaiming ? 'logout' : 'running') });
     } else {
       activeAuthOp = 'content';
       running = true;

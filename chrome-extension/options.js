@@ -452,7 +452,7 @@ function refreshStatus(cb) {
     // 故只接受字符串/数字（时间是 "HH:MM:SS" 字符串，也可能是时间戳）。
     const text = (v) => (typeof v === 'string' || typeof v === 'number') ? String(v) : '';
     const t = text(r && r.time);
-    const m = text(r && r.message);
+    const m = normalizeStatusMessage(text(r && r.message));
     $('stLast').textContent = [t, m].filter(Boolean).join(' · ') || '暂无记录';
     activityTimeline.render((s && Array.isArray(s.eventLogs)) ? s.eventLogs : []);
   });
@@ -486,9 +486,12 @@ function refreshStatus(cb) {
       setTelemetryAria('stMac', '物理 MAC 地址暂不可用');
       $('stTime').textContent = '—';
       $('stPing').textContent = '—';
+      const errPingBadge = $('pingBadge');
+      if (errPingBadge) {
+        errPingBadge.className = 'latency-badge slow';
+        errPingBadge.textContent = '超时';
+      }
       renderOptPingSparkline(-1);
-      $('stFlow').textContent = '—';
-      $('stFlowDetail').textContent = '流量明细: —';
       optFlowMeter.reset();
       $('stStime').textContent = '上线时间: —';
       $('btnLogoutNow').disabled = true;
@@ -690,6 +693,7 @@ const SECTION_ORDER = ['overview', 'credentials', 'automation', 'backup'];
 let currentSectionKey = 'overview';
 let lastIndicatorW = 0;
 let lastIndicatorH = 0;
+let sidebarResizeRaf = 0;
 
 function updateSidebarIndicator(activeNavEl, immediate = false) {
   const ind = $('sidebarNavIndicator');
@@ -805,15 +809,14 @@ function initSidebarNavigation() {
     });
   }
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-    let resizeRaf = 0;
     window.addEventListener('resize', () => {
-      if (resizeRaf) return;
+      if (sidebarResizeRaf) return;
       const run = () => {
-        resizeRaf = 0;
+        sidebarResizeRaf = 0;
         updateSidebarIndicator($(SECTION_META[currentSectionKey].navId), true);
       };
       if (typeof requestAnimationFrame === 'function') {
-        resizeRaf = requestAnimationFrame(run);
+        sidebarResizeRaf = requestAnimationFrame(run);
       } else {
         run();
       }
@@ -1022,7 +1025,7 @@ bindInteractiveNode($('topoNodeInternet'), () => {
 
 // --- 巡检事件流抽屉操作：复制脱敏诊断报告 & 清空日志 ---
 $('btnCopyDiagnostic')?.addEventListener('click', () => {
-  chrome.storage.local.get(['eventLogs', 'lastResult'], (s) => {
+  chrome.storage.local.get(['eventLogs'], (s) => {
     const safeLogs = (!chrome.runtime.lastError && s && Array.isArray(s.eventLogs)) ? s.eventLogs : [];
     const reportText = generateDiagnosticSnapshot({
       account: $('account')?.value?.trim() || '',
@@ -1068,7 +1071,9 @@ $('btnResetDefaults').addEventListener('click', () => {
       // 清掉「凭据类错误」标记（否则用户改好密码后点恢复默认，仍会被低频重试挡着）。
       chrome.storage.local.set({
         ...DEFAULTS,
+        initialized: true,
         manualLogout: false,
+        logoutResidualOnline: false,
         unreachableStreak: 0,
         connState: 'unknown',
         authError: false,
@@ -1161,6 +1166,12 @@ if ($('btnImportConfig') && $('importFileInput')) {
   $('importFileInput').addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
+    const MAX_IMPORT_BYTES = 1024 * 1024;
+    if (typeof file.size === 'number' && file.size > MAX_IMPORT_BYTES) {
+      showToast('导入失败：配置文件过大（超过 1 MB），请确认选择了正确的 JSON 备份', 'err');
+      $('importFileInput').value = '';
+      return;
+    }
 
     const reader = new FileReader();
     // 读取阶段的失败只触发 error、不触发 load，onload 里的 try/catch 兜不住。
@@ -1229,6 +1240,7 @@ if ($('btnImportConfig') && $('importFileInput')) {
         // 导入的是一份「新的」配置：清掉凭据错误标记，让新凭据立刻按正常节奏生效。
         // 否则若之前因密码错而降频，导入正确配置后仍会被低频重试挡着。
         toSave.authError = false;
+        toSave.initialized = true;
 
         chrome.storage.local.set(toSave, () => {
           setDirtyState(false);
@@ -1252,7 +1264,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     const r = changes.lastResult.newValue;
     const text = (v) => (typeof v === 'string' || typeof v === 'number') ? String(v) : '';
     const t = text(r && r.time);
-    const m = text(r && r.message);
+    const m = normalizeStatusMessage(text(r && r.message));
     if ($('stLast')) {
       $('stLast').textContent = [t, m].filter(Boolean).join(' · ') || '暂无记录';
     }
@@ -1355,7 +1367,12 @@ window.addEventListener('pagehide', () => {
     cancelAnimationFrame(heroRippleRaf);
     heroRippleRaf = 0;
   }
+  if (sidebarResizeRaf && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(sidebarResizeRaf);
+    sidebarResizeRaf = 0;
+  }
   durationTicker.stop();
+  logoutConfirmBtn.reset();
   passwordToggle.rehide();
   if (activityTimeline && activityTimeline.destroy) activityTimeline.destroy();
   if (privacyMask && privacyMask.destroy) privacyMask.destroy();
