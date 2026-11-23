@@ -283,12 +283,12 @@ function initIspQuickPills() {
     }
   };
   wrap.addEventListener('click', (e) => {
-    const btn = e.target.closest('.isp-pill');
+    const btn = e && e.target && typeof e.target.closest === 'function' ? e.target.closest('.isp-pill') : null;
     if (btn) selectPill(btn);
   });
   wrap.addEventListener('keydown', (e) => {
     const pills = Array.from(wrap.querySelectorAll('.isp-pill'));
-    const idx = pills.indexOf(e.target.closest('.isp-pill'));
+    const idx = pills.indexOf(e && e.target && typeof e.target.closest === 'function' ? e.target.closest('.isp-pill') : null);
     if (idx === -1) return;
     let nextIdx = -1;
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
@@ -642,6 +642,11 @@ function save(cb) {
   // 使新凭据或运算符配置立即恢复正常重试节奏。
   const payload = Object.assign({}, data, { authError: false });
   chrome.storage.local.set(payload, () => {
+    if (chrome.runtime && chrome.runtime.lastError) {
+      showToast('保存配置失败，请重试', 'err');
+      if (cb) cb(false);
+      return;
+    }
     savedCredentials = { account: data.account, password: data.password };
     setDirtyState(false);
     updatePolicySummaryPill();
@@ -657,6 +662,11 @@ function save(cb) {
 function savePartialSetting(patch, cb) {
   const payload = Object.assign({}, patch, { initialized: true });
   chrome.storage.local.set(payload, () => {
+    if (chrome.runtime && chrome.runtime.lastError) {
+      showToast('保存设置失败，请重试', 'err');
+      if (cb) cb(false);
+      return;
+    }
     updatePolicySummaryPill();
     syncIspQuickPills();
     syncDirtyState();
@@ -737,6 +747,13 @@ function updateSidebarIndicator(activeNavEl, immediate = false) {
 function switchOptionsSection(sectionKey, syncHash = true, immediateIndicator = false) {
   const key = SECTION_META[sectionKey] ? sectionKey : 'overview';
   currentSectionKey = key;
+
+  if (typeof closeAllCustomSelects === 'function') {
+    closeAllCustomSelects();
+  }
+  if (key !== 'overview' && activityTimeline && typeof activityTimeline.toggle === 'function') {
+    activityTimeline.toggle(false);
+  }
 
   for (const k of SECTION_ORDER) {
     const item = SECTION_META[k];
@@ -830,8 +847,8 @@ $('form').addEventListener('submit', (e) => {
 
   // 只有「测试登录」才需要凭据；非凭据设置先保存下来（U6）
   if (!hasCredentials()) {
-    save(() => {
-      showToast('设置已保存（提示：账号或密码为空，未发起登录连接）。', 'warn');
+    save((ok) => {
+      if (ok) showToast('设置已保存（提示：账号或密码为空，未发起登录连接）。', 'warn');
     });
     const s = readForm();
     // 自动切回凭据视图，避免用户停留在其他分页时校验红框与焦点不可见
@@ -867,7 +884,15 @@ $('form').addEventListener('submit', (e) => {
   const topoStrip = $('networkTopology');
   if (topoStrip) topoStrip.classList.add('authenticating');
 
-  save(() => {
+  save((ok) => {
+    if (!ok) {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      $('btnSaveText').textContent = '保存并连接';
+      const topo = $('networkTopology');
+      if (topo) topo.classList.remove('authenticating');
+      return;
+    }
     chrome.runtime.sendMessage({ type: 'login' }, (res) => {
       btn.disabled = false;
       btn.classList.remove('loading');
@@ -944,8 +969,8 @@ $('btnLoginNow').addEventListener('click', () => {
         e.preventDefault();
         clearFieldError('account');
         clearFieldError('password');
-        save(() => {
-          showToast('设置已自动保存', 'ok');
+        save((ok) => {
+          if (ok) showToast('设置已自动保存', 'ok');
         });
       }
     });
@@ -1079,6 +1104,10 @@ $('btnResetDefaults').addEventListener('click', () => {
         authError: false,
         onlineSince: null
       }, () => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          showToast('恢复默认设置失败，请重试', 'err');
+          return;
+        }
         setDirtyState(false);
         load();
         chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => { void chrome.runtime.lastError; });
@@ -1243,6 +1272,10 @@ if ($('btnImportConfig') && $('importFileInput')) {
         toSave.initialized = true;
 
         chrome.storage.local.set(toSave, () => {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            showToast('导入失败：写入本地配置时出错', 'err');
+            return;
+          }
           setDirtyState(false);
           load();
           chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => { void chrome.runtime.lastError; });
@@ -1297,7 +1330,9 @@ $('password')?.addEventListener('input', () => clearFieldError('password'));
   const el = $(id);
   if (el) {
     el.addEventListener('change', () => {
-      savePartialSetting({ [id]: !!el.checked }, () => showToast('设置已自动保存。', 'ok'));
+      savePartialSetting({ [id]: !!el.checked }, (ok) => {
+        if (ok) showToast('设置已自动保存。', 'ok');
+      });
     });
   }
 });
@@ -1305,7 +1340,8 @@ $('password')?.addEventListener('input', () => clearFieldError('password'));
 $('adaptive')?.addEventListener('change', () => {
   syncOfflineRow();
   updatePolicySummaryPill();
-  savePartialSetting({ adaptive: !!$('adaptive').checked }, () => {
+  savePartialSetting({ adaptive: !!$('adaptive').checked }, (ok) => {
+    if (!ok) return;
     showToast($('adaptive').checked
       ? `已启用自适应重连加速（掉线重试：${fmt($('offlineIntervalMin').value)}）`
       : '已关闭自适应加速，统一使用常规间隔。', 'ok');
@@ -1320,7 +1356,9 @@ $('adaptive')?.addEventListener('change', () => {
       const parsed = parseFloat(el.value);
       const val = Number.isFinite(parsed) ? parsed : DEFAULTS[id];
       updatePolicySummaryPill();
-      savePartialSetting({ [id]: val }, () => showToast('参数已自动保存并生效。', 'ok'));
+      savePartialSetting({ [id]: val }, (ok) => {
+        if (ok) showToast('参数已自动保存并生效。', 'ok');
+      });
     });
   }
 });
@@ -1328,8 +1366,8 @@ $('adaptive')?.addEventListener('change', () => {
 $('isp')?.addEventListener('change', () => {
   syncIspQuickPills();
   // 切换运营商后与弹窗保持一致，清除凭据降频标记以恢复正常重试节奏
-  savePartialSetting({ isp: $('isp').value, authError: false }, () => {
-    showToast('运营商已保存并生效。', 'ok');
+  savePartialSetting({ isp: $('isp').value, authError: false }, (ok) => {
+    if (ok) showToast('运营商已保存并生效。', 'ok');
   });
 });
 

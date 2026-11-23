@@ -816,6 +816,8 @@ async function doLogout() {
       if (lastLogoutResult && Date.now() - lastLogoutAt < LOGOUT_DEDUP_MS) {
         return lastLogoutResult;
       }
+      // 已落盘 manualLogout=true，立即把闹钟降回常规间隔（尤其当占用者是 content 时它不会调用 ensureAlarm）
+      await ensureAlarm();
       return fail(`当前正在进行${activeAuthOp === 'content' ? '页面认证' : '网络操作'}，已暂停自动登录；该操作结束后不会自动重连`, false);
     }
 

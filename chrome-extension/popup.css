@@ -519,11 +519,10 @@ body {
   height: 150px;
   pointer-events: none;
   border-radius: 50%;
-  opacity: 0.65;
-  filter: blur(24px);
+  opacity: 0.72;
   will-change: transform, opacity;
   transition: opacity 0.4s ease;
-  background: radial-gradient(circle at 35% 35%, rgba(148, 163, 184, 0.12) 0%, transparent 70%);
+  background: radial-gradient(circle at 35% 35%, rgba(148, 163, 184, 0.14) 0%, transparent 70%);
 }
 
 /* State Morphing Ripple Wave (网络认证成功瞬间的柔和物理扩散波纹) */
@@ -1526,9 +1525,6 @@ body {
   0%, 100% { transform: translateX(-50%) scale(0.9); opacity: 0.6; }
   50% { transform: translateX(-50%) scale(1.6); opacity: 1; }
 }
-
-
-
 
 .dock-value.mono,
 .mono,

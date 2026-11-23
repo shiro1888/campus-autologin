@@ -581,13 +581,17 @@ if (accountIspEl && ispQuickSheet) {
 
   ispQuickSheet.addEventListener('click', (e) => {
     e.stopPropagation();
-    const btn = e.target.closest('.isp-sheet-btn');
+    const btn = e && e.target && typeof e.target.closest === 'function' ? e.target.closest('.isp-sheet-btn') : null;
     if (!btn) return;
     const next = btn.getAttribute('data-isp');
     if (!next || !ISP_ORDER.includes(next)) return;
 
     const meta = getIspMeta(next);
     chrome.storage.local.set({ isp: next, authError: false }, () => {
+      if (chrome.runtime && chrome.runtime.lastError) {
+        setMsg('切换运营商失败，请重试', 'err', 2400);
+        return;
+      }
       syncIspDisplay(next);
       toggleIspSheet(false, true);
       chrome.runtime.sendMessage({ type: 'settingsChanged' }, () => {

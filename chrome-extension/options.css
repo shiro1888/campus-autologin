@@ -205,8 +205,6 @@ body {
   z-index: 1;
 }
 
-
-
 /* ==========================================================================
    Sidebar Brand, Utilities & Badges
    ========================================================================== */
@@ -473,8 +471,6 @@ body {
   height: 12px;
 }
 
-
-
 /* ==========================================================================
    Card Base
    ========================================================================== */
@@ -485,6 +481,7 @@ body {
   box-shadow: var(--shadow-card);
   overflow: hidden;
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
@@ -497,8 +494,6 @@ body {
     box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 }
-
-
 
 /* ==========================================================================
    Hero Status & Telemetry Radar Deck

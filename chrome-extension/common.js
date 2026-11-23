@@ -1004,6 +1004,7 @@ function initAccent(callback) {
   // 记录最新回调：监听器只注册一次，但每次调用都应让新回调接管后续变更
   if (typeof callback === 'function') accentOnChange = callback;
   chrome.storage.local.get({ accentColor: 'blue' }, (res) => {
+    if (chrome.runtime && chrome.runtime.lastError) return;
     const acc = applyAccent(res && res.accentColor);
     if (typeof callback === 'function') callback(acc);
   });
@@ -1084,6 +1085,11 @@ function createThemeManager(options = {}) {
         _themeSelfWriteTimer = setTimeout(() => { _themeSelfWriteValue = null; }, 300);
 
         chrome.storage.local.set({ theme: next }, () => {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            _themeSelfWriteValue = null;
+            finishCycle();
+            return;
+          }
           const reducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
           if (!reducedMotion && typeof document !== 'undefined' && typeof document.startViewTransition === 'function') {
             try {
@@ -1117,6 +1123,7 @@ function createThemeManager(options = {}) {
     _themeApplyFn = apply;
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
       chrome.storage.local.get({ theme: 'auto' }, (s) => {
+        if (chrome.runtime && chrome.runtime.lastError) return;
         apply(s && s.theme);
       });
 
@@ -1740,7 +1747,7 @@ function initCustomSelects(root = document) {
   if (!root._customSelectGlobalBound && typeof document !== 'undefined') {
     root._customSelectGlobalBound = true;
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('.select-wrap')) {
+      if (!e || !e.target || typeof e.target.closest !== 'function' || !e.target.closest('.select-wrap')) {
         closeAllCustomSelects();
       }
     });
@@ -1787,15 +1794,18 @@ function createPrivacyMaskManager(options = {}) {
   }
 
   function toggle() {
-    isMasked = !isMasked;
+    const nextMasked = !isMasked;
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.set({ privacyMask: isMasked }, () => {
+      chrome.storage.local.set({ privacyMask: nextMasked }, () => {
+        if (chrome.runtime && chrome.runtime.lastError) return;
+        isMasked = nextMasked;
         render();
         if (typeof options.onNotify === 'function') {
           options.onNotify(isMasked ? '已开启自习室防窥模式' : '已恢复明文显示');
         }
       });
     } else {
+      isMasked = nextMasked;
       render();
     }
   }
@@ -1803,6 +1813,7 @@ function createPrivacyMaskManager(options = {}) {
   function init() {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
       chrome.storage.local.get({ privacyMask: false }, (s) => {
+        if (chrome.runtime && chrome.runtime.lastError) return;
         isMasked = !!(s && s.privacyMask);
         render();
       });
@@ -1876,6 +1887,10 @@ function createAccentPicker(options = {}) {
       if (_accentSelfWriteTimer) clearTimeout(_accentSelfWriteTimer);
       _accentSelfWriteTimer = setTimeout(() => { _accentSelfWriteValue = null; }, 300);
       chrome.storage.local.set({ accentColor: normalized }, () => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          _accentSelfWriteValue = null;
+          return;
+        }
         applyAccent(normalized);
         sync(normalized);
         if (typeof options.onNotify === 'function') {
@@ -1892,7 +1907,7 @@ function createAccentPicker(options = {}) {
     initAccent((cur) => sync(cur));
     if (bar) {
       bar.addEventListener('click', (e) => {
-        const dot = e.target.closest(dotSelector);
+        const dot = e && e.target && typeof e.target.closest === 'function' ? e.target.closest(dotSelector) : null;
         if (dot && dot.dataset.accent) {
           set(dot.dataset.accent);
         }
@@ -1991,8 +2006,10 @@ function createVisibilityPoller(callback, intervalMs = 15000) {
 
 /**
  * 组件 17：无排版抖动的微动效触发器 (PulseAnimation Component)
- * 利用 requestAnimationFrame 重新挂载 CSS 动画，杜绝 offsetWidth 导致的强制重排（Layout Thrashing）。
+ * 利用双 requestAnimationFrame 重新挂载 CSS 动画，杜绝 offsetWidth 导致的强制重排（Layout Thrashing），
+ * 同时避免单帧内 remove + add 被浏览器合并导致动画未重播。
  */
+let _pulseRafId = 0;
 function triggerPulseAnimation(selectorOrElements, className = 'val-pulse') {
   if (typeof document === 'undefined') return;
   const elements = typeof selectorOrElements === 'string'
@@ -2000,10 +2017,17 @@ function triggerPulseAnimation(selectorOrElements, className = 'val-pulse') {
     : selectorOrElements;
   if (!elements || !elements.length) return;
 
+  if (_pulseRafId && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(_pulseRafId);
+    _pulseRafId = 0;
+  }
   elements.forEach((node) => node.classList.remove(className));
   if (typeof requestAnimationFrame !== 'undefined') {
-    requestAnimationFrame(() => {
-      elements.forEach((node) => node.classList.add(className));
+    _pulseRafId = requestAnimationFrame(() => {
+      _pulseRafId = requestAnimationFrame(() => {
+        _pulseRafId = 0;
+        elements.forEach((node) => node.classList.add(className));
+      });
     });
   } else {
     elements.forEach((node) => node.classList.add(className));
@@ -2167,10 +2191,16 @@ function initHoverTooltips() {
           if (m.target === activeTarget) {
             showTip(activeTarget);
           }
-        } else if (m.type === 'childList' && m.addedNodes && m.addedNodes.length) {
-          m.addedNodes.forEach((n) => {
-            if (n && n.nodeType === 1) sweepTitles(n);
-          });
+        } else if (m.type === 'childList') {
+          if (m.addedNodes && m.addedNodes.length) {
+            m.addedNodes.forEach((n) => {
+              if (n && n.nodeType === 1) sweepTitles(n);
+            });
+          }
+          if (activeTarget && m.removedNodes && m.removedNodes.length &&
+              typeof document.contains === 'function' && !document.contains(activeTarget)) {
+            hideTip();
+          }
         }
       }
     });

@@ -4695,6 +4695,214 @@ const fs = require('fs'), vm = require('vm'), assert = require('assert');
         res = subprocess.run(["node", "-e", js], capture_output=True, text=True, encoding="utf-8", timeout=30)
         self.assertEqual(res.returncode, 0, f"UI 无障碍与错误态回归失败:\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}")
 
+    def test_deep_audit_resilience_invariants(self):
+        """深度巡检韧性与渲染回归校验：
+        1. initHoverTooltips 必须在悬停目标节点被 DOM 移除时自动收起浮层（避免浮层残留卡死）；
+        2. shared.css 的 .ui-hover-tip 层级必须高于 modal-overlay (9999) 且低于 toast-container (99999)；
+        3. popup.css 的 .status-glow 去除冗余 filter: blur，options.css 的 .card 具备 -webkit-backdrop-filter；
+        4. common.js 的 triggerPulseAnimation 采用双 rAF + cancelAnimationFrame 重播；
+        5. options.js 的 save / savePartialSetting / reset / import 必须校验 chrome.runtime.lastError，
+           switchOptionsSection 切换分区时收起已展开下拉菜单与日志抽屉；
+        6. background.js 的 doLogout 忙锁超时后必须调用 ensureAlarm 降频。
+        """
+        import subprocess
+        common_path = os.path.join(EXT_DIR, "common.js")
+        bg_path = os.path.join(EXT_DIR, "background.js")
+        options_path = os.path.join(EXT_DIR, "options.js")
+        with open(os.path.join(EXT_DIR, "shared.css"), "r", encoding="utf-8") as f:
+            shared_css = f.read()
+        with open(os.path.join(EXT_DIR, "popup.css"), "r", encoding="utf-8") as f:
+            popup_css = f.read()
+        with open(os.path.join(EXT_DIR, "options.css"), "r", encoding="utf-8") as f:
+            options_css = f.read()
+
+        # 2. Tooltip 层级夹在 modal-overlay (9999) 与 toast-container (99999) 之间
+        z_match = re.search(r"\.ui-hover-tip\s*\{[^}]*z-index\s*:\s*(\d+)", shared_css)
+        self.assertIsNotNone(z_match, "shared.css 缺少 .ui-hover-tip 的 z-index 声明")
+        z_val = int(z_match.group(1))
+        self.assertGreater(z_val, 9999, ".ui-hover-tip z-index 必须高于 .modal-overlay (9999)")
+        self.assertLess(z_val, 99999, ".ui-hover-tip z-index 必须低于 .toast-container (99999)")
+
+        # 3. 去除动画发光层冗余 blur；补齐 .card 的 -webkit-backdrop-filter
+        glow_block = re.search(r"\.status-glow\s*\{([^}]*)\}", popup_css)
+        self.assertIsNotNone(glow_block)
+        self.assertNotIn("filter: blur", glow_block.group(1), ".status-glow 不应叠加昂贵的 filter: blur")
+        card_block = re.search(r"\.card\s*\{([^}]*)\}", options_css)
+        self.assertIsNotNone(card_block)
+        self.assertIn("-webkit-backdrop-filter: blur(16px);", card_block.group(1))
+
+        # 1 + 4 + 5 + 6 运行时验证
+        js = f"""
+const fs = require('fs'), vm = require('vm'), assert = require('assert');
+
+// A. initHoverTooltips: 目标节点从 DOM 移除时 MutationObserver 必须自动 hideTip
+{{
+  const docListeners = {{}};
+  let moCallback = null;
+  class FakeNode {{
+    constructor(tag) {{
+      this.tagName = tag;
+      this.nodeType = 1;
+      this.id = '';
+      this.className = '';
+      this.textContent = '';
+      this.style = {{}};
+      this.children = [];
+      this.attrs = new Map();
+      this._cls = new Set();
+      this.offsetWidth = 100;
+      this.offsetHeight = 24;
+      this.classList = {{
+        add: (...xs) => xs.forEach((c) => this._cls.add(c)),
+        remove: (...xs) => xs.forEach((c) => this._cls.delete(c)),
+        contains: (c) => this._cls.has(c),
+        toggle: (c, f) => (f === undefined ? (this._cls.has(c) ? this._cls.delete(c) : this._cls.add(c)) : (f ? this._cls.add(c) : this._cls.delete(c)))
+      }};
+    }}
+    appendChild(child) {{ this.children.push(child); return child; }}
+    setAttribute(k, v) {{ this.attrs.set(k, String(v)); }}
+    getAttribute(k) {{ return this.attrs.has(k) ? this.attrs.get(k) : null; }}
+    hasAttribute(k) {{ return this.attrs.has(k); }}
+    removeAttribute(k) {{ this.attrs.delete(k); }}
+    querySelector(sel) {{
+      if (sel === '.ui-hover-tip-text') return this.children.find((c) => c.className === 'ui-hover-tip-text') || null;
+      if (sel === '.ui-hover-tip-arrow') return this.children.find((c) => c.className === 'ui-hover-tip-arrow') || null;
+      return null;
+    }}
+    querySelectorAll() {{ return []; }}
+    closest(sel) {{ return (this.hasAttribute('data-tip') || this.hasAttribute('title')) ? this : null; }}
+    getBoundingClientRect() {{ return {{ left: 50, top: 100, right: 120, bottom: 120, width: 70, height: 20 }}; }}
+  }}
+  const body = new FakeNode('BODY');
+  const badge = new FakeNode('SPAN');
+  badge.setAttribute('data-tip', '连续相同状态合并计数');
+  body.appendChild(badge);
+  let attached = true;
+  const ctx = {{
+    console,
+    Node: FakeNode,
+    MutationObserver: class {{
+      constructor(cb) {{ moCallback = cb; }}
+      observe() {{}}
+      disconnect() {{}}
+    }},
+    window: {{ innerWidth: 400, innerHeight: 600, addEventListener() {{}} }},
+    document: {{
+      body,
+      documentElement: {{ clientWidth: 400, clientHeight: 600 }},
+      getElementById: (id) => body.children.find((c) => c.id === id) || null,
+      createElement: (tag) => new FakeNode(tag),
+      querySelectorAll: () => [],
+      contains: (node) => node === badge ? attached : true,
+      addEventListener: (t, fn) => {{ (docListeners[t] = docListeners[t] || []).push(fn); }}
+    }}
+  }};
+  vm.runInNewContext(fs.readFileSync({common_path!r}, 'utf8'), ctx);
+  ctx.initHoverTooltips();
+  (docListeners.mouseover || []).forEach((fn) => fn({{ target: badge }}));
+  const tipEl = body.children.find((c) => c.id === 'uiHoverTip');
+  assert.ok(tipEl && tipEl.classList.contains('show'), '悬停节点时应展示 tooltip');
+  // 模拟节点从 DOM 移除（不派发 mouseout）
+  attached = false;
+  moCallback([{{ type: 'childList', addedNodes: [], removedNodes: [badge] }}]);
+  assert.strictEqual(tipEl.classList.contains('show'), false, '目标节点从 DOM 移除后必须自动隐藏 tooltip');
+  assert.strictEqual(tipEl.getAttribute('aria-hidden'), 'true');
+}}
+
+// B. triggerPulseAnimation 使用双 rAF 并在连续触发时取消前一次未决帧
+{{
+  const queued = [];
+  let cancelled = 0;
+  const cls = new Set(['val-pulse']);
+  const node = {{ classList: {{ remove: (c) => cls.delete(c), add: (c) => cls.add(c) }} }};
+  const ctx = {{
+    console,
+    document: {{ querySelectorAll: () => [node] }},
+    requestAnimationFrame: (fn) => {{ queued.push(fn); return queued.length; }},
+    cancelAnimationFrame: () => {{ cancelled++; }}
+  }};
+  vm.runInNewContext(fs.readFileSync({common_path!r}, 'utf8'), ctx);
+  ctx.triggerPulseAnimation('.dock-value');
+  assert.strictEqual(cls.has('val-pulse'), false, '首帧前应先移除动画类');
+  assert.strictEqual(queued.length, 1);
+  // 连续再次触发应取消前次 rAF
+  ctx.triggerPulseAnimation('.dock-value');
+  assert.strictEqual(cancelled, 1, '连续触发应取消前次未执行 rAF');
+  // 跑完两帧后重新挂上动画类
+  const f1 = queued.pop();
+  f1();
+  assert.strictEqual(cls.has('val-pulse'), false, '仅过第一帧不应过早加回动画类');
+  const f2 = queued.pop();
+  f2();
+  assert.strictEqual(cls.has('val-pulse'), true, '双 rAF 完成后应重新挂上动画类');
+}}
+
+// C. options.js storage.set lastError 保护与切页清理守卫
+{{
+  const src = fs.readFileSync({options_path!r}, 'utf8');
+  assert.ok(src.includes("if (chrome.runtime && chrome.runtime.lastError)"), 'options.js 写入 storage 回调必须检查 lastError');
+  assert.ok(src.includes("showToast('保存配置失败，请重试', 'err')"));
+  assert.ok(src.includes("showToast('保存设置失败，请重试', 'err')"));
+  assert.ok(src.includes("closeAllCustomSelects()"), 'switchOptionsSection 必须收起展开的自定义下拉菜单');
+}}
+
+// D. background.js doLogout 忙锁超时必须调用 ensureAlarm 降频
+{{
+  const bgSrc = fs.readFileSync({bg_path!r}, 'utf8');
+  const listeners = {{}};
+  let alarmCreates = 0;
+  const storage = {{ initialized: true, account: 'u1', password: 'p1', isp: '1', connState: 'offline', adaptive: true, intervalMin: 10 / 60, offlineIntervalMin: 1 / 60 }};
+  const chrome = {{
+    storage: {{ local: {{
+      get: (arg, cb) => {{ const r = {{ ...storage }}; if (cb) cb(r); return Promise.resolve(r); }},
+      set: (p, cb) => {{ Object.assign(storage, p); if (cb) cb(); return Promise.resolve(); }}
+    }} }},
+    runtime: {{
+      onInstalled: {{ addListener() {{}} }},
+      onStartup: {{ addListener() {{}} }},
+      onMessage: {{ addListener: (f) => listeners.message = f }},
+      getManifest: () => ({{ version: '1.0.0' }}),
+      lastError: null
+    }},
+    alarms: {{ onAlarm: {{ addListener() {{}} }}, get: async () => null, create: async () => {{ alarmCreates++; }} }},
+    action: {{ setBadgeText() {{}}, setBadgeBackgroundColor() {{}} }},
+    commands: null,
+    webNavigation: {{ onCommitted: {{ addListener() {{}} }}, onErrorOccurred: {{ addListener() {{}} }} }}
+  }};
+  let fakeNow = 1000000;
+  const FakeDate = new Proxy(Date, {{
+    get(t, k) {{ return k === 'now' ? () => (fakeNow += 1200) : t[k]; }}
+  }});
+  const ctx = {{
+    console: {{ log() {{}}, warn() {{}}, error() {{}} }},
+    chrome,
+    setTimeout: (fn, ms) => setTimeout(fn, ms && ms < 1000 ? 0 : (ms || 0)),
+    clearTimeout,
+    setInterval: () => 0,
+    clearInterval: () => {{}},
+    Date: FakeDate,
+    Math, JSON, Promise, Number, String, Array, Object, RegExp,
+    parseInt, parseFloat, isNaN, Boolean, Set, Map, Error,
+    TextDecoder, TextEncoder, AbortController, Uint8Array, ArrayBuffer, URLSearchParams,
+    fetch: async () => {{ throw new Error('unexpected'); }}
+  }};
+  vm.createContext(ctx);
+  vm.runInContext(bgSrc, ctx);
+  const send = (msg) => new Promise((resolve) => listeners.message(msg, {{}}, resolve));
+  (async () => {{
+    const acq = await send({{ type: 'acquireAuthLock' }});
+    assert.strictEqual(acq.ok, true);
+    const r = await send({{ type: 'logout' }});
+    assert.strictEqual(r.ok, false);
+    assert.strictEqual(storage.manualLogout, true);
+    assert.ok(alarmCreates >= 1, 'doLogout 忙锁超时返回前必须调用 ensureAlarm 降频');
+    await send({{ type: 'releaseAuthLock', token: acq.token }});
+  }})().catch((e) => {{ console.error(e); process.exit(1); }});
+}}
+"""
+        res = subprocess.run(["node", "-e", js], capture_output=True, text=True, encoding="utf-8", timeout=30)
+        self.assertEqual(res.returncode, 0, f"深度巡检韧性回归失败:\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}")
+
 
 if __name__ == "__main__":
     unittest.main()
