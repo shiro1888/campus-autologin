@@ -1,5 +1,4 @@
 @echo off
-chcp 936 >nul
 title Reload Browser Extension
 cd /d "%~dp0"
 
