@@ -755,22 +755,35 @@ async function doLogin(settings) {
  */
 // 注销去重：doLogout() 与 autoLogin 里「登录在途时用户点了注销」的补发路径
 // 可能同时触发注销。若各发一条完整序列，会重复请求门户。
-// 统一由此执行器去重：在途复用同一 Promise；刚完成的结果在 3 秒窗口内复用。
+// 统一由此执行器去重：在途复用同一 Promise；刚完成的结果仅在 3 秒窗口内、
+// 且 authStateEpoch 未变化时复用（登录/注销/重置会让旧结果立即失效）。
 let logoutInFlight = null;
 let doLogoutInFlight = null;
 let lastLogoutResult = null;
 let lastLogoutAt = 0;
+// 注销结果只在「认证状态未变化」的短窗口内可复用。注销/手动登录/设置重置
+// 都会推进 authStateEpoch；若只按时间窗复用，用户注销→3 秒内重新登录→再注销
+// 会拿到上一次的旧结果，界面提示成功但实际没有发出任何注销请求。
+let lastLogoutEpoch = null;
 const LOGOUT_DEDUP_MS = 3000;
+
+/** 是否存在可复用的注销结果（时间窗 + 认证状态纪元都必须匹配） */
+function hasReusableLogoutResult() {
+  return !!lastLogoutResult &&
+    lastLogoutEpoch === authStateEpoch &&
+    Date.now() - lastLogoutAt < LOGOUT_DEDUP_MS;
+}
 
 function runLogoutOnce(opts) {
   if (logoutInFlight) return logoutInFlight;
-  if (lastLogoutResult && Date.now() - lastLogoutAt < LOGOUT_DEDUP_MS) {
+  if (hasReusableLogoutResult()) {
     return Promise.resolve(lastLogoutResult);
   }
   logoutInFlight = _doLogoutInternal(opts).then((res) => {
     if (!res || !res._earlyAbort) {
       lastLogoutResult = res;
       lastLogoutAt = Date.now();
+      lastLogoutEpoch = authStateEpoch;
     }
     return res;
   }).finally(() => {
@@ -813,7 +826,7 @@ async function doLogout() {
       // 竞态下 autoLogin 可能已补发注销（还没等到锁释放）：此时绝不能回滚暂停标志，
       // 否则 UI 说「注销已跳过」、门户实际已注销，下一轮巡检又会把人静默登回。
       if (logoutInFlight) return logoutInFlight;
-      if (lastLogoutResult && Date.now() - lastLogoutAt < LOGOUT_DEDUP_MS) {
+      if (hasReusableLogoutResult()) {
         return lastLogoutResult;
       }
       // 已落盘 manualLogout=true，立即把闹钟降回常规间隔（尤其当占用者是 content 时它不会调用 ensureAlarm）

@@ -4507,7 +4507,8 @@ assert.strictEqual(setAttrCalls, 2);
         1. doLogout 异步抢锁阶段 (logoutClaiming) 必须拒绝 acquireAuthLock，堵住 TOCTOU 竞态；
         2. autoLogin 途中触发注销补发时，不得重复 saveResult 导致时间轴 repeat 计数虚增为 ×2；
         3. doLogout 确认下线后必须同步落盘 connState='offline'；
-        4. status 消息检测到离线时不得返回并残留陈旧 onlineSince。
+        4. status 消息检测到离线时不得返回并残留陈旧 onlineSince；
+        5. 注销结果去重缓存必须随 authStateEpoch 失效：登录后立即再注销不得复用旧结果。
         """
         import subprocess
         bg_path = os.path.join(EXT_DIR, "background.js")
@@ -4627,6 +4628,48 @@ function mkResp(body) {{
     assert.strictEqual(st.online, false);
     assert.strictEqual(st.onlineSince, null, '离线状态下 status 不得返回陈旧 onlineSince');
     assert.strictEqual(env.storage.onlineSince, null, '离线状态下 status 应清理存储中的陈旧 onlineSince');
+  }}
+
+  // 4. 注销结果缓存必须随 authStateEpoch 失效：注销 -> 手动登录 -> 立即再注销，
+  //    不得复用上一次的成功结果，否则界面提示已注销但门户会话仍在。
+  {{
+    let online = true;
+    let logoutFetches = 0;
+    const env = createBgEnv({{ connState: 'online' }}, (url) => {{
+      if (url.includes('/drcom/chkstatus')) {{
+        return mkResp(online ? 'dr1001({{"result":1}})' : 'dr1001({{"result":0}})');
+      }}
+      if (url.includes('/drcom/login')) {{
+        online = true;
+        return mkResp('dr1002({{"result":1}})');
+      }}
+      if (url.includes('/drcom/logout') || url.includes('a=Logout')) {{
+        logoutFetches += 1;
+        online = false;
+        return mkResp('dr1003({{"result":1}})');
+      }}
+      return mkResp('dr1003({{"result":1}})');
+    }});
+
+    const first = await env.send({{ type: 'logout' }});
+    assert.strictEqual(first.ok, true, '首次注销应成功');
+    assert.strictEqual(logoutFetches, 2, '首次注销应发出两条注销请求');
+    assert.strictEqual(env.storage.manualLogout, true);
+
+    // 同一认证纪元、同一 3 秒窗口内的重复调用仍必须复用，不能破坏原有去重。
+    const cached = await env.ctx.runLogoutOnce();
+    assert.strictEqual(cached.ok, true);
+    assert.strictEqual(logoutFetches, 2, '同一认证纪元内应复用注销结果，不得重复请求');
+
+    const login = await env.send({{ type: 'login' }});
+    assert.strictEqual(login.ok, true, '手动登录应成功');
+    assert.strictEqual(login.online, true);
+
+    // 关键：仍在上次注销的 3 秒去重窗口内，但认证状态已变化，必须重新注销。
+    const second = await env.send({{ type: 'logout' }});
+    assert.strictEqual(second.ok, true, '第二次注销应成功');
+    assert.strictEqual(logoutFetches, 4, '登录后再次注销必须重新请求门户，不能复用旧缓存');
+    assert.strictEqual(env.storage.manualLogout, true);
   }}
 }})().catch((e) => {{ console.error(e); process.exit(1); }});
 """
