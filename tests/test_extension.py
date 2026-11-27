@@ -1449,9 +1449,10 @@ console.log(problems.length ? 'COMPONENT_RUNTIME_PROBLEMS:\n' + problems.join('\
 
         extensions = (".js", ".html", ".css", ".json", ".py", ".md", ".txt", ".ps1", ".bat", ".yml", ".yaml")
         files_scanned = []
+        skip_dirs = {".git", "__pycache__", "node_modules"}
         for root, dirs, files in os.walk(PROJECT_DIR):
-            if ".git" in root or "__pycache__" in root or "node_modules" in root:
-                continue
+            # 只跳过精确的目录名，避免 ".git" 子串误伤 .github/workflows。
+            dirs[:] = [d for d in dirs if d not in skip_dirs]
             for file in files:
                 if file.endswith(extensions):
                     files_scanned.append(os.path.join(root, file))
@@ -4148,7 +4149,7 @@ assert.ok(!menu.children.some(c => c.classList && c.classList.contains('focused'
   assert.strictEqual(bgStore.logoutResidualOnline, false, '确认真正离线后才清理 logoutResidualOnline');
 }})().catch(err => {{ console.error(err); process.exit(1); }});
 """
-        res = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=False)
+        res = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=False, timeout=30)
         self.assertEqual(res.returncode, 0, f"Node 行为校验失败:\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}")
 
         # 3. content.js 与 clean_history.ps1 / CSS / options.js 关键不变量断言
@@ -4304,7 +4305,7 @@ fire('keydown', {{ key: 'Escape' }});
 assert.strictEqual(tipEl.classList.contains('show'), false);
 assert.strictEqual(tipEl.getAttribute('aria-hidden'), 'true');
 """
-        res = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=False)
+        res = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=False, timeout=30)
         self.assertEqual(res.returncode, 0, f"统一 tooltip 运行时测试失败:\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}")
 
     def test_motion_microinteractions_and_spring_physics(self):
@@ -4463,7 +4464,7 @@ assert.strictEqual(setAttrCalls, 1, '相同文案重复 setTooltip 不应触发�
 ctx.setTooltip(mockEl, '变更提示');
 assert.strictEqual(setAttrCalls, 2);
 """
-        res = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=False)
+        res = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=False, timeout=30)
         self.assertEqual(res.returncode, 0, f"性能/生命周期运行时校验失败:\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}")
 
     def test_css_brace_balance_and_focus_geometry(self):
@@ -4508,7 +4509,8 @@ assert.strictEqual(setAttrCalls, 2);
         2. autoLogin 途中触发注销补发时，不得重复 saveResult 导致时间轴 repeat 计数虚增为 ×2；
         3. doLogout 确认下线后必须同步落盘 connState='offline'；
         4. status 消息检测到离线时不得返回并残留陈旧 onlineSince；
-        5. 注销结果去重缓存必须随 authStateEpoch 失效：登录后立即再注销不得复用旧结果。
+        5. 注销结果去重缓存必须随 authStateEpoch 失效：登录后立即再注销不得复用旧结果；
+        6. 状态检查期间用户保存新凭据时，不得用旧快照继续发起登录。
         """
         import subprocess
         bg_path = os.path.join(EXT_DIR, "background.js")
@@ -4670,6 +4672,25 @@ function mkResp(body) {{
     assert.strictEqual(second.ok, true, '第二次注销应成功');
     assert.strictEqual(logoutFetches, 4, '登录后再次注销必须重新请求门户，不能复用旧缓存');
     assert.strictEqual(env.storage.manualLogout, true);
+  }}
+
+  // 5. 状态检查期间用户保存了新密码 -> 不得拿旧快照继续登录
+  {{
+    let loginCalls = 0;
+    const env = createBgEnv({{ connState: 'offline' }}, (url) => {{
+      if (url.includes('/drcom/chkstatus')) {{
+        env.storage.password = 'p2';
+        return mkResp('dr1001({{"result":0}})');
+      }}
+      if (url.includes('/drcom/login')) {{
+        loginCalls += 1;
+        return mkResp('dr1002({{"result":1}})');
+      }}
+      return mkResp('dr1003({{"result":1}})');
+    }});
+    const r = await env.ctx.autoLogin('定时', false);
+    assert.strictEqual(r.skipped, true, '配置在检测期间变更时应跳过本轮登录');
+    assert.strictEqual(loginCalls, 0, '不得使用旧密码快照发起登录');
   }}
 }})().catch((e) => {{ console.error(e); process.exit(1); }});
 """

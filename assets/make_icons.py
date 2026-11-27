@@ -12,8 +12,19 @@ OUT_DIR = os.path.join(PROJECT_ROOT, "chrome-extension", "icons")
 def main():
     try:
         from PIL import Image, ImageDraw, ImageOps
+        from PIL import __version__ as PILLOW_VERSION
     except ImportError:
         print("错误: 生成图标需要安装 Pillow (pip install pillow)。")
+        return 1
+
+    # rounded_rectangle 从 Pillow 8.2 才提供；低于该版本会在生成阶段抛
+    # AttributeError，提前给出可读的版本提示，避免误以为图片/路径有问题。
+    try:
+        pillow_ver = tuple(int(x) for x in str(PILLOW_VERSION).split('.')[:2])
+    except (TypeError, ValueError):
+        pillow_ver = (99, 99)
+    if pillow_ver < (8, 2):
+        print(f"错误: 生成图标需要 Pillow >= 8.2.0（当前 {PILLOW_VERSION}）。")
         return 1
 
     # 兼容旧版 Pillow（<9.1.0 无 Image.Resampling）。

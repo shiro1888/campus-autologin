@@ -483,6 +483,16 @@ function updateActionBadge(online, text) {
 
 const MAX_EVENT_LOGS = 15;
 let eventLogs = [];
+// eventLogs / lastResult / pingHistory 的写入必须串行：否则 settingsChanged 或
+// clearLogs 可能在 saveResult 的 set 尚未落盘时读到旧快照，把刚写入/清空的
+// 日志覆盖回去（低概率，只影响诊断时间轴，但会让日志看起来"复活"）。
+let logWriteChain = Promise.resolve();
+
+function enqueueLogWrite(task) {
+  const run = logWriteChain.then(task, task);
+  logWriteChain = run.catch(() => {});
+  return run;
+}
 
 /** 把结果写入 storage（popup / options 直接读这里，并维护去重事件时间轴日志） */
 async function saveResult(result, trigger) {
@@ -491,40 +501,42 @@ async function saveResult(result, trigger) {
   // eventLogs 仍是空数组，直接 set 会把磁盘上的历史日志整段覆盖成 1 条。
   await hydrateState();
   try {
-    stateGen += 1;
-    const safeResult = result && typeof result === 'object'
-      ? Object.assign({}, result, result.message !== undefined ? { message: redactCredentials(result.message) } : {})
-      : result;
-    if (safeResult && safeResult.message) {
-      const entry = {
-        time: safeResult.time || nowText(),
-        message: safeResult.message,
-        ok: !!safeResult.ok,
-        online: !!safeResult.online,
-        pending: !!(safeResult.pending || safeResult.state === 'submitted'),
-        from: String(trigger || safeResult.from || '后台巡检'),
-        count: 1
-      };
-      const head = eventLogs[0];
-      if (head && head.message === entry.message && head.ok === entry.ok && head.online === entry.online && !!head.pending === !!entry.pending) {
-        head.time = entry.time;
-        head.from = entry.from;
-        head.count = (Number(head.count) || 1) + 1;
-      } else {
-        eventLogs.unshift(entry);
-        if (eventLogs.length > MAX_EVENT_LOGS) {
-          eventLogs = eventLogs.slice(0, MAX_EVENT_LOGS);
+    await enqueueLogWrite(async () => {
+      stateGen += 1;
+      const safeResult = result && typeof result === 'object'
+        ? Object.assign({}, result, result.message !== undefined ? { message: redactCredentials(result.message) } : {})
+        : result;
+      if (safeResult && safeResult.message) {
+        const entry = {
+          time: safeResult.time || nowText(),
+          message: safeResult.message,
+          ok: !!safeResult.ok,
+          online: !!safeResult.online,
+          pending: !!(safeResult.pending || safeResult.state === 'submitted'),
+          from: String(trigger || safeResult.from || '后台巡检'),
+          count: 1
+        };
+        const head = eventLogs[0];
+        if (head && head.message === entry.message && head.ok === entry.ok && head.online === entry.online && !!head.pending === !!entry.pending) {
+          head.time = entry.time;
+          head.from = entry.from;
+          head.count = (Number(head.count) || 1) + 1;
+        } else {
+          eventLogs.unshift(entry);
+          if (eventLogs.length > MAX_EVENT_LOGS) {
+            eventLogs = eventLogs.slice(0, MAX_EVENT_LOGS);
+          }
         }
       }
-    }
-    // 心跳历史与结果同批落盘：掉线时 1 秒巡检节奏下，若 recordPingHistory 每次
-    // 单独 setState，会多出约每秒 1 次写盘；合并后不增加额外 I/O。
-    await chrome.storage.local.set({
-      lastResult: safeResult,
-      eventLogs: eventLogs,
-      pingHistory: getPingHistory()
+      // 心跳历史与结果同批落盘：掉线时 1 秒巡检节奏下，若 recordPingHistory 每次
+      // 单独 setState，会多出约每秒 1 次写盘；合并后不增加额外 I/O。
+      await chrome.storage.local.set({
+        lastResult: safeResult,
+        eventLogs: eventLogs,
+        pingHistory: getPingHistory()
+      });
+      updateActionBadge(safeResult && safeResult.online);
     });
-    updateActionBadge(safeResult && safeResult.online);
   } catch (e) {
     // 忽略
   }
@@ -1162,11 +1174,25 @@ async function autoLogin(trigger, manual) {
     }
 
     // 4) 登录（门户可达但未认证 -> 真·掉线，保持快速重连）
-    // 在发起登录前，检查检测期间用户是否发起注销：用户意图优先，主动中止让出
-    if ((await getSettings()).manualLogout) {
+    // 在发起登录前重新读一次设置：
+    //   1. 用户可能在检测期间点了注销 —— 用户意图优先，主动中止让出；
+    //   2. 用户也可能刚保存了新账号/密码/运营商 —— 不能拿本轮开始时捕获的
+    //      旧快照继续认证，否则会再打一次旧密码，甚至把刚清掉的 authError 置回。
+    const latestSettings = await getSettings();
+    if (latestSettings.manualLogout) {
       console.log(tag + '检测到用户已请求注销，主动中止本次自动登录');
       return { ok: true, online: false, skipped: true, paused: true,
                message: '已手动注销，自动登录已取消', time: nowText() };
+    }
+    if (latestSettings.account !== settings.account ||
+        latestSettings.password !== settings.password ||
+        latestSettings.isp !== settings.isp) {
+      const r = ok('登录配置已更新，已取消本次旧凭据认证，等待下一轮巡检', false);
+      r.skipped = true;
+      console.log(tag + '检测到登录配置已变更，取消使用旧凭据认证');
+      await saveResult(r, trigger);
+      await applyCadence();
+      return r;
     }
 
     console.log(tag + '未在线，开始登录：' + maskAccount(settings.account));
@@ -1492,6 +1518,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 内存副本仍是旧值；只重建闹钟不会让退避计数归零，导致恢复默认后仍在退避。
     let genBefore = stateGen;
     hydrateState()
+      // 等待所有已排队的日志写入落盘，避免用旧快照覆盖 saveResult 刚写入的条目。
+      .then(() => logWriteChain)
       .then(() => {
         genBefore = stateGen;
         return getSettings();
@@ -1517,12 +1545,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 若并发的 status / checkStatus 在本条 set 落盘之前触发 hydrateState，
     // 其 !eventLogs.length 条件会把磁盘上的旧日志重新灌回内存，随后又被
     // 下一次 saveResult 写回 —— 清空操作被静默撤销。
+    // 与 saveResult 共用同一条写入队列：清空必须排在所有在途日志写入之后，
+    // 否则刚清空的日志可能被一条尚未落盘的旧结果重新写回。
     hydrateState()
-      .then(() => {
+      .then(() => enqueueLogWrite(async () => {
         stateGen += 1;
         eventLogs = [];
-        return setState({ eventLogs: [] });
-      })
+        await setState({ eventLogs: [] });
+      }))
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }));
     return true;

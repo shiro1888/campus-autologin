@@ -48,6 +48,35 @@ function Invoke-Git {
     return $out
 }
 
+# git-filter-repo 有两种可用形态：PATH 上的可执行文件，或 python 模块。
+# 预检与真正执行必须走同一种形态，否则「预检通过、重写时 git 找不到命令」。
+function Invoke-FilterRepo {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('exe', 'module')]
+        [string]$Mode,
+        [Parameter(Mandatory = $true)]
+        [string[]]$RepoArgs
+    )
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        if ($Mode -eq 'module') {
+            $out = & python -m git_filter_repo @RepoArgs 2>&1
+        } else {
+            $out = & git filter-repo @RepoArgs 2>&1
+        }
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEAP
+    }
+    if ($code -ne 0) {
+        $msg = if ($out) { ($out | Out-String).Trim() } else { "退出码 $code" }
+        throw "git-filter-repo ($Mode) 执行失败 (退出码 $code): $msg"
+    }
+    return $out
+}
+
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Red
 Write-Host "  Campus AutoLogin - Git 历史敏感凭据清洗脚本" -ForegroundColor Yellow
@@ -67,26 +96,21 @@ if ($dirty) {
     exit 1
 }
 
-# 1. 检查 git-filter-repo 工具
-$hasTool = $false
+# 1. 检测 git-filter-repo 工具（可执行文件优先，其次 python 模块）
+#    这里只记录调用形态，不立即退出：错误凭据的前置拦截应先于工具检查执行，
+#    否则 E2E 在「未安装工具」环境会把工具缺失误判成「密码未命中历史」。
+$filterRepoMode = $null
 if (Get-Command "git-filter-repo" -ErrorAction SilentlyContinue) {
-    $hasTool = $true
+    $filterRepoMode = 'exe'
 } else {
     try {
         & python -m git_filter_repo --version *> $null
         if ($LASTEXITCODE -eq 0) {
-            $hasTool = $true
+            $filterRepoMode = 'module'
         }
     } catch {
-        $hasTool = $false
+        $filterRepoMode = $null
     }
-}
-if (-not $hasTool) {
-    Write-Host "  [错误] 未检测到 git-filter-repo 工具。" -ForegroundColor Red
-    Write-Host "  请先在终端运行以下命令安装后重试:" -ForegroundColor Yellow
-    Write-Host "      pip install git-filter-repo" -ForegroundColor White
-    Write-Host ""
-    exit 1
 }
 
 # 2. 运行时获取需要脱敏的凭据（不将任何明文写入脚本自身）
@@ -138,6 +162,17 @@ if (-not [string]::IsNullOrWhiteSpace($Account)) {
     Write-Host "  [OK] 已在 Git 历史中精确定位到旧账号记录。" -ForegroundColor Green
 }
 
+# 凭据前置检查已完成，此时再确认工具可用性：缺工具时尚未改动任何历史，可安全退出。
+if (-not $filterRepoMode) {
+    Write-Host "  [错误] 未检测到可用的 git-filter-repo。" -ForegroundColor Red
+    Write-Host "  请先运行以下命令安装后重试:" -ForegroundColor Yellow
+    Write-Host "      pip install git-filter-repo" -ForegroundColor White
+    Write-Host "  若已安装但命令不可用，请把 Python 的 Scripts 目录加入 PATH，" -ForegroundColor Yellow
+    Write-Host "  或确认 python -m git_filter_repo --version 能正常执行。" -ForegroundColor Yellow
+    Write-Host ""
+    exit 1
+}
+
 # 4.0 记录重写前的 origin 地址：filter-repo 会移除 origin，重写后需原样恢复。
 # 绝不能硬编码仓库地址 —— fork / 换源后强行指向原地址会把本地历史推到错误仓库。
 $originalOriginUrl = $null
@@ -164,7 +199,12 @@ $preRewriteHead = (Invoke-Git @('rev-parse', 'HEAD') -AllowFail)
 if ($preRewriteHead) { $preRewriteHead = ($preRewriteHead | Select-Object -First 1).Trim() }
 
 try {
-    Invoke-Git @('filter-repo', '--replace-text', $rulesFile, '--path', 'config.json', '--invert-paths', '--force')
+    Invoke-FilterRepo -Mode $filterRepoMode -RepoArgs @(
+        '--replace-text', $rulesFile,
+        '--path', 'config.json',
+        '--invert-paths',
+        '--force'
+    )
     Write-Host "  [OK] 历史对象重写完成。" -ForegroundColor Green
 } finally {
     if (Test-Path $rulesFile) { Remove-Item $rulesFile -Force -ErrorAction SilentlyContinue }
