@@ -113,9 +113,15 @@ try {
     $hasFilterRepo = $false
     if (Get-Command "git-filter-repo" -ErrorAction SilentlyContinue) {
         $hasFilterRepo = $true
-    } else {
-        $pyCheck = Start-Process python -ArgumentList "-m git_filter_repo --version" -NoNewWindow -Wait -PassThru -ErrorAction SilentlyContinue
-        if ($pyCheck -and $pyCheck.ExitCode -eq 0) { $hasFilterRepo = $true }
+    } elseif (Get-Command "python" -ErrorAction SilentlyContinue) {
+        # Python 本身也可能是缺失的（此时 Start-Process 会直接抛异常，
+        # 不能只靠 -ErrorAction SilentlyContinue），必须显式 try/catch。
+        try {
+            $pyCheck = Start-Process python -ArgumentList "-m git_filter_repo --version" -NoNewWindow -Wait -PassThru -ErrorAction Stop
+            if ($pyCheck -and $pyCheck.ExitCode -eq 0) { $hasFilterRepo = $true }
+        } catch {
+            $hasFilterRepo = $false
+        }
     }
     if (-not $hasFilterRepo) {
         $skippedTests++
